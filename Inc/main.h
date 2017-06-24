@@ -37,7 +37,7 @@
   */
 /* Define to prevent recursive inclusion -------------------------------------*/
 #ifndef __MAIN_H
-#define __MAIN_H7
+#define __MAIN_H
   /* Includes ------------------------------------------------------------------*/
 
 /* USER CODE BEGIN Includes */
@@ -50,7 +50,6 @@
 /* Private define ------------------------------------------------------------*/
 
 /* USER CODE BEGIN Private defines */
-extern volatile uint16_t data[2];
 extern volatile bool is_RX;
 /* USER CODE END Private defines */
 

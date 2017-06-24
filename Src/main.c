@@ -118,12 +118,12 @@ int main(void)
         USART1->CR1 |= USART_CR1_TE;
         USART1->ISR |= USART_ISR_TXE;
      
-        USART1->TDR = data[0];
+        USART1->TDR = rx_buf_pop();
         
         while(!(USART1->ISR & USART_ISR_TC));
         
         USART1->ISR |= USART_ISR_TXE;
-        USART1->TDR = data[1];
+        USART1->TDR = rx_buf_pop();
         
         while(!(USART1->ISR & USART_ISR_TC));
         

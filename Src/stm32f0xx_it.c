@@ -36,8 +36,6 @@
 #include "stm32f0xx_it.h"
 
 /* USER CODE BEGIN 0 */
-volatile uint16_t data[2];
-volatile uint8_t count = 0;
 volatile bool is_RX = false;
 /* USER CODE END 0 */
 
@@ -136,14 +134,11 @@ void USART1_IRQHandler(void)
     if(status & USART_ISR_RXNE)
     {
         uint16_t byte = USART1->RDR;
+
+        rx_buf_push(byte);
         
-        data[count++] = byte&0xFF;
-        
-        if(count == 2)
-        {
+        if(rx_buf_size() == 2)
             is_RX = true;
-            count = 0;
-        }
         
         USART1->RQR |= USART_RQR_RXFRQ;
     }

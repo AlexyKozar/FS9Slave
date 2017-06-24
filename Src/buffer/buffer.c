@@ -1,141 +1,65 @@
 #include "buffer.h"
-//-----------------------------
-struct ring_buffer_t buffer_rx = { 0, 0, 0, 0 };
-struct ring_buffer_t buffer_tx = { 0, 0, 0, 0 };
-//-----------------------------------
-bool buf_push(uint8_t byte, bool dir)
+//---------------------------------
+uint8_t rx_buffer[MAX_BUF_SIZE_RX]; // buffer rx
+uint8_t rx_count = 0; // the byte counter
+uint8_t rx_head =  0; // the head buffer
+uint8_t rx_tail =  0; // the tail buffer
+//----------------------------
+bool rx_buf_push(uint8_t byte)
 {
-    struct ring_buffer_t* buffer;
-    
-    if(dir)
-        buffer = &buffer_rx;
-    else
-        buffer = &buffer_tx;
-    
-    if(buffer->count != MAX_BUF_SIZE)
+    if(rx_count != MAX_BUF_SIZE_RX)
     {
-        buffer->buffer[buffer->tail++] = byte;
+        rx_buffer[rx_tail++] = byte;
         
-        if(buffer->tail == MAX_BUF_SIZE)
-            buffer->tail = 0;
+        if(rx_tail == MAX_BUF_SIZE_RX)
+            rx_tail = 0;
         
-        buffer->count++;
+        rx_count++;
     }
     else
         return false;
     
     return true;
 }
+//----------------------
+uint8_t rx_buf_pop(void)
+{
+    uint8_t byte = 0;
+    
+    if(rx_count > 0)
+    {
+        byte = rx_buffer[rx_head++];
+        
+        if(rx_head == MAX_BUF_SIZE_RX)
+            rx_head = 0;
+        
+        rx_count--;
+    }
+    
+    return byte;
+}
 //-----------------------
-uint8_t buf_pop(bool dir)
+uint8_t rx_buf_size(void)
 {
-    struct ring_buffer_t* buffer;
-    uint8_t byte = 0xFF;
-    
-    if(dir)
-        buffer = &buffer_rx;
-    else
-        buffer = &buffer_tx;
-    
-    if(buffer->count > 0)
-    {
-        byte = buffer->buffer[buffer->head++];
-        
-        if(buffer->head == MAX_BUF_SIZE)
-            buffer->head = 0;
-        
-        buffer->count--;
-    }
-    
-    return byte;
-}
-//----------------------------
-uint8_t buf_end_byte(bool dir)
-{
-    struct ring_buffer_t* buffer;
-    uint8_t byte = 0xFF;
-    
-    if(dir)
-        buffer = &buffer_rx;
-    else
-        buffer = &buffer_tx;
-    
-    if(buffer->count > 0)
-    {
-        byte = buffer->buffer[buffer->tail - 1];
-    }
-    
-    return byte;
-}
-//------------------------------
-uint8_t buf_front_byte(bool dir)
-{
-    struct ring_buffer_t* buffer;
-    uint8_t byte = 0xFF;
-    
-    if(dir)
-        buffer = &buffer_rx;
-    else
-        buffer = &buffer_tx;
-    
-    if(buffer->count > 0)
-    {
-        byte = buffer->buffer[buffer->head];
-    }
-    
-    return byte;
-}
-//-------------------------
-bool buf_is_empty(bool dir)
-{
-    struct ring_buffer_t* buffer;
-    
-    if(dir)
-        buffer = &buffer_rx;
-    else
-        buffer = &buffer_tx;
-    
-    if(buffer->count == 0)
-        return true;
-    
-    return false;
+    return rx_count;
 }
 //------------------------
-bool buf_is_full(bool dir)
+uint8_t rx_buf_front(void)
 {
-    struct ring_buffer_t* buffer;
+    uint8_t byte = 0;
     
-    if(dir)
-        buffer = &buffer_rx;
-    else
-        buffer = &buffer_tx;
+    if(rx_count > 0)
+        byte = rx_buffer[rx_head];
     
-    if(buffer->count == MAX_BUF_SIZE)
-        return true;
-    
-    return false;
+    return byte;
 }
 //----------------------
-void buf_clear(bool dir)
+uint8_t rx_buf_end(void)
 {
-    struct ring_buffer_t* buffer;
+    uint8_t byte = 0;
     
-    if(dir)
-        buffer = &buffer_rx;
-    else
-        buffer = &buffer_tx;
+    if(rx_count > 0)
+        byte = rx_buffer[rx_tail - 1];
     
-    buffer->head = buffer->tail = buffer->count = 0;
-}
-//------------------------
-uint8_t buf_size(bool dir)
-{
-    struct ring_buffer_t* buffer;
-    
-    if(dir)
-        buffer = &buffer_rx;
-    else
-        buffer = &buffer_tx;
-    
-    return buffer->count;
+    return byte;
 }
