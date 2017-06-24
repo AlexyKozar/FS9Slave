@@ -135,7 +135,8 @@ void USART1_IRQHandler(void)
     {
         uint16_t byte = USART1->RDR;
 
-        rx_buf_push(byte);
+        if(!rx_buf_is_full())
+            rx_buf_push(byte);
         
         if(rx_buf_size() == 2)
             is_RX = true;
@@ -145,7 +146,15 @@ void USART1_IRQHandler(void)
     
     if(status & USART_ISR_TXE)
     {
-        
+       if(!tx_buf_is_empty())
+        {
+            USART1->TDR = tx_buf_pop();
+        }
+        else
+        {
+            USART1->CR1 &= ~(USART_CR1_TE | USART_CR1_TXEIE);
+            USART1->ISR &= ~USART_ISR_TXE;
+        }
     }
     
     if(status & USART_ISR_ORE)

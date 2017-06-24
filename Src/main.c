@@ -115,17 +115,20 @@ int main(void)
   /* USER CODE BEGIN 3 */
     if(is_RX)
     {
-        USART1->CR1 |= USART_CR1_TE;
+        if(!rx_buf_is_empty())
+        {
+            volatile uint8_t count = rx_buf_size();
+            volatile uint8_t byte;
+            
+            for(uint8_t i = 0; i < count; i++)
+            {
+                byte = rx_buf_pop();
+                tx_buf_push(byte);
+            }
+        }
+        
+        USART1->CR1 |= USART_CR1_TE | USART_CR1_TXEIE;
         USART1->ISR |= USART_ISR_TXE;
-     
-        USART1->TDR = rx_buf_pop();
-        
-        while(!(USART1->ISR & USART_ISR_TC));
-        
-        USART1->ISR |= USART_ISR_TXE;
-        USART1->TDR = rx_buf_pop();
-        
-        while(!(USART1->ISR & USART_ISR_TC));
         
         is_RX = false;
     }
