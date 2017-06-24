@@ -15,4 +15,9 @@
         @return address a device (default value 0xFF)
      */
     uint8_t dev_get_addr(void);
+    /** @brief This function for get a cmd size packet
+        @param cmd id
+        @return a size packet
+     */
+    uint8_t dev_get_size_packet(uint8_t cmd);
 #endif

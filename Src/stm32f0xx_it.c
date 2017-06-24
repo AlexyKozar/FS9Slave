@@ -37,6 +37,8 @@
 
 /* USER CODE BEGIN 0 */
 volatile bool is_packet = false;
+volatile uint8_t size_packet = 0;
+volatile bool is_data = false;
 /* USER CODE END 0 */
 
 /* External variables --------------------------------------------------------*/
@@ -133,13 +135,37 @@ void USART1_IRQHandler(void)
     
     if(status & USART_ISR_RXNE)
     {
-        uint16_t byte = USART1->RDR;
+        uint16_t byte9bit = USART1->RDR;
 
-        if(!rx_buf_is_full())
-            rx_buf_push(byte);
-        
-        if(rx_buf_size() == 2)
-            is_packet = true;
+        if(byte9bit & 0x0100)
+        {
+            uint8_t byte = (uint8_t)(byte9bit & 0xFF);
+            uint8_t addr = (byte & 0xC0) >> 6; // get a device address
+            
+            if(addr == dev_get_addr())
+            {
+                uint8_t cmd = byte & 0x3F; // get a command
+                
+                size_packet = dev_get_size_packet(cmd); // get a size packet
+                
+                if(size_packet > 0) // cmd is valid
+                {
+                    is_data = true; // a begin packet is find
+                    rx_buf_push(byte); // first byte a packet
+                }
+            }
+        }
+        else if(is_data)
+        {
+            rx_buf_push((uint8_t)(byte9bit & 0xFF));
+            
+            if(rx_buf_size() == size_packet)
+            {
+                is_packet   = true;
+                is_data     = false;
+                size_packet = 0;
+            }
+        }
         
         USART1->RQR |= USART_RQR_RXFRQ;
     }
