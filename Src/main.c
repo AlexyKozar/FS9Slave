@@ -93,19 +93,13 @@ int main(void)
   MX_USART1_UART_Init();
 
   /* USER CODE BEGIN 2 */
-    //USART1->CR1 |= USART_CR1_TE;
     USART1->CR1 |= USART_CR1_RE | USART_CR1_RXNEIE;
     
-    RCC->APB1ENR |= RCC_APB1ENR_TIM14EN;
+    // get a device address
+    uint8_t addr = (uint8_t)((GPIOC->IDR & 0xC000) >> 14);
+    // set a device address
+    dev_set_addr(addr);
     
-    TIM14->PSC = 48000 - 1;
-    TIM14->ARR = 1000 - 1;
-    TIM14->DIER |= TIM_DIER_UIE;
-    TIM14->CR1  |= TIM_CR1_CEN;
-    
-    //NVIC_EnableIRQ(TIM14_IRQn);
-  /* USER CODE END 2 */
-
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
@@ -113,7 +107,7 @@ int main(void)
   /* USER CODE END WHILE */
 
   /* USER CODE BEGIN 3 */
-    if(is_RX)
+    if(is_packet)
     {
         if(!rx_buf_is_empty())
         {
@@ -130,7 +124,7 @@ int main(void)
         USART1->CR1 |= USART_CR1_TE | USART_CR1_TXEIE;
         USART1->ISR |= USART_ISR_TXE;
         
-        is_RX = false;
+        is_packet = false;
     }
   }
   /* USER CODE END 3 */

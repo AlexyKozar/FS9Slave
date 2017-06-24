@@ -36,7 +36,7 @@
 #include "stm32f0xx_it.h"
 
 /* USER CODE BEGIN 0 */
-volatile bool is_RX = false;
+volatile bool is_packet = false;
 /* USER CODE END 0 */
 
 /* External variables --------------------------------------------------------*/
@@ -139,7 +139,7 @@ void USART1_IRQHandler(void)
             rx_buf_push(byte);
         
         if(rx_buf_size() == 2)
-            is_RX = true;
+            is_packet = true;
         
         USART1->RQR |= USART_RQR_RXFRQ;
     }

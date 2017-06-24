@@ -43,14 +43,14 @@
 /* USER CODE BEGIN Includes */
 #include <stdint.h>
 #include <stdbool.h>
-#include "../src/cmd/cmdlist.h"
 #include "../src/buffer/buffer.h"
+#include "../src/device/device.h"
 /* USER CODE END Includes */
 
 /* Private define ------------------------------------------------------------*/
 
 /* USER CODE BEGIN Private defines */
-extern volatile bool is_RX;
+extern volatile bool is_packet;
 /* USER CODE END Private defines */
 
 void _Error_Handler(char *, int);

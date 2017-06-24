@@ -22,7 +22,7 @@
     #define SET_LEVEL_LOW_DSOut_Ch3  (uint8_t)0x09 // the command set on discret out low value chanel 3
     #define SET_LEVEL_LOW_DSOut_Ch4  (uint8_t)0x0A // the command set on discret out low value chanel 4
     #define SET_LEVEL_LOW_DSOut_Ch5  (uint8_t)0x0B // the command set on discret out low value chanel 5
-    #define SET_LEVEL_LOW_DSOut_Ch6  (uint8_t)0x0С // the command set on discret out low value chanel 6
+    #define SET_LEVEL_LOW_DSOut_Ch6  (uint8_t)0x0C // the command set on discret out low value chanel 6
     #define SET_LEVEL_LOW_DSOut_Ch7  (uint8_t)0x0D // the command set on discret out low value chanel 7
     #define SET_LEVEL_HIGH_DSOut_Ch0 (uint8_t)0x0E // the command set on discret out high value chanel 0
     #define SET_LEVEL_HIGH_DSOut_Ch1 (uint8_t)0x0F // the command set on discret out high value chanel 1
