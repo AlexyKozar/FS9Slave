@@ -51,6 +51,7 @@
 
 /* USER CODE BEGIN Private defines */
 extern volatile bool is_packet;
+extern volatile uint16_t GPIO_INT;
 /* USER CODE END Private defines */
 
 void _Error_Handler(char *, int);

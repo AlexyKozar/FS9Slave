@@ -95,6 +95,24 @@ int main(void)
   /* USER CODE BEGIN 2 */
     USART1->CR1 |= USART_CR1_RE | USART_CR1_RXNEIE;
     
+    RCC->APB1ENR |= RCC_APB1ENR_TIM14EN;
+    RCC->APB2ENR |= RCC_APB2ENR_TIM16EN;
+    
+    HAL_GPIO_WritePin(GPIOB, GPIO_INT, GPIO_PIN_SET); // set high level on INT pin
+    
+    TIM14->PSC   = 48000 - 1; // each 1ms
+    TIM14->ARR   = 100 - 1; // reload 100ms
+    TIM14->CR1  |= TIM_CR1_ARPE;
+    TIM14->DIER |= TIM_DIER_UIE;
+    TIM14->CR1  |= TIM_CR1_CEN;
+    
+    TIM16->PSC   = 480 - 1; // each 100us
+    TIM16->ARR   = 10 - 1; // reload 1ms
+    TIM16->DIER |= TIM_DIER_UIE;
+    
+    NVIC_EnableIRQ(TIM14_IRQn);
+    NVIC_EnableIRQ(TIM16_IRQn);
+    
     // get a device address
     uint8_t addr = (uint8_t)((GPIOC->IDR & 0xC000) >> 14);
     // set a device address
@@ -267,19 +285,17 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
-
+    
+    GPIO_InitTypeDef GPIO_InitINT;
+    
+    GPIO_InitINT.Pin = GPIO_INT;
+    GPIO_InitINT.Mode = GPIO_MODE_OUTPUT_PP;
+    GPIO_InitINT.Pull = GPIO_NOPULL;
+    HAL_GPIO_Init(GPIOB, &GPIO_InitINT);
 }
 
 /* USER CODE BEGIN 4 */
-void TIM14_IRQHandler(void)
-{
-    TIM14->SR &= ~TIM_SR_UIF;
-    
-    USART1->ISR |= USART_ISR_TXE;
-    USART1->TDR  = 0x30;
-    
-    while(!(USART1->ISR & USART_ISR_TC));
-}
+
 /* USER CODE END 4 */
 
 /**

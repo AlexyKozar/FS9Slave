@@ -39,6 +39,7 @@
 volatile bool is_packet = false;
 volatile uint8_t size_packet = 0;
 volatile bool is_data = false;
+volatile uint16_t GPIO_INT = GPIO_PIN_5; // for send change signal to master
 /* USER CODE END 0 */
 
 /* External variables --------------------------------------------------------*/
@@ -195,6 +196,20 @@ void USART1_IRQHandler(void)
 }
 
 /* USER CODE BEGIN 1 */
+void TIM14_IRQHandler(void)
+{
+    HAL_GPIO_WritePin(GPIOB, GPIO_INT, GPIO_PIN_RESET);
 
+    TIM16->CR1 |= TIM_CR1_CEN;
+    
+    TIM14->SR &= ~TIM_SR_UIF;
+}
+
+void TIM16_IRQHandler(void)
+{
+    HAL_GPIO_WritePin(GPIOB, GPIO_INT, GPIO_PIN_SET);
+    
+    TIM16->SR &= ~TIM_SR_UIF;
+}
 /* USER CODE END 1 */
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/
