@@ -100,6 +100,35 @@ int main(void)
     // set a device address
     dev_set_addr(addr);
     
+    uint16_t output[8]; // output chanels
+    uint8_t  output_count = 0; 
+    
+    if(addr == 0x00) // device-01
+    {
+        output[0] = GPIO_PIN_10; // chanel 1
+        output[1] = GPIO_PIN_15; // chanel 2
+        output[2] = GPIO_PIN_14; // chanel 3
+        output[3] = GPIO_PIN_13; // chanel 4
+        output[4] = GPIO_PIN_12; // chanel 5
+        output[5] = GPIO_PIN_11; // chanel 6
+        
+        output_count = 6;
+    }
+    else if(addr == 0x01) // device-02
+    {
+        output[0] = GPIO_PIN_11; // chanel 1
+        output[1] = GPIO_PIN_12; // chanel 2
+        output[2] = GPIO_PIN_13; // chanel 3
+        output[3] = GPIO_PIN_14; // chanel 4
+        output[4] = GPIO_PIN_15; // chanel 5
+        output[5] = GPIO_PIN_10; // chanel 6
+        output[6] = GPIO_PIN_2; // chanel 7
+        
+        output_count = 7;
+    }
+    
+    dev_set_output(output, output_count);
+    
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
@@ -111,18 +140,27 @@ int main(void)
     {
         if(!rx_buf_is_empty())
         {
-            volatile uint8_t count = rx_buf_size();
-            volatile uint8_t byte;
+            uint8_t size = rx_buf_size();
+            struct packet_t packet = { {0}, size };
             
-            for(uint8_t i = 0; i < count; i++)
+            for(uint8_t i = 0; i < size; i++)
             {
-                byte = rx_buf_pop();
-                tx_buf_push(byte);
+                packet.array[i] = rx_buf_pop();
+            }
+            
+            dev_get_packet(&packet);
+            
+            if(packet.size != 0)
+            {
+                for(uint8_t i = 0; i < packet.size; i++)
+                {
+                    tx_buf_push(packet.array[i]);
+                }
+                
+                USART1->CR1 |= USART_CR1_TE | USART_CR1_TXEIE;
+                USART1->ISR |= USART_ISR_TXE;
             }
         }
-        
-        USART1->CR1 |= USART_CR1_TE | USART_CR1_TXEIE;
-        USART1->ISR |= USART_ISR_TXE;
         
         is_packet = false;
     }
