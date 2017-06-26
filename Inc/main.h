@@ -52,6 +52,9 @@
 /* USER CODE BEGIN Private defines */
 extern volatile bool is_packet;
 extern volatile uint16_t GPIO_INT;
+extern volatile uint32_t T_adc;
+extern volatile uint8_t  T_adc_count;
+extern volatile bool     adc_is_ready;
 /* USER CODE END Private defines */
 
 void _Error_Handler(char *, int);

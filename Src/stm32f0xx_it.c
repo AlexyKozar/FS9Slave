@@ -40,6 +40,9 @@ volatile bool is_packet = false;
 volatile uint8_t size_packet = 0;
 volatile bool is_data = false;
 volatile uint16_t GPIO_INT = GPIO_PIN_5; // for send change signal to master
+volatile uint32_t T_adc = 0;
+volatile uint8_t  T_adc_count = 0;
+volatile bool     adc_is_ready = false;
 /* USER CODE END 0 */
 
 /* External variables --------------------------------------------------------*/
@@ -210,6 +213,21 @@ void TIM16_IRQHandler(void)
     HAL_GPIO_WritePin(GPIOB, GPIO_INT, GPIO_PIN_SET);
     
     TIM16->SR &= ~TIM_SR_UIF;
+}
+
+void ADC1_IRQHandler(void)
+{
+    if((ADC1->ISR & ADC_ISR_EOC) == ADC_ISR_EOC)
+    {   
+        T_adc += ADC1->DR;
+        
+        T_adc_count++;
+        
+        if(T_adc_count >= 10)
+            adc_is_ready = true;
+        
+        ADC1->ISR |= ADC_ISR_EOC;
+    }
 }
 /* USER CODE END 1 */
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

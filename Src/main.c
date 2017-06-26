@@ -48,7 +48,8 @@ UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
 /* Private variables ---------------------------------------------------------*/
-
+/* Temperature sensor calibration value address */
+    #define TEMP30_CAL_ADDR ((uint16_t*) ((uint32_t) 0x1FFFF7B8))
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -58,11 +59,12 @@ static void MX_USART1_UART_Init(void);
 
 /* USER CODE BEGIN PFP */
 /* Private function prototypes -----------------------------------------------*/
-
+void init_adc(void);
+int32_t cpu_temperature(uint16_t t_adc);
 /* USER CODE END PFP */
 
 /* USER CODE BEGIN 0 */
-
+int32_t temp = 0;
 /* USER CODE END 0 */
 
 int main(void)
@@ -93,7 +95,11 @@ int main(void)
   MX_USART1_UART_Init();
 
   /* USER CODE BEGIN 2 */
+    init_adc();
+    
     USART1->CR1 |= USART_CR1_RE | USART_CR1_RXNEIE;
+    
+    ADC1->CR |= ADC_CR_ADSTART; // adc start conversion
     
     RCC->APB1ENR |= RCC_APB1ENR_TIM14EN;
     RCC->APB2ENR |= RCC_APB2ENR_TIM16EN;
@@ -146,7 +152,6 @@ int main(void)
     }
     
     dev_set_output(output, output_count);
-    
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
@@ -181,6 +186,16 @@ int main(void)
         }
         
         is_packet = false;
+    }
+    
+    if(adc_is_ready)
+    {
+        // data temperature is ready
+        temp = cpu_temperature(T_adc/10);
+        
+        T_adc = 0;
+        T_adc_count = 0;
+        adc_is_ready = false;
     }
   }
   /* USER CODE END 3 */
@@ -295,7 +310,40 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+void init_adc(void)
+{
+    RCC->APB2ENR |= RCC_APB2ENR_ADC1EN | RCC_APB2ENR_ADCEN;
+    
+    ADC1->CR &= ~ADC_CR_ADEN; // disable adc for calibration
+    ADC1->CR |= ADC_CR_ADCAL; // start calibration adc
+    
+    while((ADC1->CR & ADC_CR_ADCAL) == ADC_CR_ADCAL); // wait end calibration adc
+    
+    ADC1->CFGR1 &= ~ADC_CFGR1_RES; // resolution 12 bit
+    ADC1->CFGR1 &= ~ADC_CFGR1_ALIGN; // right-aligned
+    //ADC1->ISR   |= ADC_ISR_ADRDY;
+    ADC1->CR    |= ADC_CR_ADEN; // adc enable
+    
+    while((ADC1->ISR & ADC_ISR_ADRDY) != ADC_ISR_ADRDY); // wait ready adc
+    
+    ADC1->CHSELR |= ADC_CHSELR_CHSEL16/* | ADC_CHSELR_CHSEL17*/; // selection temperature sensor channel
+    ADC1->SMPR   |= ADC_SMPR_SMP_0 | ADC_SMPR_SMP_1 | ADC_SMPR_SMP_2; // set sampling time 239.5 ADC clock cycles
+    ADC1->CFGR1  |= ADC_CFGR1_CONT; // continuous conversion mode
+    ADC1->IER    |= ADC_IER_EOCIE; // generate interrupt EOC
+    ADC->CCR     |= ADC_CCR_TSEN; // enable temperature sensor
+    //ADC->CCR     |= ADC_CCR_VREFEN;
+    
+    NVIC_EnableIRQ(ADC1_IRQn);
+}
 
+int32_t cpu_temperature(uint16_t t_adc)
+{
+    int32_t temperature = 0;
+    
+    temperature = (*TEMP30_CAL_ADDR - t_adc)/5 + 30;
+    
+    return temperature;
+}
 /* USER CODE END 4 */
 
 /**
