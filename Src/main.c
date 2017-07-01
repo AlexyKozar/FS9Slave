@@ -122,7 +122,6 @@ int main(void)
     // get a device address
     uint8_t addr = (uint8_t)((GPIOC->IDR & 0xC000) >> 14);
     // set a device address
-    dev_set_addr(addr);
     
     uint16_t output[8]; // output chanels
     uint8_t  output_count = 0; 
@@ -151,7 +150,6 @@ int main(void)
         output_count = 7;
     }
     
-    dev_set_output(output, output_count);
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
@@ -159,33 +157,14 @@ int main(void)
   /* USER CODE END WHILE */
 
   /* USER CODE BEGIN 3 */
-    if(is_packet)
+      
+    if(FS9_Data_Ready)
     {
-        if(!rx_buf_is_empty())
-        {
-            uint8_t size = rx_buf_size();
-            struct packet_t packet = { {0}, size };
-            
-            for(uint8_t i = 0; i < size; i++)
-            {
-                packet.array[i] = rx_buf_pop();
-            }
-            
-            dev_get_packet(&packet);
-            
-            if(packet.size != 0)
-            {
-                for(uint8_t i = 0; i < packet.size; i++)
-                {
-                    tx_buf_push(packet.array[i]);
-                }
-                
-                USART1->CR1 |= USART_CR1_TE | USART_CR1_TXEIE;
-                USART1->ISR |= USART_ISR_TXE;
-            }
-        }
+        uint8_t buf[20];
         
-        is_packet = false;
+        uint8_t count = FS9_read(buf);
+        
+        FS9_write(buf, count);
     }
     
     if((DMA1->ISR & DMA_ISR_TCIF1) == DMA_ISR_TCIF1)
