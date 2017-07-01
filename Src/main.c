@@ -188,6 +188,15 @@ int main(void)
         is_packet = false;
     }
     
+    if((DMA1->ISR & DMA_ISR_TCIF1) == DMA_ISR_TCIF1)
+    {
+        AIN1 = AIN_channels[0];
+        AIN2 = AIN_channels[1];
+        AIN_TEMP = AIN_channels[2];
+        
+        DMA1->IFCR |=DMA_IFCR_CTCIF1;
+    }
+    
     if(adc_is_ready)
     {
         // data temperature is ready
