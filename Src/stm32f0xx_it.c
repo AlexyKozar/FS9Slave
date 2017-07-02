@@ -36,21 +36,7 @@
 #include "stm32f0xx_it.h"
 
 /* USER CODE BEGIN 0 */
-volatile bool is_packet = false;
-volatile uint8_t size_packet = 0;
-volatile bool is_data = false;
 volatile uint16_t GPIO_INT = GPIO_PIN_5; // for send change signal to master
-volatile uint32_t T_adc = 0;
-volatile uint8_t  T_adc_count = 0;
-volatile bool     adc_is_ready = false;
-
-volatile uint16_t AIN_channels[3] = { 0, 0, 0 };
-volatile uint16_t AIN_TEMP = 0;
-volatile uint16_t AIN1 = 0;
-volatile uint16_t AIN2 = 0;
-
-volatile uint8_t AIN_ch_cur = 0;
-volatile uint8_t AIN_CON_count = 0;
 /* USER CODE END 0 */
 
 /* External variables --------------------------------------------------------*/
@@ -137,12 +123,8 @@ void SysTick_Handler(void)
 /* please refer to the startup file (startup_stm32f0xx.s).                    */
 /******************************************************************************/
 
-/**
-* @brief This function handles USART1 global interrupt.
-*/
-void USART1_IRQHandler(void)
+/*void USART1_IRQHandler(void)
 {
-    /* USER CODE BEGIN USART1_IRQn 0 */
     uint32_t status = USART1->ISR;
     
     if(status & USART_ISR_RXNE)
@@ -199,12 +181,7 @@ void USART1_IRQHandler(void)
     {
         USART1->ICR |= USART_ICR_ORECF;
     }
-    /* USER CODE END USART1_IRQn 0 */
-
-    /* USER CODE BEGIN USART1_IRQn 1 */
-
-    /* USER CODE END USART1_IRQn 1 */
-}
+}*/
 
 /* USER CODE BEGIN 1 */
 void TIM14_IRQHandler(void)
@@ -221,35 +198,6 @@ void TIM16_IRQHandler(void)
     HAL_GPIO_WritePin(GPIOB, GPIO_INT, GPIO_PIN_SET);
     
     TIM16->SR &= ~TIM_SR_UIF;
-}
-
-void ADC1_IRQHandler(void)
-{
-    if((ADC1->ISR & ADC_ISR_EOC) == ADC_ISR_EOC)
-    {   
-        /*T_adc += ADC1->DR;
-        
-        T_adc_count++;
-        
-        if(T_adc_count >= 10)
-            adc_is_ready = true;*/
-
-        AIN_channels[AIN_ch_cur++] = ADC1->DR;
-        
-        if(AIN_ch_cur == 3)
-            AIN_ch_cur = 0;
-        
-        AIN_CON_count++;
-        
-        if(AIN_CON_count == 10)
-        {
-            AIN_ch_cur = 0;
-            AIN_CON_count = 0;
-            adc_is_ready = true;
-        }
-        
-        ADC1->ISR |= ADC_ISR_EOC;
-    }
 }
 /* USER CODE END 1 */
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

@@ -47,7 +47,6 @@
     {
         uint8_t n; // the count bytes in command
         uint8_t m; // the count bytes in response
-        uint8_t type; // the type command
         bool    is_ack; // need ack
     };
     //-----------------------------------

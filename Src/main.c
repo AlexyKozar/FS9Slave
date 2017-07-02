@@ -59,12 +59,11 @@ static void MX_USART1_UART_Init(void);
 
 /* USER CODE BEGIN PFP */
 /* Private function prototypes -----------------------------------------------*/
-void init_adc(void);
 int32_t cpu_temperature(uint16_t t_adc);
 /* USER CODE END PFP */
 
 /* USER CODE BEGIN 0 */
-int32_t temp = 0;
+
 /* USER CODE END 0 */
 
 int main(void)
@@ -80,7 +79,7 @@ int main(void)
   HAL_Init();
 
   /* USER CODE BEGIN Init */
-
+    AIN_Init();
   /* USER CODE END Init */
 
   /* Configure the system clock */
@@ -95,8 +94,6 @@ int main(void)
   MX_USART1_UART_Init();
 
   /* USER CODE BEGIN 2 */
-    init_adc();
-    
     USART1->CR1 |= USART_CR1_RE | USART_CR1_RXNEIE;
     
     ADC1->CR |= ADC_CR_ADSTART; // adc start conversion
@@ -118,40 +115,61 @@ int main(void)
     
     NVIC_EnableIRQ(TIM14_IRQn);
     NVIC_EnableIRQ(TIM16_IRQn);
+  
+    // Create device
+    DEV_Create(GPIOB, GPIO_PIN_14 | GPIO_PIN_15);
+    // Get address device
+    uint8_t addr = DEV_Address();
     
-    // get a device address
-    uint8_t addr = (uint8_t)((GPIOC->IDR & 0xC000) >> 14);
-    // set a device address
-    dev_set_addr(addr);
+    // Declaration struct inputs and outputs
+    struct IO_Type in; // the input channels
+    struct IO_Type out; // the output channels
     
-    uint16_t output[8]; // output chanels
-    uint8_t  output_count = 0; 
+    in.gpio  = GPIOA;
+    out.gpio = GPIOB;
     
+    in.io[0] = GPIO_PIN_0; // input channel 1
+    in.io[1] = GPIO_PIN_1; // input channel 2
+    in.io[2] = GPIO_PIN_2; // input channel 3
+    in.io[3] = GPIO_PIN_3; // input channel 4
+    in.io[4] = GPIO_PIN_4; // input channel 5
+    in.io[5] = GPIO_PIN_5; // input channel 6
+    in.io[6] = GPIO_PIN_6; // input channel 7
+    in.io[7] = GPIO_PIN_7; // input channel 8
+    in.io[8] = GPIO_PIN_8; // input channel 9
+    in.io[9] = GPIO_PIN_9; // input channel 10
+
     if(addr == 0x00) // device-01
     {
-        output[0] = GPIO_PIN_10; // chanel 1
-        output[1] = GPIO_PIN_15; // chanel 2
-        output[2] = GPIO_PIN_14; // chanel 3
-        output[3] = GPIO_PIN_13; // chanel 4
-        output[4] = GPIO_PIN_12; // chanel 5
-        output[5] = GPIO_PIN_11; // chanel 6
+        in.io[10] = GPIO_PIN_10; // input channel 11
+        in.io[11] = GPIO_PIN_11; // input channel 12
         
-        output_count = 6;
+        out.io[0] = GPIO_PIN_10; // output chanel 1
+        out.io[1] = GPIO_PIN_15; // output chanel 2
+        out.io[2] = GPIO_PIN_14; // output chanel 3
+        out.io[3] = GPIO_PIN_13; // output chanel 4
+        out.io[4] = GPIO_PIN_12; // output chanel 5
+        out.io[5] = GPIO_PIN_11; // output chanel 6
+        
+        in.size  = 12;
+        out.size = 6;
     }
     else if(addr == 0x01) // device-02
     {
-        output[0] = GPIO_PIN_11; // chanel 1
-        output[1] = GPIO_PIN_12; // chanel 2
-        output[2] = GPIO_PIN_13; // chanel 3
-        output[3] = GPIO_PIN_14; // chanel 4
-        output[4] = GPIO_PIN_15; // chanel 5
-        output[5] = GPIO_PIN_10; // chanel 6
-        output[6] = GPIO_PIN_2; // chanel 7
+        out.io[0] = GPIO_PIN_11; // output chanel 1
+        out.io[1] = GPIO_PIN_12; // output chanel 2
+        out.io[2] = GPIO_PIN_13; // output chanel 3
+        out.io[3] = GPIO_PIN_14; // output chanel 4
+        out.io[4] = GPIO_PIN_15; // output chanel 5
+        out.io[5] = GPIO_PIN_10; // output chanel 6
+        out.io[6] = GPIO_PIN_2; // output chanel 7
         
-        output_count = 7;
+        in.size  = 10;
+        out.size = 7;
     }
     
-    dev_set_output(output, output_count);
+    DEV_Init(&in, &out);
+    
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
@@ -159,35 +177,17 @@ int main(void)
   /* USER CODE END WHILE */
 
   /* USER CODE BEGIN 3 */
-    if(is_packet)
+      
+    if(FS9_Is_Ready())
     {
-        if(!rx_buf_is_empty())
-        {
-            uint8_t size = rx_buf_size();
-            struct packet_t packet = { {0}, size };
-            
-            for(uint8_t i = 0; i < size; i++)
-            {
-                packet.array[i] = rx_buf_pop();
-            }
-            
-            dev_get_packet(&packet);
-            
-            if(packet.size != 0)
-            {
-                for(uint8_t i = 0; i < packet.size; i++)
-                {
-                    tx_buf_push(packet.array[i]);
-                }
-                
-                USART1->CR1 |= USART_CR1_TE | USART_CR1_TXEIE;
-                USART1->ISR |= USART_ISR_TXE;
-            }
-        }
+        struct FS9Packet_t packet_source;
+        struct FS9Packet_t packet_dest;
         
-        is_packet = false;
+        if(FS9_read(&packet_source))
+            DEV_Request(&packet_source, &packet_dest);
     }
     
+<<<<<<< HEAD
     if(adc_is_ready)
     {
         // data temperature is ready
@@ -198,6 +198,16 @@ int main(void)
         
         adc_is_ready = false;
     }
+=======
+    /*if((DMA1->ISR & DMA_ISR_TCIF1) == DMA_ISR_TCIF1)
+    {
+        AIN1 = AIN_channels[0];
+        AIN2 = AIN_channels[1];
+        AIN_TEMP = AIN_channels[2];
+        
+        DMA1->IFCR |=DMA_IFCR_CTCIF1;
+    }*/
+>>>>>>> fs9slave
   }
   /* USER CODE END 3 */
 
@@ -311,42 +321,6 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-void init_adc(void)
-{
-    RCC->APB2ENR |= RCC_APB2ENR_ADC1EN;
-    RCC->AHBENR |= RCC_AHBENR_GPIOBEN | RCC_AHBENR_DMA1EN;
-    
-    GPIOB->MODER |= GPIO_MODER_MODER8 | GPIO_MODER_MODER9; // input analog
-    GPIOB->PUPDR &= (GPIO_PUPDR_PUPDR8 | GPIO_PUPDR_PUPDR9);
-    
-    ADC1->CR &= ~ADC_CR_ADEN; // disable adc for calibration
-    ADC1->CR |= ADC_CR_ADCAL; // start calibration adc
-    
-    while((ADC1->CR & ADC_CR_ADCAL) == ADC_CR_ADCAL); // wait end calibration adc
-    
-    ADC1->CFGR1 &= ~ADC_CFGR1_RES; // resolution 12 bit
-    ADC1->CFGR1 &= ~ADC_CFGR1_ALIGN; // right-aligned
-    ADC1->CFGR1 |= ADC_CFGR1_DMAEN | ADC_CFGR1_DMACFG;
-    DMA1_Channel1->CPAR = (uint32_t)(&(ADC1->DR));
-    DMA1_Channel1->CMAR = (uint32_t)(AIN_channels);
-    DMA1_Channel1->CNDTR = 3;
-    DMA1_Channel1->CCR |= DMA_CCR_MINC | DMA_CCR_MSIZE_0 | DMA_CCR_PSIZE_0 | DMA_CCR_TEIE | DMA_CCR_CIRC;
-    DMA1_Channel1->CCR |= DMA_CCR_EN;
-    //ADC1->ISR   |= ADC_ISR_ADRDY;
-    ADC1->CR    |= ADC_CR_ADEN; // adc enable
-    
-    while((ADC1->ISR & ADC_ISR_ADRDY) != ADC_ISR_ADRDY); // wait ready adc
-    
-    ADC1->CHSELR |= ADC_CHSELR_CHSEL8 | ADC_CHSELR_CHSEL9 | ADC_CHSELR_CHSEL16/* | ADC_CHSELR_CHSEL17*/; // selection temperature sensor channel
-    ADC1->SMPR   |= ADC_SMPR_SMP_0 | ADC_SMPR_SMP_1 | ADC_SMPR_SMP_2; // set sampling time 239.5 ADC clock cycles
-    ADC1->CFGR1  |= ADC_CFGR1_CONT; // continuous conversion mode
-    //ADC1->IER    |= ADC_IER_EOCIE; // generate interrupt EOC
-    ADC->CCR     |= ADC_CCR_TSEN; // enable temperature sensor
-    //ADC->CCR     |= ADC_CCR_VREFEN;
-    
-    NVIC_EnableIRQ(ADC1_IRQn);
-}
-
 int32_t cpu_temperature(uint16_t t_adc)
 {
     int32_t temperature = 0;
