@@ -36,7 +36,7 @@
 #include "stm32f0xx_it.h"
 
 /* USER CODE BEGIN 0 */
-volatile uint16_t GPIO_INT = GPIO_PIN_5; // for send change signal to master
+
 /* USER CODE END 0 */
 
 /* External variables --------------------------------------------------------*/
@@ -123,81 +123,7 @@ void SysTick_Handler(void)
 /* please refer to the startup file (startup_stm32f0xx.s).                    */
 /******************************************************************************/
 
-/*void USART1_IRQHandler(void)
-{
-    uint32_t status = USART1->ISR;
-    
-    if(status & USART_ISR_RXNE)
-    {
-        uint16_t byte9bit = USART1->RDR;
-
-        if(byte9bit & 0x0100)
-        {
-            uint8_t byte = (uint8_t)(byte9bit & 0xFF);
-            uint8_t addr = (byte & 0xC0) >> 6; // get a device address
-            
-            if(addr == dev_get_addr())
-            {
-                uint8_t cmd = byte & 0x3F; // get a command
-                
-                size_packet = dev_get_size_packet(cmd); // get a size packet
-                
-                if(size_packet > 0) // cmd is valid
-                {
-                    is_data = true; // a begin packet is find
-                    rx_buf_push(byte); // first byte a packet
-                }
-            }
-        }
-        else if(is_data)
-        {
-            rx_buf_push((uint8_t)(byte9bit & 0xFF));
-            
-            if(rx_buf_size() == size_packet)
-            {
-                is_packet   = true;
-                is_data     = false;
-                size_packet = 0;
-            }
-        }
-        
-        USART1->RQR |= USART_RQR_RXFRQ;
-    }
-    
-    if(status & USART_ISR_TXE)
-    {
-       if(!tx_buf_is_empty())
-        {
-            USART1->TDR = tx_buf_pop();
-        }
-        else
-        {
-            USART1->CR1 &= ~(USART_CR1_TE | USART_CR1_TXEIE);
-            USART1->ISR &= ~USART_ISR_TXE;
-        }
-    }
-    
-    if(status & USART_ISR_ORE)
-    {
-        USART1->ICR |= USART_ICR_ORECF;
-    }
-}*/
-
 /* USER CODE BEGIN 1 */
-void TIM14_IRQHandler(void)
-{
-    HAL_GPIO_WritePin(GPIOB, GPIO_INT, GPIO_PIN_RESET);
 
-    TIM16->CR1 |= TIM_CR1_CEN;
-    
-    TIM14->SR &= ~TIM_SR_UIF;
-}
-
-void TIM16_IRQHandler(void)
-{
-    HAL_GPIO_WritePin(GPIOB, GPIO_INT, GPIO_PIN_SET);
-    
-    TIM16->SR &= ~TIM_SR_UIF;
-}
 /* USER CODE END 1 */
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

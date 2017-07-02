@@ -1,9 +1,8 @@
 #include "ain.h"
-//-------------------------------------
-uint16_t AIN_channels[MAX_NUM_CHANNEL];
-uint16_t AIN_buffer[MAX_NUM_CHANNEL] = { 0 };
-uint8_t  AIN_number_con = 0; // number conversions
-bool     AIN_Data_Ready = false; // data is ready
+//----------------------------------------------
+volatile uint16_t AIN_channels[MAX_NUM_CHANNEL];
+volatile uint16_t AIN_buffer[MAX_NUM_CHANNEL] = { 0 };
+volatile bool     AIN_Data_Ready = false; // data is ready
 //-----------------
 void AIN_Init(void)
 {
@@ -52,27 +51,15 @@ void AIN_Read(uint16_t* buf)
     {
         buf[i] = AIN_buffer[i]/MAX_NUM_CONVERSION;
     }
+    
+    AIN_Data_Ready = false;
 }
 //-----------------------
 void AIN_IRQHandler(void)
 {
     if((DMA1->ISR & DMA_ISR_TCIF1) == DMA_ISR_TCIF1)
     {
-        for(uint8_t i = 0; i < MAX_NUM_CHANNEL; ++i)
-        {
-            if(AIN_number_con == 0)
-                AIN_buffer[i] = 0;
-            
-            AIN_buffer[i] += AIN_channels[i];
-        }
-        
-        AIN_number_con++;
-        
-        if(AIN_number_con == MAX_NUM_CONVERSION)
-        {
-            AIN_Data_Ready = true;
-            AIN_number_con = 0;
-        }
+        AIN_Data_Ready = true;
         
         DMA1->IFCR &= ~DMA_IFCR_CTCIF1; // clear flag
     }

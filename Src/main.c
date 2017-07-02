@@ -63,7 +63,7 @@ int32_t cpu_temperature(uint16_t t_adc);
 /* USER CODE END PFP */
 
 /* USER CODE BEGIN 0 */
-
+uint16_t buffer[MAX_NUM_CHANNEL];
 /* USER CODE END 0 */
 
 int main(void)
@@ -79,7 +79,7 @@ int main(void)
   HAL_Init();
 
   /* USER CODE BEGIN Init */
-    AIN_Init();
+    
   /* USER CODE END Init */
 
   /* Configure the system clock */
@@ -96,26 +96,9 @@ int main(void)
   /* USER CODE BEGIN 2 */
     USART1->CR1 |= USART_CR1_RE | USART_CR1_RXNEIE;
     
+    //AIN_Init();
     ADC1->CR |= ADC_CR_ADSTART; // adc start conversion
     
-    RCC->APB1ENR |= RCC_APB1ENR_TIM14EN;
-    RCC->APB2ENR |= RCC_APB2ENR_TIM16EN;
-    
-    HAL_GPIO_WritePin(GPIOB, GPIO_INT, GPIO_PIN_SET); // set high level on INT pin
-    
-    TIM14->PSC   = 48000 - 1; // each 1ms
-    TIM14->ARR   = 100 - 1; // reload 100ms
-    TIM14->CR1  |= TIM_CR1_ARPE;
-    TIM14->DIER |= TIM_DIER_UIE;
-    TIM14->CR1  |= TIM_CR1_CEN;
-    
-    TIM16->PSC   = 480 - 1; // each 100us
-    TIM16->ARR   = 10 - 1; // reload 1ms
-    TIM16->DIER |= TIM_DIER_UIE;
-    
-    NVIC_EnableIRQ(TIM14_IRQn);
-    NVIC_EnableIRQ(TIM16_IRQn);
-  
     // Create device
     DEV_Create(GPIOB, GPIO_PIN_14 | GPIO_PIN_15);
     // Get address device
@@ -180,25 +163,23 @@ int main(void)
       
     if(FS9_Is_Ready())
     {
-        struct FS9Packet_t packet_source;
-        struct FS9Packet_t packet_dest;
+        struct FS9Packet_t packet_source = { 0, 0 };
+        struct FS9Packet_t packet_dest = { 0, 0 };
         
         if(FS9_read(&packet_source))
             DEV_Request(&packet_source, &packet_dest);
+        
+        if(packet_dest.size > 0)
+        {
+            FS9_write(&packet_dest);
+        }
     }
     
-<<<<<<< HEAD
-    if(adc_is_ready)
+    /*if(AIN_Is_Ready())
     {
-        // data temperature is ready
-        //temp = cpu_temperature(T_adc/10);
-        
-        //T_adc = 0;
-        //T_adc_count = 0;
-        
-        adc_is_ready = false;
-    }
-=======
+        AIN_Read(buffer);
+    }*/
+
     /*if((DMA1->ISR & DMA_ISR_TCIF1) == DMA_ISR_TCIF1)
     {
         AIN1 = AIN_channels[0];
@@ -207,7 +188,6 @@ int main(void)
         
         DMA1->IFCR |=DMA_IFCR_CTCIF1;
     }*/
->>>>>>> fs9slave
   }
   /* USER CODE END 3 */
 
@@ -311,13 +291,6 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
-    
-    GPIO_InitTypeDef GPIO_InitINT;
-    
-    GPIO_InitINT.Pin = GPIO_INT;
-    GPIO_InitINT.Mode = GPIO_MODE_OUTPUT_PP;
-    GPIO_InitINT.Pull = GPIO_NOPULL;
-    HAL_GPIO_Init(GPIOB, &GPIO_InitINT);
 }
 
 /* USER CODE BEGIN 4 */
