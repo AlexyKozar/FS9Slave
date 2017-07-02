@@ -78,7 +78,7 @@ bool DEV_Request(struct FS9Packet_t* source, struct FS9Packet_t* dest)
     
     struct cmd_t tcmd = CMD_get(cmd); // verification command
     
-    if(tcmd.n == 0)
+    if(tcmd.n == 0 || tcmd.m == 0)
         return false; // command is not valid
     
     uint8_t checksum = DEV_Checksum(source, source->size - 1);
@@ -89,10 +89,15 @@ bool DEV_Request(struct FS9Packet_t* source, struct FS9Packet_t* dest)
     if(!DEV_Driver(cmd, dest))
         return false;
     
-    if(dest->size > 0)
+    if(tcmd.n > 0 && tcmd.m > 0)
     {
-        checksum = DEV_Checksum(dest, dest->size);
+        if(tcmd.is_ack)
+        {
+            dest->buffer[dest->size++] = ACK;
+        }
         
+        // append checksum for packet
+        checksum = DEV_Checksum(dest, dest->size);
         dest->buffer[dest->size++] = checksum;
     }
     else
@@ -112,9 +117,6 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* packet)
                 {
                     io_outputs->gpio->ODR &= ~io_outputs->io[0];
                 }
-                
-                packet->buffer[0] = ACK;
-                packet->size = 1;
             }
         break;
             
@@ -125,9 +127,6 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* packet)
                 {
                     io_outputs->gpio->ODR &= ~io_outputs->io[1];
                 }
-                
-                packet->buffer[0] = ACK;
-                packet->size = 1;
             }
         break;
             
@@ -138,9 +137,6 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* packet)
                 {
                     io_outputs->gpio->ODR &= ~io_outputs->io[2];
                 }
-                
-                packet->buffer[0] = ACK;
-                packet->size = 1;
             }
         break;
             
@@ -151,9 +147,6 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* packet)
                 {
                     io_outputs->gpio->ODR &= ~io_outputs->io[3];
                 }
-                
-                packet->buffer[0] = ACK;
-                packet->size = 1;
             }
         break;
             
@@ -164,9 +157,6 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* packet)
                 {
                     io_outputs->gpio->ODR &= ~io_outputs->io[4];
                 }
-                
-                packet->buffer[0] = ACK;
-                packet->size = 1;
             }
             break;
             
@@ -177,9 +167,6 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* packet)
                 {
                     io_outputs->gpio->ODR &= ~io_outputs->io[5];
                 }
-                
-                packet->buffer[0] = ACK;
-                packet->size = 1;
             }
         break;
             
@@ -190,9 +177,6 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* packet)
                 {
                     io_outputs->gpio->ODR &= ~io_outputs->io[6];
                 }
-                
-                packet->buffer[0] = ACK;
-                packet->size = 1;
             }
         break;
             
@@ -203,9 +187,6 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* packet)
                 {
                     io_outputs->gpio->ODR &= ~io_outputs->io[7];
                 }
-                
-                packet->buffer[0] = ACK;
-                packet->size = 1;
             }
         break;
             
@@ -216,9 +197,6 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* packet)
                 {
                     io_outputs->gpio->ODR |= io_outputs->io[0];
                 }
-                
-                packet->buffer[0] = ACK;
-                packet->size = 1;
             }
         break;
             
@@ -229,9 +207,6 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* packet)
                 {
                     io_outputs->gpio->ODR |= io_outputs->io[1];
                 }
-                
-                packet->buffer[0] = ACK;
-                packet->size = 1;
             }
         break;
             
@@ -242,9 +217,6 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* packet)
                 {
                     io_outputs->gpio->ODR |= io_outputs->io[2];
                 }
-                
-                packet->buffer[0] = ACK;
-                packet->size = 1;
             }
         break;
             
@@ -255,9 +227,6 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* packet)
                 {
                     io_outputs->gpio->ODR |= io_outputs->io[3];
                 }
-                
-                packet->buffer[0] = ACK;
-                packet->size = 1;
             }
         break;
             
@@ -268,9 +237,6 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* packet)
                 {
                     io_outputs->gpio->ODR |= io_outputs->io[4];
                 }
-                
-                packet->buffer[0] = ACK;
-                packet->size = 1;
             }
         break;
             
@@ -281,9 +247,6 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* packet)
                 {
                     io_outputs->gpio->ODR |= io_outputs->io[5];
                 }
-                
-                packet->buffer[0] = ACK;
-                packet->size = 1;
             }
         break;
             
@@ -294,9 +257,6 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* packet)
                 {
                     io_outputs->gpio->ODR |= io_outputs->io[6];
                 }
-                
-                packet->buffer[0] = ACK;
-                packet->size = 1;
             }
         break;
             
@@ -307,9 +267,6 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* packet)
                 {
                     io_outputs->gpio->ODR |= io_outputs->io[7];
                 }
-                
-                packet->buffer[0] = ACK;
-                packet->size = 1;
             }
         break;
         
