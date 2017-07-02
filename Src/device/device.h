@@ -5,6 +5,7 @@
     #include <stdbool.h>
     #include "stm32f0xx_hal.h"
     #include "../fs9slave/fs9slave.h"
+    #include "../ain/ain.h"
     //-----------------------
     #define MAX_SIZE_DS_IO 16
     //------------------------
@@ -26,4 +27,7 @@
     void    DEV_Create(GPIO_TypeDef* gpio, uint16_t pin_addr);
     void    DEV_Init(struct IO_Type* inputs, struct IO_Type* outputs);
     uint8_t DEV_Address(void);
+    bool    DEV_Request(struct FS9Packet_t* source, struct FS9Packet_t* dest);
+    bool    DEV_Driver(uint8_t cmd, struct FS9Packet_t* packet);
+    uint8_t DEV_Checksum(struct FS9Packet_t* packet, uint8_t size);
 #endif

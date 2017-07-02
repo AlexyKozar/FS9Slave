@@ -59,12 +59,11 @@ static void MX_USART1_UART_Init(void);
 
 /* USER CODE BEGIN PFP */
 /* Private function prototypes -----------------------------------------------*/
-void init_adc(void);
 int32_t cpu_temperature(uint16_t t_adc);
 /* USER CODE END PFP */
 
 /* USER CODE BEGIN 0 */
-int32_t temp = 0;
+
 /* USER CODE END 0 */
 
 int main(void)
@@ -80,7 +79,7 @@ int main(void)
   HAL_Init();
 
   /* USER CODE BEGIN Init */
-
+    AIN_Init();
   /* USER CODE END Init */
 
   /* Configure the system clock */
@@ -95,8 +94,6 @@ int main(void)
   MX_USART1_UART_Init();
 
   /* USER CODE BEGIN 2 */
-    init_adc();
-    
     USART1->CR1 |= USART_CR1_RE | USART_CR1_RXNEIE;
     
     ADC1->CR |= ADC_CR_ADSTART; // adc start conversion
@@ -121,8 +118,10 @@ int main(void)
   
     // Create device
     DEV_Create(GPIOB, GPIO_PIN_14 | GPIO_PIN_15);
+    // Get address device
     uint8_t addr = DEV_Address();
     
+    // Declaration struct inputs and outputs
     struct IO_Type in; // the input channels
     struct IO_Type out; // the output channels
     
@@ -179,34 +178,23 @@ int main(void)
 
   /* USER CODE BEGIN 3 */
       
-    if(FS9_Data_Ready)
+    if(FS9_Is_Ready())
     {
-        uint8_t buf[20];
+        struct FS9Packet_t packet_source;
+        struct FS9Packet_t packet_dest;
         
-        uint8_t count = FS9_read(buf);
-        
-        FS9_write(buf, count);
+        if(FS9_read(&packet_source))
+            DEV_Request(&packet_source, &packet_dest);
     }
     
-    if((DMA1->ISR & DMA_ISR_TCIF1) == DMA_ISR_TCIF1)
+    /*if((DMA1->ISR & DMA_ISR_TCIF1) == DMA_ISR_TCIF1)
     {
         AIN1 = AIN_channels[0];
         AIN2 = AIN_channels[1];
         AIN_TEMP = AIN_channels[2];
         
         DMA1->IFCR |=DMA_IFCR_CTCIF1;
-    }
-    
-    if(adc_is_ready)
-    {
-        // data temperature is ready
-        //temp = cpu_temperature(T_adc/10);
-        
-        //T_adc = 0;
-        //T_adc_count = 0;
-        
-        adc_is_ready = false;
-    }
+    }*/
   }
   /* USER CODE END 3 */
 
@@ -320,42 +308,6 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-void init_adc(void)
-{
-    RCC->APB2ENR |= RCC_APB2ENR_ADC1EN;
-    RCC->AHBENR |= RCC_AHBENR_GPIOBEN | RCC_AHBENR_DMA1EN;
-    
-    GPIOB->MODER |= GPIO_MODER_MODER8 | GPIO_MODER_MODER9; // input analog
-    GPIOB->PUPDR &= (GPIO_PUPDR_PUPDR8 | GPIO_PUPDR_PUPDR9);
-    
-    ADC1->CR &= ~ADC_CR_ADEN; // disable adc for calibration
-    ADC1->CR |= ADC_CR_ADCAL; // start calibration adc
-    
-    while((ADC1->CR & ADC_CR_ADCAL) == ADC_CR_ADCAL); // wait end calibration adc
-    
-    ADC1->CFGR1 &= ~ADC_CFGR1_RES; // resolution 12 bit
-    ADC1->CFGR1 &= ~ADC_CFGR1_ALIGN; // right-aligned
-    ADC1->CFGR1 |= ADC_CFGR1_DMAEN | ADC_CFGR1_DMACFG;
-    DMA1_Channel1->CPAR = (uint32_t)(&(ADC1->DR));
-    DMA1_Channel1->CMAR = (uint32_t)(AIN_channels);
-    DMA1_Channel1->CNDTR = 3;
-    DMA1_Channel1->CCR |= DMA_CCR_MINC | DMA_CCR_MSIZE_0 | DMA_CCR_PSIZE_0 | DMA_CCR_TEIE | DMA_CCR_CIRC;
-    DMA1_Channel1->CCR |= DMA_CCR_EN;
-    //ADC1->ISR   |= ADC_ISR_ADRDY;
-    ADC1->CR    |= ADC_CR_ADEN; // adc enable
-    
-    while((ADC1->ISR & ADC_ISR_ADRDY) != ADC_ISR_ADRDY); // wait ready adc
-    
-    ADC1->CHSELR |= ADC_CHSELR_CHSEL8 | ADC_CHSELR_CHSEL9 | ADC_CHSELR_CHSEL16/* | ADC_CHSELR_CHSEL17*/; // selection temperature sensor channel
-    ADC1->SMPR   |= ADC_SMPR_SMP_0 | ADC_SMPR_SMP_1 | ADC_SMPR_SMP_2; // set sampling time 239.5 ADC clock cycles
-    ADC1->CFGR1  |= ADC_CFGR1_CONT; // continuous conversion mode
-    //ADC1->IER    |= ADC_IER_EOCIE; // generate interrupt EOC
-    ADC->CCR     |= ADC_CCR_TSEN; // enable temperature sensor
-    //ADC->CCR     |= ADC_CCR_VREFEN;
-    
-    NVIC_EnableIRQ(ADC1_IRQn);
-}
-
 int32_t cpu_temperature(uint16_t t_adc)
 {
     int32_t temperature = 0;

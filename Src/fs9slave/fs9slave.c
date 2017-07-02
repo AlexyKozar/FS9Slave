@@ -106,35 +106,42 @@ bool tx_is_empty(void)
 {
     return (tx_count == 0);
 }
-//----------------------------
-uint8_t FS9_read(uint8_t* buf)
+//---------------------------------------
+bool FS9_read(struct FS9Packet_t* packet)
 {   
-    uint8_t count = rx_size();
-    
     if(!rx_is_empty())
     {
-        for(uint8_t i = 0; i < count; ++i)
+        packet->size = rx_size();
+        
+        for(uint8_t i = 0; i < packet->size; ++i)
         {
-            buf[i] = rx_pop();
+            packet->buffer[i] = rx_pop();
         }
     }
+    else
+        return false;
     
     FS9_Data_Ready = false;
     
-    return count;
+    return true;
 }
 //----------------------------------------
-bool FS9_write(uint8_t* buf, uint8_t size)
+bool FS9_write(struct FS9Packet_t* packet)
 {
-    for(uint8_t i = 0; i < size; ++i)
+    for(uint8_t i = 0; i < packet->size; ++i)
     {
-        if(!tx_push(buf[i]))
+        if(!tx_push(packet->buffer[i]))
             return false;
     }
     
     FS9_UART->CR1 |= USART_CR1_TE | USART_CR1_TXEIE;
     
     return true;
+}
+//---------------------
+bool FS9_Is_Ready(void)
+{
+    return FS9_Data_Ready;
 }
 //-----------------------
 void FS9_IRQHandler(void)

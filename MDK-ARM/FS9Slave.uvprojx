@@ -495,14 +495,14 @@
               <FilePath>..\Src\device\device.c</FilePath>
             </File>
             <File>
-              <FileName>cmdlist.c</FileName>
+              <FileName>fs9slave.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\Src\device\cmd\cmdlist.c</FilePath>
+              <FilePath>..\Src\fs9slave\fs9slave.c</FilePath>
             </File>
             <File>
-              <FileName>buffer.c</FileName>
+              <FileName>cmd.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\Src\buffer\buffer.c</FilePath>
+              <FilePath>..\Src\fs9slave\cmd\cmd.c</FilePath>
             </File>
           </Files>
         </Group>

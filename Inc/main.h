@@ -51,20 +51,7 @@
 /* Private define ------------------------------------------------------------*/
 
 /* USER CODE BEGIN Private defines */
-extern volatile bool is_packet;
 extern volatile uint16_t GPIO_INT;
-extern volatile uint32_t T_adc;
-extern volatile uint8_t  T_adc_count;
-extern volatile bool     adc_is_ready;
-
-extern volatile uint16_t AIN_TEMP;
-extern volatile uint16_t AIN1;
-extern volatile uint16_t AIN2;
-
-extern volatile uint16_t AIN_channels[3];
-
-extern volatile uint8_t AIN_ch_cur; // current input channel
-extern volatile uint8_t AIN_CON_count; // count conversions for result
 /* USER CODE END Private defines */
 
 void _Error_Handler(char *, int);

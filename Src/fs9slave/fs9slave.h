@@ -15,9 +15,18 @@
     //------------------------
     #define MAX_SIZE_BUF_RX 20
     #define MAX_SIZE_BUF_TX 20
-    //----------------------------------
-    extern volatile bool FS9_Data_Ready;
-    //-----------------------------
-    uint8_t FS9_read(uint8_t* buf);
-    bool    FS9_write(uint8_t* buf, uint8_t size_t);
+    //--------------------------
+    #define MAX_SIZE_PACK_BUF 20
+    //--------------
+    #define ACK 0x06
+    //----------------
+    struct FS9Packet_t
+    {
+        uint8_t buffer[MAX_SIZE_PACK_BUF];
+        uint8_t size;
+    };
+    //----------------------------------------
+    bool FS9_read(struct FS9Packet_t* packet);
+    bool FS9_write(struct FS9Packet_t* packet);
+    bool FS9_Is_Ready(void);
 #endif
