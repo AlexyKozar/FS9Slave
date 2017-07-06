@@ -13,7 +13,7 @@ void DEV_Create(GPIO_TypeDef* gpio, uint16_t pin_addr)
     IO_Clock_Enable(gpio);
     IO_Init(gpio, pin_addr, DEV_IO_INPUT);
     
-    devAddr = (uint8_t)(gpio->IDR & pin_addr) >> 14; // set the address device
+    devAddr = (uint8_t)((gpio->IDR & DEV_ADDR_MASK) >> 14); // set the address device
 }
 //------------------------------------------------------------
 void DEV_Init(struct IO_Type* inputs, struct IO_Type* outputs)
