@@ -58,11 +58,11 @@ static void MX_USART1_UART_Init(void);
 
 /* USER CODE BEGIN PFP */
 /* Private function prototypes -----------------------------------------------*/
-int32_t cpu_temperature(uint16_t t_adc);
+
 /* USER CODE END PFP */
 
 /* USER CODE BEGIN 0 */
-uint16_t buffer[MAX_NUM_CHANNEL];
+
 /* USER CODE END 0 */
 
 int main(void)
@@ -92,9 +92,6 @@ int main(void)
   MX_USART1_UART_Init();
 
   /* USER CODE BEGIN 2 */
-    
-    //AIN_Init();
-    //ADC1->CR |= ADC_CR_ADSTART; // adc start conversion
     
     // Create device
     DEV_Create(GPIOC, GPIO_PIN_14 | GPIO_PIN_15);
@@ -255,14 +252,7 @@ static void MX_USART1_UART_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-int32_t cpu_temperature(uint16_t t_adc)
-{
-    int32_t temperature = 0;
-    
-    temperature = (*TEMP30_CAL_ADDR - t_adc)/5 + 30;
-    
-    return temperature;
-}
+
 /* USER CODE END 4 */
 
 /**
