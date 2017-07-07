@@ -7,13 +7,13 @@ struct IO_Type* io_inputs;
 struct IO_Type* io_outputs;
 //---------------------
 uint8_t devAddr = 0xFF;
-//----------------------------------------------------
-void DEV_Create(GPIO_TypeDef* gpio, uint16_t pin_addr)
+//-----------------------------------------------------
+void DEV_Create(GPIO_TypeDef* gpio, uint16_t addr_pins)
 {
     IO_Clock_Enable(gpio);
-    IO_Init(gpio, pin_addr, DEV_IO_INPUT);
+    IO_Init(gpio, addr_pins, DEV_IO_INPUT);
     
-    devAddr = (uint8_t)((gpio->IDR & DEV_ADDR_MASK) >> 14); // set the address device
+    devAddr = (uint8_t)((gpio->IDR & addr_pins) >> 14); // set the address device
 }
 //------------------------------------------------------------
 void DEV_Init(struct IO_Type* inputs, struct IO_Type* outputs)
