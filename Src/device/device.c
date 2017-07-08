@@ -7,6 +7,10 @@ struct PORT_Input_Type*  io_inputs;
 struct PORT_Output_Type* io_outputs;
 //---------------------
 uint8_t devAddr = 0xFF;
+//--------------------
+uint8_t bit_count = 0;
+//-----------------------
+bool Input_Ready = false;
 //-----------------------------------------------------
 void DEV_Create(GPIO_TypeDef* gpio, uint16_t addr_pins)
 {
@@ -39,6 +43,17 @@ void DEV_Init(struct PORT_Input_Type* inputs, struct PORT_Output_Type* outputs)
     
     IO_Init(io_inputs->gpio, in, DEV_IO_INPUT);
     IO_Init(io_outputs->gpio, out, DEV_IO_OUTPUT);
+    
+    DEV_Input_Set_Default();
+    
+    RCC->APB2ENR |= RCC_APB2ENR_TIM16EN;
+    
+    TIM16->PSC   = 48 - 1;
+    TIM16->ARR   = 1000 - 1;
+    TIM16->DIER |= TIM_DIER_UIE;
+    TIM16->CR1  |= TIM_CR1_CEN;
+    
+    NVIC_EnableIRQ(TIM16_IRQn);
 }
 //--------------------------------------
 void IO_Clock_Enable(GPIO_TypeDef* gpio)
@@ -290,4 +305,88 @@ uint8_t DEV_Checksum(struct FS9Packet_t* packet, uint8_t size)
     checksum ^= 0xFF;
     
     return checksum;
+}
+//-----------------------
+void DEV_Input_Scan(void)
+{
+    for(uint8_t i = 0; i < io_inputs->size; ++i)
+    {
+        if((io_inputs->gpio->IDR & io_inputs->inputs[i].In) == true)
+        {
+            io_inputs->inputs[i].In_buf |= 1 << bit_count;
+        }
+    }
+    
+    bit_count++;
+}
+//------------------------------
+void DEV_Input_Set_Default(void)
+{
+    for(uint8_t i = 0; i < io_inputs->size; ++i)
+    {
+        io_inputs->inputs[i].In_mode = IN_MODE_AC;
+        io_inputs->inputs[i].In_dir  = IN_DIR_DIRECT;
+        io_inputs->inputs[i].In_buf  = 0;
+        io_inputs->inputs[i].In_state = 0;
+    }
+    
+    bit_count = 0;
+    Input_Ready = false;
+}
+//------------------------
+bool DEV_Input_Ready(void)
+{
+    return Input_Ready;
+}
+//-------------------------
+void DEV_Input_Filter(void)
+{
+    for(uint8_t i = 0; i < io_inputs->size; ++i)
+    {
+        uint8_t count = 0;
+        
+        for(uint8_t j = 0; j < 10; ++j)
+        {
+            if((io_inputs->inputs[i].In_buf & (1 << j)) == true)
+            {
+                count++;
+            }
+        }
+        
+        if(count > 5)
+            io_inputs->inputs[i].In_state = 1; // the state is ON
+        else if(count > 0 && count <= 3)
+            io_inputs->inputs[i].In_state = 2; // the state is channel error
+    }
+}
+//---------------------------------
+bool DEV_Input_Change_Channel(void)
+{
+    bool state = false;
+    
+    for(uint8_t i = 0; i < io_inputs->size; ++i)
+    {
+        if(io_inputs->inputs[i].In_state == true)
+            state = true;
+    }
+    
+    DEV_Input_Set_Default();
+    
+    return state;
+}
+//-------------------------
+void TIM16_IRQHandler(void)
+{
+    if((TIM16->SR & TIM_SR_UIF) == TIM_SR_UIF)
+    {
+        if(bit_count == 10)
+        {
+            Input_Ready = true;
+            TIM16->CR1 &= ~TIM_CR1_CEN;
+        }
+        else
+            DEV_Input_Scan();
+        
+        TIM16->SR &= ~TIM_SR_UIF;
+    }
 }

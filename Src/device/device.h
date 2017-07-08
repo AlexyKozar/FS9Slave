@@ -5,7 +5,7 @@
     #include <stdbool.h>
     #include "stm32f0xx_hal.h"
     #include "stm32f0xx_hal_gpio.h"
-    #include "../fs9slave/fs9slave.h"
+    #include "fs9slave/fs9slave.h"
     //---------------------------
     #define MAX_SIZE_DS_INPUT  12
     #define MAX_SIZE_DS_OUTPUT 8
@@ -28,6 +28,8 @@
         uint8_t  NSac;    // the noise length (0..2)
         uint8_t  In_mode; // the input mode AC or DC
         uint8_t  In_dir;  // the input direct
+        uint32_t In_buf;  // the input buffer for filter
+        uint8_t  In_state; // the state input
     };
     //--------------------
     struct PORT_Input_Type
@@ -50,4 +52,9 @@
     bool    DEV_Request(struct FS9Packet_t* source, struct FS9Packet_t* dest);
     bool    DEV_Driver(uint8_t cmd, struct FS9Packet_t* packet);
     uint8_t DEV_Checksum(struct FS9Packet_t* packet, uint8_t size);
+    void    DEV_Input_Scan(void);
+    void    DEV_Input_Set_Default(void);
+    bool    DEV_Input_Ready(void);
+    void    DEV_Input_Filter(void);
+    bool    DEV_Input_Change_Channel(void);
 #endif

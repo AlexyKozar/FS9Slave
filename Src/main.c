@@ -168,6 +168,25 @@ int main(void)
             FS9_write(&packet_dest);
         }
     }
+    
+    if(DEV_Input_Ready() == true)
+    {
+        // the proccessing input data
+        DEV_Input_Filter();
+        
+        if(DEV_Input_Change_Channel() == false)
+        {
+            struct FS9Packet_t packet;
+            
+            packet.buffer[0] = 0xFF;
+            packet.buffer[1] = 0x01;
+            packet.buffer[2] = 0xFF;
+            
+            packet.size = 3;
+            
+            FS9_write(&packet);
+        }
+    }
   }
   /* USER CODE END 3 */
 

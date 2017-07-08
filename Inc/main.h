@@ -43,8 +43,6 @@
 /* USER CODE BEGIN Includes */
 #include <stdint.h>
 #include <stdbool.h>
-//#include "../src/buffer/buffer.h"
-#include "../src/fs9slave/fs9slave.h"
 #include "../src/device/device.h"
 /* USER CODE END Includes */
 

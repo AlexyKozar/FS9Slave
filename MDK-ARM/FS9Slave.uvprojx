@@ -497,12 +497,12 @@
             <File>
               <FileName>fs9slave.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\Src\fs9slave\fs9slave.c</FilePath>
+              <FilePath>..\Src\device\fs9slave\fs9slave.c</FilePath>
             </File>
             <File>
               <FileName>cmd.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\Src\fs9slave\cmd\cmd.c</FilePath>
+              <FilePath>..\Src\device\fs9slave\cmd\cmd.c</FilePath>
             </File>
           </Files>
         </Group>
