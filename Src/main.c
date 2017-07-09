@@ -99,53 +99,53 @@ int main(void)
     uint8_t addr = DEV_Address();
     
     // Declaration struct inputs and outputs
-    struct PORT_Input_Type in; // the input channels
-    struct PORT_Output_Type out; // the output channels
+    struct PORT_Input_Type input; // the input channels
+    struct PORT_Output_Type output; // the output channels
     
-    in.gpio  = GPIOA;
-    out.gpio = GPIOB;
+    input.gpio  = GPIOA;
+    output.gpio = GPIOB;
     
-    in.inputs[0].In = GPIO_PIN_0; // input channel 1
-    in.inputs[1].In = GPIO_PIN_1; // input channel 2
-    in.inputs[2].In = GPIO_PIN_2; // input channel 3
-    in.inputs[3].In = GPIO_PIN_3; // input channel 4
-    in.inputs[4].In = GPIO_PIN_4; // input channel 5
-    in.inputs[5].In = GPIO_PIN_5; // input channel 6
-    in.inputs[6].In = GPIO_PIN_6; // input channel 7
-    in.inputs[7].In = GPIO_PIN_7; // input channel 8
-    in.inputs[8].In = GPIO_PIN_8; // input channel 9
-    in.inputs[9].In = GPIO_PIN_9; // input channel 10
+    input.in_arr[0].in = GPIO_PIN_0; // input channel 1
+    input.in_arr[1].in = GPIO_PIN_1; // input channel 2
+    input.in_arr[2].in = GPIO_PIN_2; // input channel 3
+    input.in_arr[3].in = GPIO_PIN_3; // input channel 4
+    input.in_arr[4].in = GPIO_PIN_4; // input channel 5
+    input.in_arr[5].in = GPIO_PIN_5; // input channel 6
+    input.in_arr[6].in = GPIO_PIN_6; // input channel 7
+    input.in_arr[7].in = GPIO_PIN_7; // input channel 8
+    input.in_arr[8].in = GPIO_PIN_8; // input channel 9
+    input.in_arr[9].in = GPIO_PIN_9; // input channel 10
 
     if(addr == 0x00) // device-01
     {
-        in.inputs[10].In = GPIO_PIN_10; // input channel 11
-        in.inputs[11].In = GPIO_PIN_11; // input channel 12
+        input.in_arr[10].in = GPIO_PIN_10; // input channel 11
+        input.in_arr[11].in = GPIO_PIN_11; // input channel 12
         
-        out.outputs[0] = GPIO_PIN_10; // output chanel 1
-        out.outputs[1] = GPIO_PIN_15; // output chanel 2
-        out.outputs[2] = GPIO_PIN_14; // output chanel 3
-        out.outputs[3] = GPIO_PIN_13; // output chanel 4
-        out.outputs[4] = GPIO_PIN_12; // output chanel 5
-        out.outputs[5] = GPIO_PIN_11; // output chanel 6
+        output.out_arr[0] = GPIO_PIN_10; // output chanel 1
+        output.out_arr[1] = GPIO_PIN_15; // output chanel 2
+        output.out_arr[2] = GPIO_PIN_14; // output chanel 3
+        output.out_arr[3] = GPIO_PIN_13; // output chanel 4
+        output.out_arr[4] = GPIO_PIN_12; // output chanel 5
+        output.out_arr[5] = GPIO_PIN_11; // output chanel 6
         
-        in.size  = 12;
-        out.size = 6;
+        input.size  = 12;
+        output.size = 6;
     }
     else if(addr == 0x01) // device-02
     {
-        out.outputs[0] = GPIO_PIN_11; // output chanel 1
-        out.outputs[1] = GPIO_PIN_12; // output chanel 2
-        out.outputs[2] = GPIO_PIN_13; // output chanel 3
-        out.outputs[3] = GPIO_PIN_14; // output chanel 4
-        out.outputs[4] = GPIO_PIN_15; // output chanel 5
-        out.outputs[5] = GPIO_PIN_10; // output chanel 6
-        out.outputs[6] = GPIO_PIN_2; // output chanel 7
+        output.out_arr[0] = GPIO_PIN_11; // output chanel 1
+        output.out_arr[1] = GPIO_PIN_12; // output chanel 2
+        output.out_arr[2] = GPIO_PIN_13; // output chanel 3
+        output.out_arr[3] = GPIO_PIN_14; // output chanel 4
+        output.out_arr[4] = GPIO_PIN_15; // output chanel 5
+        output.out_arr[5] = GPIO_PIN_10; // output chanel 6
+        output.out_arr[6] = GPIO_PIN_2; // output chanel 7
         
-        in.size  = 10;
-        out.size = 7;
+        input.size  = 10;
+        output.size = 7;
     }
     
-    DEV_Init(&in, &out);
+    DEV_Init(&input, &output);
     
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */

@@ -8,7 +8,7 @@ struct PORT_Output_Type* io_outputs;
 //---------------------
 uint8_t devAddr = 0xFF;
 //--------------------
-uint8_t bit_count = 0;
+uint8_t bit_count = 0; // the bit counter
 //-----------------------
 bool Input_Ready = false;
 //-----------------------------------------------------
@@ -30,12 +30,12 @@ void DEV_Init(struct PORT_Input_Type* inputs, struct PORT_Output_Type* outputs)
     
     for(uint8_t i = 0; i < io_inputs->size; ++i)
     {
-        in |= io_inputs->inputs[i].In;
+        in |= io_inputs->in_arr[i].in;
     }
     
     for(uint8_t i = 0; i < io_outputs->size; ++i)
     {
-        out |= io_outputs->outputs[i];
+        out |= io_outputs->out_arr[i];
     }
     
     IO_Clock_Enable(io_inputs->gpio);
@@ -128,9 +128,9 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* packet)
         case 0x06: // set level low on channel 0
             if(io_outputs->size > 0)
             {
-                if(io_outputs->gpio->ODR & io_outputs->outputs[0])
+                if(io_outputs->gpio->ODR & io_outputs->out_arr[0])
                 {
-                    io_outputs->gpio->ODR &= ~io_outputs->outputs[0];
+                    io_outputs->gpio->ODR &= ~io_outputs->out_arr[0];
                 }
             }
         break;
@@ -138,9 +138,9 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* packet)
         case 0x07: // set level low on channel 1
             if(io_outputs->size > 1)
             {
-                if(io_outputs->gpio->ODR & io_outputs->outputs[1])
+                if(io_outputs->gpio->ODR & io_outputs->out_arr[1])
                 {
-                    io_outputs->gpio->ODR &= ~io_outputs->outputs[1];
+                    io_outputs->gpio->ODR &= ~io_outputs->out_arr[1];
                 }
             }
         break;
@@ -148,9 +148,9 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* packet)
         case 0x08: // set level low on channel 2
             if(io_outputs->size > 2)
             {
-                if(io_outputs->gpio->ODR & io_outputs->outputs[2])
+                if(io_outputs->gpio->ODR & io_outputs->out_arr[2])
                 {
-                    io_outputs->gpio->ODR &= ~io_outputs->outputs[2];
+                    io_outputs->gpio->ODR &= ~io_outputs->out_arr[2];
                 }
             }
         break;
@@ -158,9 +158,9 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* packet)
         case 0x09: // set level low on channel 3
             if(io_outputs->size > 3)
             {
-                if(io_outputs->gpio->ODR & io_outputs->outputs[3])
+                if(io_outputs->gpio->ODR & io_outputs->out_arr[3])
                 {
-                    io_outputs->gpio->ODR &= ~io_outputs->outputs[3];
+                    io_outputs->gpio->ODR &= ~io_outputs->out_arr[3];
                 }
             }
         break;
@@ -168,9 +168,9 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* packet)
         case 0x0A: // set level low on channel 4
             if(io_outputs->size > 4)
             {
-                if(io_outputs->gpio->ODR & io_outputs->outputs[4])
+                if(io_outputs->gpio->ODR & io_outputs->out_arr[4])
                 {
-                    io_outputs->gpio->ODR &= ~io_outputs->outputs[4];
+                    io_outputs->gpio->ODR &= ~io_outputs->out_arr[4];
                 }
             }
             break;
@@ -178,9 +178,9 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* packet)
         case 0x0B: // set level low on channel 5
             if(io_outputs->size > 5)
             {
-                if(io_outputs->gpio->ODR & io_outputs->outputs[5])
+                if(io_outputs->gpio->ODR & io_outputs->out_arr[5])
                 {
-                    io_outputs->gpio->ODR &= ~io_outputs->outputs[5];
+                    io_outputs->gpio->ODR &= ~io_outputs->out_arr[5];
                 }
             }
         break;
@@ -188,9 +188,9 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* packet)
         case 0x0C: // set level low on channel 6
             if(io_outputs->size > 6)
             {
-                if(io_outputs->gpio->ODR & io_outputs->outputs[6])
+                if(io_outputs->gpio->ODR & io_outputs->out_arr[6])
                 {
-                    io_outputs->gpio->ODR &= ~io_outputs->outputs[6];
+                    io_outputs->gpio->ODR &= ~io_outputs->out_arr[6];
                 }
             }
         break;
@@ -198,9 +198,9 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* packet)
         case 0x0D: // set level low on channel 7
             if(io_outputs->size > 7)
             {
-                if(io_outputs->gpio->ODR & io_outputs->outputs[7])
+                if(io_outputs->gpio->ODR & io_outputs->out_arr[7])
                 {
-                    io_outputs->gpio->ODR &= ~io_outputs->outputs[7];
+                    io_outputs->gpio->ODR &= ~io_outputs->out_arr[7];
                 }
             }
         break;
@@ -208,9 +208,9 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* packet)
         case 0x0E: // set level high on channel 0
             if(io_outputs->size > 0)
             {
-                if(!(io_outputs->gpio->ODR & io_outputs->outputs[0]))
+                if(!(io_outputs->gpio->ODR & io_outputs->out_arr[0]))
                 {
-                    io_outputs->gpio->ODR |= io_outputs->outputs[0];
+                    io_outputs->gpio->ODR |= io_outputs->out_arr[0];
                 }
             }
         break;
@@ -218,9 +218,9 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* packet)
         case 0x0F: // set level high on channel 1
             if(io_outputs->size > 1)
             {
-                if(!(io_outputs->gpio->ODR & io_outputs->outputs[1]))
+                if(!(io_outputs->gpio->ODR & io_outputs->out_arr[1]))
                 {
-                    io_outputs->gpio->ODR |= io_outputs->outputs[1];
+                    io_outputs->gpio->ODR |= io_outputs->out_arr[1];
                 }
             }
         break;
@@ -228,9 +228,9 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* packet)
         case 0x10: // set level high on channel 2
             if(io_outputs->size > 2)
             {
-                if(!(io_outputs->gpio->ODR & io_outputs->outputs[2]))
+                if(!(io_outputs->gpio->ODR & io_outputs->out_arr[2]))
                 {
-                    io_outputs->gpio->ODR |= io_outputs->outputs[2];
+                    io_outputs->gpio->ODR |= io_outputs->out_arr[2];
                 }
             }
         break;
@@ -238,9 +238,9 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* packet)
         case 0x11: // set level high on channel 3
             if(io_outputs->size > 3)
             {
-                if(!(io_outputs->gpio->ODR & io_outputs->outputs[3]))
+                if(!(io_outputs->gpio->ODR & io_outputs->out_arr[3]))
                 {
-                    io_outputs->gpio->ODR |= io_outputs->outputs[3];
+                    io_outputs->gpio->ODR |= io_outputs->out_arr[3];
                 }
             }
         break;
@@ -248,9 +248,9 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* packet)
         case 0x12: // set level high on channel 4
             if(io_outputs->size > 4)
             {
-                if(!(io_outputs->gpio->ODR & io_outputs->outputs[4]))
+                if(!(io_outputs->gpio->ODR & io_outputs->out_arr[4]))
                 {
-                    io_outputs->gpio->ODR |= io_outputs->outputs[4];
+                    io_outputs->gpio->ODR |= io_outputs->out_arr[4];
                 }
             }
         break;
@@ -258,9 +258,9 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* packet)
         case 0x13: // set level high on channel 5
             if(io_outputs->size > 5)
             {
-                if(!(io_outputs->gpio->ODR & io_outputs->outputs[5]))
+                if(!(io_outputs->gpio->ODR & io_outputs->out_arr[5]))
                 {
-                    io_outputs->gpio->ODR |= io_outputs->outputs[5];
+                    io_outputs->gpio->ODR |= io_outputs->out_arr[5];
                 }
             }
         break;
@@ -268,9 +268,9 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* packet)
         case 0x14: // set level high on channel 6
             if(io_outputs->size > 6)
             {
-                if(!(io_outputs->gpio->ODR & io_outputs->outputs[6]))
+                if(!(io_outputs->gpio->ODR & io_outputs->out_arr[6]))
                 {
-                    io_outputs->gpio->ODR |= io_outputs->outputs[6];
+                    io_outputs->gpio->ODR |= io_outputs->out_arr[6];
                 }
             }
         break;
@@ -278,9 +278,9 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* packet)
         case 0x15: // set level high on channel 7
             if(io_outputs->size > 7)
             {
-                if(!(io_outputs->gpio->ODR & io_outputs->outputs[7]))
+                if(!(io_outputs->gpio->ODR & io_outputs->out_arr[7]))
                 {
-                    io_outputs->gpio->ODR |= io_outputs->outputs[7];
+                    io_outputs->gpio->ODR |= io_outputs->out_arr[7];
                 }
             }
         break;
@@ -309,29 +309,12 @@ uint8_t DEV_Checksum(struct FS9Packet_t* packet, uint8_t size)
 //-----------------------
 void DEV_Input_Scan(void)
 {
-    for(uint8_t i = 0; i < io_inputs->size; ++i)
-    {
-        if((io_inputs->gpio->IDR & io_inputs->inputs[i].In) == true)
-        {
-            io_inputs->inputs[i].In_buf |= 1 << bit_count;
-        }
-    }
     
-    bit_count++;
 }
 //------------------------------
 void DEV_Input_Set_Default(void)
 {
-    for(uint8_t i = 0; i < io_inputs->size; ++i)
-    {
-        io_inputs->inputs[i].In_mode = IN_MODE_AC;
-        io_inputs->inputs[i].In_dir  = IN_DIR_DIRECT;
-        io_inputs->inputs[i].In_buf  = 0;
-        io_inputs->inputs[i].In_state = 0;
-    }
     
-    bit_count = 0;
-    Input_Ready = false;
 }
 //------------------------
 bool DEV_Input_Ready(void)
@@ -341,36 +324,12 @@ bool DEV_Input_Ready(void)
 //-------------------------
 void DEV_Input_Filter(void)
 {
-    for(uint8_t i = 0; i < io_inputs->size; ++i)
-    {
-        uint8_t count = 0;
-        
-        for(uint8_t j = 0; j < 10; ++j)
-        {
-            if((io_inputs->inputs[i].In_buf & (1 << j)) == true)
-            {
-                count++;
-            }
-        }
-        
-        if(count > 5)
-            io_inputs->inputs[i].In_state = 1; // the state is ON
-        else if(count > 0 && count <= 3)
-            io_inputs->inputs[i].In_state = 2; // the state is channel error
-    }
+    
 }
 //---------------------------------
 bool DEV_Input_Change_Channel(void)
 {
     bool state = false;
-    
-    for(uint8_t i = 0; i < io_inputs->size; ++i)
-    {
-        if(io_inputs->inputs[i].In_state == true)
-            state = true;
-    }
-    
-    DEV_Input_Set_Default();
     
     return state;
 }
@@ -378,15 +337,7 @@ bool DEV_Input_Change_Channel(void)
 void TIM16_IRQHandler(void)
 {
     if((TIM16->SR & TIM_SR_UIF) == TIM_SR_UIF)
-    {
-        if(bit_count == 10)
-        {
-            Input_Ready = true;
-            TIM16->CR1 &= ~TIM_CR1_CEN;
-        }
-        else
-            DEV_Input_Scan();
-        
+    {        
         TIM16->SR &= ~TIM_SR_UIF;
     }
 }
