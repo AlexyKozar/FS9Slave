@@ -105,21 +105,21 @@ int main(void)
     input.gpio  = GPIOA;
     output.gpio = GPIOB;
     
-    input.in_arr[0].in = GPIO_PIN_0; // input channel 1
-    input.in_arr[1].in = GPIO_PIN_1; // input channel 2
-    input.in_arr[2].in = GPIO_PIN_2; // input channel 3
-    input.in_arr[3].in = GPIO_PIN_3; // input channel 4
-    input.in_arr[4].in = GPIO_PIN_4; // input channel 5
-    input.in_arr[5].in = GPIO_PIN_5; // input channel 6
-    input.in_arr[6].in = GPIO_PIN_6; // input channel 7
-    input.in_arr[7].in = GPIO_PIN_7; // input channel 8
-    input.in_arr[8].in = GPIO_PIN_8; // input channel 9
-    input.in_arr[9].in = GPIO_PIN_9; // input channel 10
+    input.in_arr[0].pin = GPIO_PIN_0; // input channel 1
+    input.in_arr[1].pin = GPIO_PIN_1; // input channel 2
+    input.in_arr[2].pin = GPIO_PIN_2; // input channel 3
+    input.in_arr[3].pin = GPIO_PIN_3; // input channel 4
+    input.in_arr[4].pin = GPIO_PIN_4; // input channel 5
+    input.in_arr[5].pin = GPIO_PIN_5; // input channel 6
+    input.in_arr[6].pin = GPIO_PIN_6; // input channel 7
+    input.in_arr[7].pin = GPIO_PIN_7; // input channel 8
+    input.in_arr[8].pin = GPIO_PIN_8; // input channel 9
+    input.in_arr[9].pin = GPIO_PIN_9; // input channel 10
 
     if(addr == 0x00) // device-01
     {
-        input.in_arr[10].in = GPIO_PIN_10; // input channel 11
-        input.in_arr[11].in = GPIO_PIN_11; // input channel 12
+        input.in_arr[10].pin = GPIO_PIN_10; // input channel 11
+        input.in_arr[11].pin = GPIO_PIN_11; // input channel 12
         
         output.out_arr[0] = GPIO_PIN_10; // output chanel 1
         output.out_arr[1] = GPIO_PIN_15; // output chanel 2

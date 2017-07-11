@@ -30,7 +30,7 @@ void DEV_Init(struct PORT_Input_Type* inputs, struct PORT_Output_Type* outputs)
     
     for(uint8_t i = 0; i < io_inputs->size; ++i)
     {
-        in |= io_inputs->in_arr[i].in;
+        in |= io_inputs->in_arr[i].pin;
     }
     
     for(uint8_t i = 0; i < io_outputs->size; ++i)
@@ -309,12 +309,76 @@ uint8_t DEV_Checksum(struct FS9Packet_t* packet, uint8_t size)
 //-----------------------
 void DEV_Input_Scan(void)
 {
+    struct INPUT_Type* input = &io_inputs->in_arr[0]; // текущий вход
+    bool is_active = (io_inputs->gpio->IDR & input->pin)?true:false; // текущее состоние входа
+    bool lev_active = !input->state; // уровень который будет считаться активным
     
+    if(input->is_capture == false && is_active == true) // если вход не захвачен
+    {
+        // устанавливаем флаг захвата и инкрементируем счетчики тактов и импульсов
+        input->is_capture = true;
+        input->clock++;
+        input->impulse++;
+    }
+    else if(input->is_capture == true)
+    {
+        if(is_active == true)
+        {
+            input->impulse++;
+        }
+        else
+        {
+            if(input->impulse >= io_inputs->in_set.SGac)
+            {
+                input->state_period++;
+                input->impulse = 0;
+            }
+        }
+        
+        if(input->clock >= io_inputs->in_set.Dac)
+        {
+            input->period++;
+            input->clock = 0;
+        }
+        else
+            input->clock++;
+        
+        if(input->period >= io_inputs->in_set.Nac)
+        {
+            if(input->impulse >= io_inputs->in_set.SGac)
+            {
+                input->state_period++;
+            }
+            
+            if(input->state_period >= (input->period - 1))
+            {
+                input->state = true;
+            }
+            
+            input->clock        = 0;
+            input->impulse      = 0;
+            input->is_capture   = false;
+            input->period       = 0;
+            input->state_period = 0;
+        }
+    }
 }
 //------------------------------
 void DEV_Input_Set_Default(void)
 {
+    io_inputs->in_set.Nac  = 3;
+    io_inputs->in_set.Dac  = 10;
+    io_inputs->in_set.NSac = 4;
+    io_inputs->in_set.SGac = 5;
     
+    for(uint8_t i = 0; i < io_inputs->size; ++i)
+    {
+        io_inputs->in_arr[i].clock        = 0;
+        io_inputs->in_arr[i].impulse      = 0;
+        io_inputs->in_arr[i].period       = 0;
+        io_inputs->in_arr[i].state_period = 0;
+        io_inputs->in_arr[i].is_capture   = false;
+    }
 }
 //------------------------
 bool DEV_Input_Ready(void)
@@ -337,7 +401,9 @@ bool DEV_Input_Change_Channel(void)
 void TIM16_IRQHandler(void)
 {
     if((TIM16->SR & TIM_SR_UIF) == TIM_SR_UIF)
-    {        
+    {
+        DEV_Input_Scan();
+        
         TIM16->SR &= ~TIM_SR_UIF;
     }
 }

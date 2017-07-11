@@ -35,18 +35,21 @@
     //---------------
     struct INPUT_Type
     {
-        uint16_t              in;      // the input
-        struct INPUT_Set_Type set;
-        uint8_t               dir;  // the input direct
-        uint32_t              buf;  // the input buffer for filter
-        uint8_t               state; // the state input
+        uint16_t pin;    // the input
+        bool     state; // the current input state
+        uint8_t  clock; // the clock counter
+        uint8_t  period; // the period counter
+        uint8_t  impulse; // the impulse counter
+        uint8_t  state_period; // state counter for the period
+        bool     is_capture; // the input capture flag
     };
     //--------------------
     struct PORT_Input_Type
     {
-        GPIO_TypeDef*     gpio;
-        struct INPUT_Type in_arr[MAX_SIZE_DS_INPUT];
-        uint8_t           size;
+        GPIO_TypeDef*         gpio;
+        struct INPUT_Type     in_arr[MAX_SIZE_DS_INPUT];
+        struct INPUT_Set_Type in_set;
+        uint8_t               size;
     };
     //---------------------
     struct PORT_Output_Type
