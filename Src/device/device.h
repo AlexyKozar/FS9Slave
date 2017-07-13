@@ -7,6 +7,8 @@
     #include "stm32f0xx_hal_gpio.h"
     #include "fs9slave/fs9slave.h"
     #include "registers/registers.h"
+    //----------------------
+    #define F_CPU 48000000UL
     //---------------------------
     #define MAX_SIZE_DS_INPUT  12
     #define MAX_SIZE_DS_OUTPUT 8
@@ -22,7 +24,6 @@
     //-------------------
     struct INPUT_Set_Type
     {
-        uint8_t mode;
         uint8_t Nac;
         uint8_t Dac;
         float   SGac;
@@ -32,16 +33,26 @@
         uint8_t P0dc;
         uint8_t P1dc;
     };
+    //----------------------
+    struct INPUT_Filter_Type
+    {
+        uint8_t c_clock;    // счетчик тактов
+        uint8_t c_period;   // счетчик периодов для фильтрации
+        uint8_t c_high_lev; // счетчик импульсов лог. "1"
+        uint8_t c_low_lev;  // счетчик импульсов лог. "0"
+        uint8_t c_state;    // счетчик состояний входа 
+        bool    is_capture; // флаг захвата входа
+    };
     //---------------
     struct INPUT_Type
     {
-        uint16_t pin;    // the input
-        bool     state; // the current input state
-        uint8_t  clock; // the clock counter
-        uint8_t  period; // the period counter
-        uint8_t  impulse; // the impulse counter
-        uint8_t  state_period; // state counter for the period
-        bool     is_capture; // the input capture flag
+        uint16_t                 pin;    // номер входа
+        bool                     state;  // состояние входа (вкл или выкл)
+        struct INPUT_Filter_Type filter; // параметры входа
+        uint8_t                  Sdur;   // длительность сигнала в мс
+        uint8_t                  fault;  // погрешность в %
+        uint8_t                  mode;   // режим входа (AC/DC)
+        uint8_t                  dir;    // направление (прямой/инверсный)
     };
     //--------------------
     struct PORT_Input_Type
@@ -69,5 +80,7 @@
     void    DEV_Input_Set_Default(void);
     bool    DEV_Input_Ready(void);
     void    DEV_Input_Filter(void);
+    void    DEV_Input_Filter_AC(uint8_t index);
+    void    DEV_Input_Filter_DC(uint8_t index);
     bool    DEV_Input_Change_Channel(void);
 #endif

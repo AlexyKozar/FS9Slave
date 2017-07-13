@@ -7,8 +7,6 @@ struct PORT_Input_Type*  io_inputs;
 struct PORT_Output_Type* io_outputs;
 //---------------------
 uint8_t devAddr = 0xFF;
-//--------------------
-uint8_t bit_count = 0; // the bit counter
 //-----------------------
 bool Input_Ready = false;
 //-----------------------------------------------------
@@ -48,8 +46,8 @@ void DEV_Init(struct PORT_Input_Type* inputs, struct PORT_Output_Type* outputs)
     
     RCC->APB2ENR |= RCC_APB2ENR_TIM16EN;
     
-    TIM16->PSC   = 48 - 1;
-    TIM16->ARR   = 1000 - 1;
+    TIM16->PSC   = F_CPU/1000000UL - 1;
+    TIM16->ARR   = 10000/io_inputs->in_set.Dac - 1;
     TIM16->DIER |= TIM_DIER_UIE;
     TIM16->CR1  |= TIM_CR1_CEN;
     
@@ -309,59 +307,76 @@ uint8_t DEV_Checksum(struct FS9Packet_t* packet, uint8_t size)
 //-----------------------
 void DEV_Input_Scan(void)
 {
-    struct INPUT_Type* input = &io_inputs->in_arr[0]; // текущий вход
-    bool is_active = (io_inputs->gpio->IDR & input->pin)?true:false; // текущее состоние входа
-    bool lev_active = !input->state; // уровень который будет считаться активным
+    for(uint8_t i = 0; i < io_inputs->size; ++i)
+    {
+        if(io_inputs->in_arr[i].mode == IN_MODE_AC)
+            DEV_Input_Filter_AC(i);
+        else
+            DEV_Input_Filter_DC(i);
+    }
+}
+//-------------------------------------
+void DEV_Input_Filter_AC(uint8_t index)
+{
+    struct INPUT_Type* input = &io_inputs->in_arr[index];
     
-    if(input->is_capture == false && is_active == true) // если вход не захвачен
+    bool in_state  = io_inputs->gpio->IDR & input->pin;
+    bool act_level = !input->state; // ожидаемый уровень (при выключенном входе - лог "1", при включенном лог "0")
+    
+    if(input->filter.is_capture == false && in_state == act_level) // если захвата не было и на входе ожидаемый уровень
     {
-        // устанавливаем флаг захвата и инкрементируем счетчики тактов и импульсов
-        input->is_capture = true;
-        input->clock++;
-        input->impulse++;
+        input->filter.c_clock++;
+        input->filter.c_high_lev++;
+        input->filter.is_capture = true;
     }
-    else if(input->is_capture == true)
+    else if(input->filter.is_capture == true) // захват произведен - накопление данных
     {
-        if(is_active == true)
+        if(in_state == true)
+            input->filter.c_high_lev++;
+        else if(in_state == false)
+            input->filter.c_low_lev++;
+        
+        input->filter.c_clock++;
+        
+        if(input->filter.c_clock >= input->Sdur) // счетчик тактирования равен длительности сигнала
         {
-            input->impulse++;
-        }
-        else
-        {
-            if(input->impulse >= io_inputs->in_set.SGac)
-            {
-                input->state_period++;
-                input->impulse = 0;
-            }
+            // расчет полученной длительности сигнала
+            uint8_t duration = (act_level == true)?input->filter.c_high_lev + input->filter.c_low_lev:input->filter.c_low_lev;
+            
+            // расчет пределов погрешности
+            uint8_t dur_fault_beg = input->Sdur - (input->Sdur*input->fault)/100;
+            uint8_t dur_fault_end = input->Sdur + (input->Sdur*input->fault)/100;
+            
+            if(duration >= dur_fault_beg && duration <= dur_fault_end) // проверка сигнала на вхождение в пределы
+                input->filter.c_state++;
+            
+            input->filter.c_period++;
+            
+            input->filter.c_clock    = 0;
+            input->filter.c_high_lev = 0;
+            input->filter.c_low_lev  = 0;
         }
         
-        if(input->clock >= io_inputs->in_set.Dac)
+        if(input->filter.c_period >= io_inputs->in_set.Nac) // количество прошедших периодов равно установленному
         {
-            input->period++;
-            input->clock = 0;
-        }
-        else
-            input->clock++;
-        
-        if(input->period >= io_inputs->in_set.Nac)
-        {
-            if(input->impulse >= io_inputs->in_set.SGac)
-            {
-                input->state_period++;
+            if(input->filter.c_state >= (io_inputs->in_set.Nac - 1)) // количество изменений состояний входа за
+            {                                                        // прошедшие периоды равно (-1 первый период не
+                input->state = act_level;                            // считаем (списываем на помеху)
             }
             
-            if(input->state_period >= (input->period - 1))
-            {
-                input->state = true;
-            }
-            
-            input->clock        = 0;
-            input->impulse      = 0;
-            input->is_capture   = false;
-            input->period       = 0;
-            input->state_period = 0;
+            input->filter.c_clock    = 0;
+            input->filter.c_high_lev = 0;
+            input->filter.c_low_lev  = 0;
+            input->filter.c_period   = 0;
+            input->filter.c_state    = 0;
+            input->filter.is_capture = false;
         }
     }
+}
+//-------------------------------------
+void DEV_Input_Filter_DC(uint8_t index)
+{
+    
 }
 //------------------------------
 void DEV_Input_Set_Default(void)
@@ -373,11 +388,13 @@ void DEV_Input_Set_Default(void)
     
     for(uint8_t i = 0; i < io_inputs->size; ++i)
     {
-        io_inputs->in_arr[i].clock        = 0;
-        io_inputs->in_arr[i].impulse      = 0;
-        io_inputs->in_arr[i].period       = 0;
-        io_inputs->in_arr[i].state_period = 0;
-        io_inputs->in_arr[i].is_capture   = false;
+        io_inputs->in_arr[i].mode              = IN_MODE_AC;
+        io_inputs->in_arr[i].fault             = 10;
+        io_inputs->in_arr[i].filter.c_clock    = 0;
+        io_inputs->in_arr[i].filter.c_period   = 0;
+        io_inputs->in_arr[i].filter.c_state    = 0;
+        io_inputs->in_arr[i].filter.is_capture = false;
+        io_inputs->in_arr[i].Sdur              = 20;
     }
 }
 //------------------------
