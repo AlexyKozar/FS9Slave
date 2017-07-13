@@ -80,7 +80,6 @@
     uint8_t DEV_Checksum(struct FS9Packet_t* packet, uint8_t size);
     void    DEV_Input_Scan(void);
     void    DEV_Input_Set_Default(void);
-    bool    DEV_Input_Ready(void);
     void    DEV_Input_Filter(uint8_t index);
-    bool    DEV_Input_Change_Channel(void);
+    bool    DEV_Input_Changed_Channel(void);
 #endif

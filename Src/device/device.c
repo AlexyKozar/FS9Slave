@@ -7,8 +7,8 @@ struct PORT_Input_Type*  io_inputs;
 struct PORT_Output_Type* io_outputs;
 //---------------------
 uint8_t devAddr = 0xFF;
-//-----------------------
-bool Input_Ready = false;
+//-------------------------
+bool Input_Changed = false;
 //-----------------------------------------------------
 void DEV_Create(GPIO_TypeDef* gpio, uint16_t addr_pins)
 {
@@ -121,8 +121,39 @@ bool DEV_Request(struct FS9Packet_t* source, struct FS9Packet_t* dest)
 //------------------------------------------------------
 bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* packet)
 {
+    uint8_t bit_count = 0; // счетчик бит (позиция канала в байте)
+    
     switch(cmd)
     {
+        case 0x00: // чтение дискретных входов     
+            for(uint8_t i = 0; i < io_inputs->size; ++i)
+            {
+                if(bit_count == 8)
+                {
+                    bit_count = 0;
+                    packet->size++;
+                    packet->buffer[packet->size] = 0x00;
+                }
+                
+                uint8_t channel_state = 0x00;
+                
+                if(io_inputs->in_arr[i].state == true && io_inputs->in_arr[i].error == false)
+                {
+                    channel_state = 0x01;
+                }
+                else if(io_inputs->in_arr[i].error == true)
+                {
+                    channel_state = 0x02;
+                }
+                
+                packet->buffer[packet->size] |= channel_state << bit_count;
+                
+                bit_count += 2;
+            }
+            
+            packet->size = 3;
+        break;
+        
         case 0x06: // set level low on channel 0
             if(io_outputs->size > 0)
             {
@@ -378,9 +409,19 @@ void DEV_Input_Filter(uint8_t index)
             }
             
             if(is_valid == true) // проверка сигнала на вхождение в пределы
+            {
                 input->filter.c_state++;
+                
+                if(Input_Changed == false) // выставляем флаг изменения на входах
+                    Input_Changed = true;
+            }
             else
+            {
                 input->filter.с_error++; // иначе ошибка канала в текущем периоде
+                
+                if(Input_Changed == false)
+                    Input_Changed = true;
+            }
             
             input->filter.c_period++;
             
@@ -434,17 +475,10 @@ void DEV_Input_Set_Default(void)
         io_inputs->in_arr[i].filter.is_capture = false;
     }
 }
-//------------------------
-bool DEV_Input_Ready(void)
+//----------------------------------
+bool DEV_Input_Changed_Channel(void)
 {
-    return Input_Ready;
-}
-//---------------------------------
-bool DEV_Input_Change_Channel(void)
-{
-    bool state = false;
-    
-    return state;
+    return Input_Changed;
 }
 //-------------------------
 void TIM16_IRQHandler(void)
