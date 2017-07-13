@@ -27,6 +27,7 @@
         uint8_t Nac;
         uint8_t Dac;
         float   SGac;
+        uint8_t Sdur;   // длительность сигнала в мс
         float   NSac;
         uint8_t Ndc;
         uint8_t Ddc;
@@ -40,7 +41,8 @@
         uint8_t c_period;   // счетчик периодов для фильтрации
         uint8_t c_high_lev; // счетчик импульсов лог. "1"
         uint8_t c_low_lev;  // счетчик импульсов лог. "0"
-        uint8_t c_state;    // счетчик состояний входа 
+        uint8_t c_state;    // счетчик состояний входа
+        bool    с_error;    // счетчик ошибок канала
         bool    is_capture; // флаг захвата входа
     };
     //---------------
@@ -48,8 +50,8 @@
     {
         uint16_t                 pin;    // номер входа
         bool                     state;  // состояние входа (вкл или выкл)
+        bool                     error;  // ошибка канала
         struct INPUT_Filter_Type filter; // параметры входа
-        uint8_t                  Sdur;   // длительность сигнала в мс
         uint8_t                  fault;  // погрешность в %
         uint8_t                  mode;   // режим входа (AC/DC)
         uint8_t                  dir;    // направление (прямой/инверсный)
