@@ -125,7 +125,7 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* packet)
     
     switch(cmd)
     {
-        case 0x00: // чтение дискретных входов     
+        case 0x00: // чтение дискретных каналов входов
             for(uint8_t i = 0; i < io_inputs->size; ++i)
             {
                 if(bit_count == 8)
@@ -152,6 +152,22 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* packet)
             }
             
             packet->size = 3;
+        break;
+            
+        case 0x01: // чтение дискретных каналов выходов
+            packet->buffer[0] = 0x00;
+        
+            for(uint8_t i = 0; i < io_outputs->size; ++i)
+            {
+                uint16_t pin = io_outputs->out_arr[i];
+                
+                if((io_outputs->gpio->ODR & pin) == pin)
+                {
+                    packet->buffer[0] |= 0x01 << i;
+                }
+            }
+            
+            packet->size = 1;
         break;
         
         case 0x06: // set level low on channel 0
