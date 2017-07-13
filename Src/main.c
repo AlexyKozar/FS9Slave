@@ -171,9 +171,6 @@ int main(void)
     
     if(DEV_Input_Ready() == true)
     {
-        // the proccessing input data
-        DEV_Input_Filter();
-        
         if(DEV_Input_Change_Channel() == false)
         {
             struct FS9Packet_t packet;

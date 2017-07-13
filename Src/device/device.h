@@ -81,8 +81,6 @@
     void    DEV_Input_Scan(void);
     void    DEV_Input_Set_Default(void);
     bool    DEV_Input_Ready(void);
-    void    DEV_Input_Filter(void);
-    void    DEV_Input_Filter_AC(uint8_t index);
-    void    DEV_Input_Filter_DC(uint8_t index);
+    void    DEV_Input_Filter(uint8_t index);
     bool    DEV_Input_Change_Channel(void);
 #endif

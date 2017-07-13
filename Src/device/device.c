@@ -309,14 +309,11 @@ void DEV_Input_Scan(void)
 {
     for(uint8_t i = 0; i < io_inputs->size; ++i)
     {
-        if(io_inputs->in_arr[i].mode == IN_MODE_AC)
-            DEV_Input_Filter_AC(i);
-        else
-            DEV_Input_Filter_DC(i);
+        DEV_Input_Filter(i);
     }
 }
-//-------------------------------------
-void DEV_Input_Filter_AC(uint8_t index)
+//----------------------------------
+void DEV_Input_Filter(uint8_t index)
 {
     struct INPUT_Type* input = &io_inputs->in_arr[index];
     
@@ -348,85 +345,39 @@ void DEV_Input_Filter_AC(uint8_t index)
         if(input->filter.c_clock >= imp_count) // счетчик тактирования равен длительности сигнала
         {
             // расчет полученной длительности сигнала
-            uint8_t duration = (act_level == true)?input->filter.c_high_lev + input->filter.c_low_lev:input->filter.c_low_lev;
+            uint8_t duration;
+            
+            if(input->mode == IN_MODE_AC)
+            {
+                duration = (act_level == true)?input->filter.c_high_lev + input->filter.c_low_lev:
+                                               input->filter.c_low_lev;
+            }
+            else
+            {
+                duration = (act_level == true)?input->filter.c_high_lev:input->filter.c_low_lev;
+            }
             
             // расчет пределов погрешности
-            uint8_t dur_fault_beg = imp_count - (imp_count*input->fault)/100;
-            uint8_t dur_fault_end = imp_count + (imp_count*input->fault)/100;
+            bool is_valid = false;
             
-            if(duration >= dur_fault_beg && duration <= dur_fault_end) // проверка сигнала на вхождение в пределы
-                input->filter.c_state++;
+            if(input->mode == IN_MODE_AC)
+            {
+                uint8_t dur_fault_beg = imp_count - (imp_count*input->fault)/100;
+                uint8_t dur_fault_end = imp_count + (imp_count*input->fault)/100;
+                
+                if(duration >= dur_fault_beg && duration <= dur_fault_end) // проверка сигнала на вхождение в пределы
+                    is_valid = true;
+            }
             else
-                input->filter.с_error++; // иначе ошибка канала в текущем периоде
-            
-            input->filter.c_period++;
-            
-            input->filter.c_clock    = 0;
-            input->filter.c_high_lev = 0;
-            input->filter.c_low_lev  = 0;
-        }
-        
-        if(input->filter.c_period >= io_inputs->in_set.Nac) // количество прошедших периодов равно установленному
-        {
-            if(input->filter.c_state >= (io_inputs->in_set.Nac - 1)) // количество изменений состояний входа за
-            {                                                        // прошедшие периоды равно (-1 - первый период не
-                input->state = act_level;                            // считаем (списываем на помеху)
-            }
-            else if(input->filter.с_error >= (io_inputs->in_set.Nac - 1)) // иначе, если счетчик ошибок равен
-            {                                                              // количеству периодов - 1, то
-                input->error = true;                                       // ошибка канала
+            {
+                uint8_t fault = (act_level == true)?(duration*io_inputs->in_set.P1dc)/100:
+                                                    (duration*io_inputs->in_set.P0dc)/100;
+                
+                if(duration >= fault) // проверка сигнала на вхождение в предел погрешности
+                    is_valid = true;
             }
             
-            input->filter.c_clock    = 0;
-            input->filter.с_error    = 0;
-            input->filter.c_high_lev = 0;
-            input->filter.c_low_lev  = 0;
-            input->filter.c_period   = 0;
-            input->filter.c_state    = 0;
-            input->filter.is_capture = false;
-        }
-    }
-}
-//-------------------------------------
-void DEV_Input_Filter_DC(uint8_t index)
-{
-    struct INPUT_Type* input = &io_inputs->in_arr[index];
-    
-    bool in_state  = io_inputs->gpio->IDR & input->pin;
-    bool act_level = !input->state; // ожидаемый уровень (при выключенном входе - лог "1", при включенном лог "0")
-    
-    // счетчик импульсов на окно - введен для работы со стендом, т.к. частота сигнала 50Гц вместо 100Гц
-
-    uint8_t imp_count = io_inputs->in_set.Sdur/10*io_inputs->in_set.Dac;
-    
-    if(input->filter.is_capture == false && in_state == act_level) // если захвата не было и на входе ожидаемый уровень
-    {
-        input->filter.c_clock++;
-        input->filter.is_capture = true;
-        
-        if(act_level == true)
-            input->filter.c_high_lev++;
-        else
-            input->filter.c_low_lev++;
-    }
-    else if(input->filter.is_capture == true)
-    {
-        if(in_state == true)
-            input->filter.c_high_lev++;
-        else if(in_state == false)
-            input->filter.c_low_lev++;
-        
-        input->filter.c_clock++;
-        
-        if(input->filter.c_clock >= imp_count) // счетчик тактирования равен длительности сигнала
-        {
-            // расчет полученной длительности сигнала
-            uint8_t duration = (act_level == true)?input->filter.c_high_lev:input->filter.c_low_lev;
-            
-            // расчет погрешности
-            uint8_t fault = (act_level == true)?(duration*io_inputs->in_set.P1dc)/100:(duration*io_inputs->in_set.P0dc)/100;
-            
-            if(duration >= fault) // проверка сигнала на вхождение в предел погрешности
+            if(is_valid == true) // проверка сигнала на вхождение в пределы
                 input->filter.c_state++;
             else
                 input->filter.с_error++; // иначе ошибка канала в текущем периоде
@@ -487,11 +438,6 @@ void DEV_Input_Set_Default(void)
 bool DEV_Input_Ready(void)
 {
     return Input_Ready;
-}
-//-------------------------
-void DEV_Input_Filter(void)
-{
-    
 }
 //---------------------------------
 bool DEV_Input_Change_Channel(void)
