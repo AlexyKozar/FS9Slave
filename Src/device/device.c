@@ -52,6 +52,8 @@ void DEV_Init(struct PORT_Input_Type* inputs, struct PORT_Output_Type* outputs)
     TIM16->CR1  |= TIM_CR1_CEN;
     
     NVIC_EnableIRQ(TIM16_IRQn);
+    
+    AIN_Init();
 }
 //--------------------------------------
 void IO_Clock_Enable(GPIO_TypeDef* gpio)

@@ -504,6 +504,11 @@
               <FileType>1</FileType>
               <FilePath>..\Src\device\fs9slave\cmd\cmd.c</FilePath>
             </File>
+            <File>
+              <FileName>ain.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Src\device\ain\ain.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
