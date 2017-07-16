@@ -171,8 +171,12 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* packet)
             
             packet->size = 1;
         break;
+            
+        case 0x02:
+            while(AIN_Is_Ready == false); // ожидание готовности результатов
+        break;
         
-        case 0x06: // set level low on channel 0
+        case 0x06: // установка значения 0 на выходе канала 0
             if(io_outputs->size > 0)
             {
                 if(io_outputs->gpio->ODR & io_outputs->out_arr[0])
@@ -182,7 +186,7 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* packet)
             }
         break;
             
-        case 0x07: // set level low on channel 1
+        case 0x07: // установка значения 0 на выходе канала 1
             if(io_outputs->size > 1)
             {
                 if(io_outputs->gpio->ODR & io_outputs->out_arr[1])
@@ -192,7 +196,7 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* packet)
             }
         break;
             
-        case 0x08: // set level low on channel 2
+        case 0x08: // установка значения 0 на выходе канала 2
             if(io_outputs->size > 2)
             {
                 if(io_outputs->gpio->ODR & io_outputs->out_arr[2])
@@ -202,7 +206,7 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* packet)
             }
         break;
             
-        case 0x09: // set level low on channel 3
+        case 0x09: // установка значения 0 на выходе канала 3
             if(io_outputs->size > 3)
             {
                 if(io_outputs->gpio->ODR & io_outputs->out_arr[3])
@@ -212,7 +216,7 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* packet)
             }
         break;
             
-        case 0x0A: // set level low on channel 4
+        case 0x0A: // установка значения 0 на выходе канала 4
             if(io_outputs->size > 4)
             {
                 if(io_outputs->gpio->ODR & io_outputs->out_arr[4])
@@ -222,7 +226,7 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* packet)
             }
             break;
             
-        case 0x0B: // set level low on channel 5
+        case 0x0B: // установка значения 0 на выходе канала 5
             if(io_outputs->size > 5)
             {
                 if(io_outputs->gpio->ODR & io_outputs->out_arr[5])
@@ -232,7 +236,7 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* packet)
             }
         break;
             
-        case 0x0C: // set level low on channel 6
+        case 0x0C: // установка значения 0 на выходе канала 6
             if(io_outputs->size > 6)
             {
                 if(io_outputs->gpio->ODR & io_outputs->out_arr[6])
@@ -242,7 +246,7 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* packet)
             }
         break;
             
-        case 0x0D: // set level low on channel 7
+        case 0x0D: // установка значения 0 на выходе канала 7
             if(io_outputs->size > 7)
             {
                 if(io_outputs->gpio->ODR & io_outputs->out_arr[7])
@@ -252,7 +256,7 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* packet)
             }
         break;
             
-        case 0x0E: // set level high on channel 0
+        case 0x0E: // установка значения 1 на выходе канала 0
             if(io_outputs->size > 0)
             {
                 if(!(io_outputs->gpio->ODR & io_outputs->out_arr[0]))
@@ -262,7 +266,7 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* packet)
             }
         break;
             
-        case 0x0F: // set level high on channel 1
+        case 0x0F: // установка значения 1 на выходе канала 1
             if(io_outputs->size > 1)
             {
                 if(!(io_outputs->gpio->ODR & io_outputs->out_arr[1]))
@@ -272,7 +276,7 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* packet)
             }
         break;
             
-        case 0x10: // set level high on channel 2
+        case 0x10: // установка значения 1 на выходе канала 2
             if(io_outputs->size > 2)
             {
                 if(!(io_outputs->gpio->ODR & io_outputs->out_arr[2]))
@@ -282,7 +286,7 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* packet)
             }
         break;
             
-        case 0x11: // set level high on channel 3
+        case 0x11: // установка значения 1 на выходе канала 3
             if(io_outputs->size > 3)
             {
                 if(!(io_outputs->gpio->ODR & io_outputs->out_arr[3]))
@@ -292,7 +296,7 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* packet)
             }
         break;
             
-        case 0x12: // set level high on channel 4
+        case 0x12: // установка значения 1 на выходе канала 4
             if(io_outputs->size > 4)
             {
                 if(!(io_outputs->gpio->ODR & io_outputs->out_arr[4]))
@@ -302,7 +306,7 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* packet)
             }
         break;
             
-        case 0x13: // set level high on channel 5
+        case 0x13: // установка значения 1 на выходе канала 5
             if(io_outputs->size > 5)
             {
                 if(!(io_outputs->gpio->ODR & io_outputs->out_arr[5]))
@@ -312,7 +316,7 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* packet)
             }
         break;
             
-        case 0x14: // set level high on channel 6
+        case 0x14: // установка значения 1 на выходе канала 6
             if(io_outputs->size > 6)
             {
                 if(!(io_outputs->gpio->ODR & io_outputs->out_arr[6]))
@@ -322,7 +326,7 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* packet)
             }
         break;
             
-        case 0x15: // set level high on channel 7
+        case 0x15: // установка значения 1 на выходе канала 7
             if(io_outputs->size > 7)
             {
                 if(!(io_outputs->gpio->ODR & io_outputs->out_arr[7]))

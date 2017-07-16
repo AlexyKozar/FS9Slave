@@ -48,8 +48,6 @@ UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
 /* Private variables ---------------------------------------------------------*/
-/* Temperature sensor calibration value address */
-    #define TEMP30_CAL_ADDR ((uint16_t*) ((uint32_t) 0x1FFFF7B8))
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -168,19 +166,6 @@ int main(void)
             FS9_write(&packet_dest);
         }
     }
-    
-    /*if(DEV_Input_Changed_Channel() == true)
-    {
-        struct FS9Packet_t packet;
-        
-        packet.buffer[0] = 0xFF;
-        packet.buffer[1] = 0x01;
-        packet.buffer[2] = 0xFF;
-        
-        packet.size = 3;
-        
-        FS9_write(&packet);
-    }*/
   }
   /* USER CODE END 3 */
 

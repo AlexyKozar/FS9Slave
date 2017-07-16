@@ -1,6 +1,10 @@
 #include "ain.h"
 //--------------------------------------
 uint16_t AIN_channels[MAX_NUM_CHANNELS];
+uint16_t AIN_buffer[MAX_NUM_CHANNELS];
+uint16_t AIN_result[MAX_NUM_CHANNELS];
+uint8_t  conv_count = 0;
+bool     AIN_is_eoc = false;
 //-----------------
 void AIN_Init(void)
 {
@@ -44,11 +48,59 @@ void AIN_Init(void)
     
     ADC1->CR |= ADC_CR_ADSTART;
 }
+//---------------------
+bool AIN_Is_Ready(void)
+{
+    return AIN_is_eoc;
+}
+//-----------------------------
+float AIN_Get_Temperature(void)
+{
+    return 0.0f;
+}
+//---------------------------
+float AIN_Get_Channel_1(void)
+{
+    return 0.0f;
+}
+//---------------------------
+float AIN_Get_Channel_2(void)
+{
+    return 0.0f;
+}
 //----------------------------
 void DMA1_Ch1_IRQHandler(void)
 {
     if((DMA1->ISR & DMA_ISR_TCIF1) == DMA_ISR_TCIF1)
     {
-        DMA1->IFCR |= DMA_IFCR_CTCIF1;
+        DMA1_Channel1->CCR &= ~DMA_CCR_TCIE; // отключаем прерывания DMA
+        
+        AIN_buffer[0] += AIN_channels[0];
+        AIN_buffer[1] += AIN_channels[1];
+        AIN_buffer[2] += AIN_channels[2];
+        AIN_buffer[3] += AIN_channels[3];
+        
+        conv_count++;
+        
+        if(conv_count == MAX_NUM_CONVERSION)
+        {
+            AIN_is_eoc = false; // снимаем флаг готовности данных (на время сохранения новых)
+            
+            AIN_result[0] = AIN_buffer[0]/MAX_NUM_CONVERSION;
+            AIN_result[1] = AIN_buffer[1]/MAX_NUM_CONVERSION;
+            AIN_result[2] = AIN_buffer[2]/MAX_NUM_CONVERSION;
+            AIN_result[3] = AIN_buffer[3]/MAX_NUM_CONVERSION;
+            
+            AIN_buffer[0] = 0;
+            AIN_buffer[1] = 0;
+            AIN_buffer[2] = 0;
+            AIN_buffer[3] = 0;
+            
+            AIN_is_eoc = true; // устанавливаем флаг готовности данных
+            conv_count = 0;
+        }
+        
+        DMA1->IFCR         |= DMA_IFCR_CTCIF1;
+        DMA1_Channel1->CCR |= DMA_CCR_TCIE; // подключаем прерывания DMA
     }
 }
