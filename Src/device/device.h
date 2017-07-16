@@ -72,6 +72,12 @@
         uint16_t      out_arr[MAX_SIZE_DS_OUTPUT];
         uint8_t       size;
     };
+    //-----------
+    union float_t
+    {
+        uint8_t byte[4];
+        float   number;
+    };
     //---------------------------------------------------------
     void    DEV_Create(GPIO_TypeDef* gpio, uint16_t addr_pins);
     void    DEV_Init(struct PORT_Input_Type* inputs, struct PORT_Output_Type* outputs);

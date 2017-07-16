@@ -172,9 +172,42 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* packet)
             packet->size = 1;
         break;
             
-        case 0x02:
+        case 0x02: // чтение аналоговых величин 1..4
             while(AIN_Is_Ready() == false); // ожидание готовности результатов
-            int32_t temp = AIN_Get_Temperature();
+            
+            int32_t  temp = AIN_Get_Temperature();
+            uint16_t ain1 = AIN_Get_Channel_1();
+            uint16_t ain2 = AIN_Get_Channel_2();
+            
+            union float_t t;
+            
+            t.number = ain1/1000.0f;
+            
+            packet->buffer[0] = t.byte[0];
+            packet->buffer[1] = t.byte[1];
+            packet->buffer[2] = t.byte[2];
+            packet->buffer[3] = t.byte[3];
+        
+            t.number = ain2/1000.0f;
+            
+            packet->buffer[4] = t.byte[0];
+            packet->buffer[5] = t.byte[1];
+            packet->buffer[6] = t.byte[2];
+            packet->buffer[7] = t.byte[3];
+        
+            t.number = temp/1000.0f;
+        
+            packet->buffer[8]  = t.byte[0];
+            packet->buffer[9]  = t.byte[1];
+            packet->buffer[10] = t.byte[2];
+            packet->buffer[11] = t.byte[3];
+        
+            packet->buffer[12] = 0x00;
+            packet->buffer[13] = 0x00;
+            packet->buffer[14] = 0x00;
+            packet->buffer[15] = 0x00;
+        
+            packet->size = 16;
         break;
         
         case 0x06: // установка значения 0 на выходе канала 0

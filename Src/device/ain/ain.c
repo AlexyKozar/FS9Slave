@@ -1,12 +1,11 @@
 #include "ain.h"
 //--------------------------------------
-uint16_t AIN_channels[MAX_NUM_CHANNELS];
-uint16_t AIN_buffer[MAX_NUM_CHANNELS];
-uint16_t AIN_result[MAX_NUM_CHANNELS];
-uint8_t  conv_count = 0;
-bool     AIN_is_eoc = false;
-uint16_t VDDA = 0;
-int32_t  TEMP = 0;
+volatile uint16_t AIN_channels[MAX_NUM_CHANNELS];
+volatile uint16_t AIN_buffer[MAX_NUM_CHANNELS];
+volatile uint16_t AIN_result[MAX_NUM_CHANNELS];
+volatile uint8_t  conv_count = 0;
+volatile bool     AIN_is_eoc = false;
+volatile uint16_t VDDA = 0;
 //-----------------
 void AIN_Init(void)
 {
@@ -60,18 +59,18 @@ int32_t AIN_Get_Temperature(void)
 {
     int32_t temp = ((uint32_t)*TEMP30_CAL_ADDR - ((uint32_t)AIN_result[2]*VDDA/3300))*1000;
     temp = (temp/4300.0f + 30.0f)*1000;
-    TEMP = temp;
+    
     return temp;
 }
 //------------------------------
 uint16_t AIN_Get_Channel_1(void)
 {
-    return AIN_result[0]/4095*VDDA;
+    return ((float)AIN_result[0]/4095)*VDDA;
 }
 //------------------------------
 uint16_t AIN_Get_Channel_2(void)
 {
-    return AIN_result[1]/4095*VDDA;
+    return ((float)AIN_result[1]/4095)*VDDA;
 }
 //----------------------------
 void DMA1_Ch1_IRQHandler(void)
