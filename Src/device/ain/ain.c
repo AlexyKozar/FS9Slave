@@ -5,6 +5,8 @@ uint16_t AIN_buffer[MAX_NUM_CHANNELS];
 uint16_t AIN_result[MAX_NUM_CHANNELS];
 uint8_t  conv_count = 0;
 bool     AIN_is_eoc = false;
+uint16_t VDDA = 0;
+int32_t  TEMP = 0;
 //-----------------
 void AIN_Init(void)
 {
@@ -53,20 +55,23 @@ bool AIN_Is_Ready(void)
 {
     return AIN_is_eoc;
 }
-//-----------------------------
-float AIN_Get_Temperature(void)
+//-------------------------------
+int32_t AIN_Get_Temperature(void)
 {
-    return 0.0f;
+    int32_t temp = ((uint32_t)*TEMP30_CAL_ADDR - ((uint32_t)AIN_result[2]*VDDA/3300))*1000;
+    temp = (temp/4300.0f + 30.0f)*1000;
+    TEMP = temp;
+    return temp;
 }
-//---------------------------
-float AIN_Get_Channel_1(void)
+//------------------------------
+uint16_t AIN_Get_Channel_1(void)
 {
-    return 0.0f;
+    return AIN_result[0]/4095*VDDA;
 }
-//---------------------------
-float AIN_Get_Channel_2(void)
+//------------------------------
+uint16_t AIN_Get_Channel_2(void)
 {
-    return 0.0f;
+    return AIN_result[1]/4095*VDDA;
 }
 //----------------------------
 void DMA1_Ch1_IRQHandler(void)
@@ -98,6 +103,8 @@ void DMA1_Ch1_IRQHandler(void)
             
             AIN_is_eoc = true; // устанавливаем флаг готовности данных
             conv_count = 0;
+            
+            VDDA = 3300*(*VREFINT_CAL_ADDR)/AIN_result[3];
         }
         
         DMA1->IFCR         |= DMA_IFCR_CTCIF1;

@@ -173,7 +173,8 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* packet)
         break;
             
         case 0x02:
-            while(AIN_Is_Ready == false); // ожидание готовности результатов
+            while(AIN_Is_Ready() == false); // ожидание готовности результатов
+            int32_t temp = AIN_Get_Temperature();
         break;
         
         case 0x06: // установка значения 0 на выходе канала 0
