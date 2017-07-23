@@ -2,6 +2,7 @@
 //---------------------------------------
 void IO_Clock_Enable(GPIO_TypeDef* gpio);
 void IO_Init(GPIO_TypeDef* gpio, uint16_t io, uint8_t io_dir);
+void TIM_Set_Discret(void);
 //---------------------------------
 struct PORT_Input_Type*  io_inputs;
 struct PORT_Output_Type* io_outputs;
@@ -38,9 +39,11 @@ void DEV_Init(struct PORT_Input_Type* inputs, struct PORT_Output_Type* outputs)
     
     IO_Clock_Enable(io_inputs->gpio);
     IO_Clock_Enable(io_outputs->gpio);
+    IO_Clock_Enable(GPIOB); // подключение тактирования для вывода INT
     
     IO_Init(io_inputs->gpio, in, DEV_IO_INPUT);
     IO_Init(io_outputs->gpio, out, DEV_IO_OUTPUT);
+    IO_Init(GPIOB, GPIO_PIN_5, DEV_IO_OUTPUT); // вывод INT как выход
     
     DEV_Input_Set_Default();
     
@@ -48,6 +51,7 @@ void DEV_Init(struct PORT_Input_Type* inputs, struct PORT_Output_Type* outputs)
     
     TIM16->PSC   = F_CPU/1000000UL - 1;
     TIM16->ARR   = 10000/io_inputs->in_set.Dac - 1;
+    TIM16->CR1  |= TIM_CR1_ARPE;
     TIM16->DIER |= TIM_DIER_UIE;
     TIM16->CR1  |= TIM_CR1_CEN;
     
@@ -75,6 +79,11 @@ void IO_Init(GPIO_TypeDef* gpio, uint16_t io, uint8_t io_dir)
     GPIO_InitStruct.Mode = (io_dir == 0x01)?GPIO_MODE_OUTPUT_PP:GPIO_MODE_INPUT;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     HAL_GPIO_Init(gpio, &GPIO_InitStruct);
+}
+//------------------------
+void TIM_Set_Discret(void)
+{
+    TIM16->ARR = 10000/io_inputs->in_set.Dac - 1;
 }
 //-----------------------
 uint8_t DEV_Address(void)
@@ -124,6 +133,10 @@ bool DEV_Request(struct FS9Packet_t* source, struct FS9Packet_t* dest)
 bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* packet)
 {
     uint8_t bit_count = 0; // счетчик бит (позиция канала в байте)
+    
+    int32_t  temp;
+    uint16_t ain1;
+    uint16_t ain2;
     
     switch(cmd)
     {
@@ -175,9 +188,9 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* packet)
         case 0x02: // чтение аналоговых величин 1..4
             while(AIN_Is_Ready() == false); // ожидание готовности результатов
             
-            int32_t  temp = AIN_Get_Temperature();
-            uint16_t ain1 = AIN_Get_Channel_1();
-            uint16_t ain2 = AIN_Get_Channel_2();
+            temp = AIN_Get_Temperature();
+            ain1 = AIN_Get_Channel_1();
+            ain2 = AIN_Get_Channel_2();
             
             union float_t t;
             
@@ -431,59 +444,97 @@ void DEV_Input_Filter(uint8_t index)
         
         if(input->filter.c_clock >= imp_count) // счетчик тактирования равен длительности сигнала
         {
-            // расчет полученной длительности сигнала
-            uint8_t duration;
-            
-            if(input->mode == IN_MODE_AC)
-            {
-                duration = (act_level == true)?input->filter.c_high_lev + input->filter.c_low_lev:
-                                               input->filter.c_low_lev;
-            }
-            else
-            {
-                duration = (act_level == true)?input->filter.c_high_lev:input->filter.c_low_lev;
-            }
-            
-            // расчет пределов погрешности
+            uint8_t count = (act_level == true)?input->filter.c_high_lev:input->filter.c_low_lev;
             bool is_valid = false;
             
             if(input->mode == IN_MODE_AC)
             {
-                uint8_t dur_fault_beg = imp_count - (imp_count*input->fault)/100;
-                uint8_t dur_fault_end = imp_count + (imp_count*input->fault)/100;
-                
-                if(duration >= dur_fault_beg && duration <= dur_fault_end) // проверка сигнала на вхождение в пределы
+                if(count >= io_inputs->in_set.SGac)
+                {
                     is_valid = true;
+                }
+                else
+                {
+                    is_valid = false;
+                }
             }
-            else
+            else if(input->mode == IN_MODE_DC)
             {
-                uint8_t fault = (act_level == true)?(duration*io_inputs->in_set.P1dc)/100:
-                                                    (duration*io_inputs->in_set.P0dc)/100;
-                
-                if(duration >= fault) // проверка сигнала на вхождение в предел погрешности
-                    is_valid = true;
+                if(act_level == true)
+                {
+                    if(count >= io_inputs->in_set.P1dc)
+                    {
+                        is_valid = true;
+                    }
+                    else
+                    {
+                        is_valid = false;
+                    }
+                }
+                else if(act_level == false)
+                {
+                    if(count >= io_inputs->in_set.P0dc)
+                    {
+                        is_valid = true;
+                    }
+                    else
+                    {
+                        is_valid = false;
+                    }
+                }
             }
             
-            if(is_valid == true) // проверка сигнала на вхождение в пределы
+            if(is_valid == true)
             {
-                input->filter.c_state++;
+                // расчет полученной длительности сигнала
+                uint8_t duration;
                 
-                if(Input_Changed == false) // выставляем флаг изменения на входах
-                    Input_Changed = true;
-            }
-            else
-            {
-                input->filter.с_error++; // иначе ошибка канала в текущем периоде
+                if(input->mode == IN_MODE_AC)
+                {
+                    duration = (act_level == true)?input->filter.c_high_lev + input->filter.c_low_lev:
+                                                   input->filter.c_low_lev;
+                }
+                else
+                {
+                    duration = (act_level == true)?input->filter.c_high_lev:input->filter.c_low_lev;
+                }
                 
-                if(Input_Changed == false)
-                    Input_Changed = true;
+                // расчет пределов погрешности
+                is_valid = false;
+                
+                if(input->mode == IN_MODE_AC)
+                {
+                    uint8_t dur_fault_beg = imp_count - (imp_count*input->fault)/100;
+                    uint8_t dur_fault_end = imp_count + (imp_count*input->fault)/100;
+                    
+                    
+                    if(duration >= dur_fault_beg && duration <= dur_fault_end) // проверка сигнала на вхождение в пределы
+                        is_valid = true;
+                }
+                else
+                {
+                    uint8_t fault = (act_level == true)?(duration*io_inputs->in_set.P1dc)/100:
+                                                        (duration*io_inputs->in_set.P0dc)/100;
+                    
+                    if(duration >= fault) // проверка сигнала на вхождение в предел погрешности
+                        is_valid = true;
+                }
+                
+                if(is_valid == true) // проверка сигнала на вхождение в пределы
+                {
+                    input->filter.c_state++;
+                }
+                else
+                {
+                    input->filter.с_error++; // иначе ошибка канала в текущем периоде
+                }
+                
+                input->filter.c_period++;
+                
+                input->filter.c_clock    = 0;
+                input->filter.c_high_lev = 0;
+                input->filter.c_low_lev  = 0;
             }
-            
-            input->filter.c_period++;
-            
-            input->filter.c_clock    = 0;
-            input->filter.c_high_lev = 0;
-            input->filter.c_low_lev  = 0;
         }
         
         if(input->filter.c_period >= io_inputs->in_set.Nac) // количество прошедших периодов равно установленному
@@ -491,10 +542,16 @@ void DEV_Input_Filter(uint8_t index)
             if(input->filter.c_state >= (io_inputs->in_set.Nac - 1)) // количество изменений состояний входа за
             {                                                        // прошедшие периоды равно (-1 - первый период не
                 input->state = act_level;                            // считаем (списываем на помеху)
+                
+                if(Input_Changed == false) // выставляем флаг изменения на входах
+                    Input_Changed = true;
             }
             else if(input->filter.с_error >= (io_inputs->in_set.Nac - 1)) // иначе, если счетчик ошибок равен
             {                                                              // количеству периодов - 1, то
                 input->error = true;                                       // ошибка канала
+                
+                if(Input_Changed == false) // выставляем флаг изменения на входах
+                    Input_Changed = true;
             }
             
             input->filter.c_clock    = 0;
@@ -515,6 +572,8 @@ void DEV_Input_Set_Default(void)
     io_inputs->in_set.NSac = 4;
     io_inputs->in_set.SGac = 5;
     io_inputs->in_set.Sdur = 20;
+    io_inputs->in_set.Ndc  = 3;
+    io_inputs->in_set.Ddc  = 10;
     io_inputs->in_set.P0dc = 80;
     io_inputs->in_set.P1dc = 80;
     
