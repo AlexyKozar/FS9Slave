@@ -174,6 +174,7 @@ void FS9_IRQHandler(void)
             if(rx_size() == rx_bytes) // packet receiver
             {
                 FS9_Data_Ready = true;
+                is_cmd         = false;
             }
         }
         
