@@ -2,7 +2,10 @@
 //---------------------------------------
 void IO_Clock_Enable(GPIO_TypeDef* gpio);
 void IO_Init(GPIO_TypeDef* gpio, uint16_t io, uint8_t io_dir);
-void TIM_Set_Discret(void);
+void TIM_Scan_Init(void);
+void TIM_Scan_Update(void);
+void TIM_INT_Init(void);
+void TIM_INT_Start(void);
 //---------------------------------
 struct PORT_Input_Type*  io_inputs;
 struct PORT_Output_Type* io_outputs;
@@ -43,19 +46,14 @@ void DEV_Init(struct PORT_Input_Type* inputs, struct PORT_Output_Type* outputs)
     
     IO_Init(io_inputs->gpio, in, DEV_IO_INPUT);
     IO_Init(io_outputs->gpio, out, DEV_IO_OUTPUT);
-    IO_Init(GPIOB, GPIO_PIN_5, DEV_IO_OUTPUT); // вывод INT как выход
+    IO_Init(GPIO_INT, GPIO_INT_PIN, DEV_IO_OUTPUT); // вывод INT как выход
+    
+    GPIO_INT->BSRR |= GPIO_INT_SET; // включить выход INT (default state)
     
     DEV_Input_Set_Default();
     
-    RCC->APB2ENR |= RCC_APB2ENR_TIM16EN;
-    
-    TIM16->PSC   = F_CPU/1000000UL - 1;
-    TIM16->ARR   = 10000/io_inputs->in_set.Dac - 1;
-    TIM16->CR1  |= TIM_CR1_ARPE;
-    TIM16->DIER |= TIM_DIER_UIE;
-    TIM16->CR1  |= TIM_CR1_CEN;
-    
-    NVIC_EnableIRQ(TIM16_IRQn);
+    TIM_Scan_Init();
+    TIM_INT_Init();
     
     AIN_Init();
 }
@@ -80,10 +78,46 @@ void IO_Init(GPIO_TypeDef* gpio, uint16_t io, uint8_t io_dir)
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     HAL_GPIO_Init(gpio, &GPIO_InitStruct);
 }
-//------------------------
-void TIM_Set_Discret(void)
+//----------------------
+void TIM_Scan_Init(void)
 {
-    TIM16->ARR = 10000/io_inputs->in_set.Dac - 1;
+    RCC->APB2ENR |= RCC_APB2ENR_TIM16EN;
+    
+    TIM16->PSC   = F_CPU/1000000UL - 1;
+    
+    TIM_Scan_Update();
+    
+    TIM16->CR1  |= TIM_CR1_ARPE;
+    TIM16->DIER |= TIM_DIER_UIE;
+    TIM16->CR1  |= TIM_CR1_CEN;
+    
+    NVIC_EnableIRQ(TIM16_IRQn);
+}
+//------------------------
+void TIM_Scan_Update(void)
+{
+    TIM16->ARR   = 10000/io_inputs->in_set.Dac - 1;
+    TIM16->DIER &= ~TIM_DIER_UIE;
+    TIM16->EGR  |= TIM_EGR_UG;
+    TIM16->DIER |= TIM_DIER_UIE;
+}
+//---------------------
+void TIM_INT_Init(void)
+{
+    RCC->APB2ENR |= RCC_APB2ENR_TIM17EN;
+    
+    TIM17->PSC   = F_CPU/1000000UL - 1;
+    TIM17->ARR   = 5000; // 5 ms сигнал INT
+    TIM17->DIER |= TIM_DIER_UIE;
+    TIM17->CR1  |= TIM_CR1_OPM;
+    
+    NVIC_EnableIRQ(TIM17_IRQn);
+}
+//----------------------
+void TIM_INT_Start(void)
+{
+    GPIO_INT->BSRR |= GPIO_INT_RESET;
+    TIM17->CR1 |= TIM_CR1_CEN;
 }
 //-----------------------
 uint8_t DEV_Address(void)
@@ -110,7 +144,16 @@ bool DEV_Request(struct FS9Packet_t* source, struct FS9Packet_t* dest)
     if(checksum != source->buffer[source->size - 1])
         return false;
     
-    if(!DEV_Driver(cmd, dest))
+    struct FS9Packet_t packet;
+    
+    packet.size = source->size - 2;
+    
+    for(uint8_t i = 0; i < packet.size; ++i)
+    {
+        packet.buffer[i] = source->buffer[i + 1];
+    }
+    
+    if(!DEV_Driver(cmd, &packet, dest))
         return false;
     
     if(tcmd.n > 0 && tcmd.m > 0)
@@ -129,8 +172,8 @@ bool DEV_Request(struct FS9Packet_t* source, struct FS9Packet_t* dest)
     
     return true;
 }
-//------------------------------------------------------
-bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* packet)
+//--------------------------------------------------------------------------------
+bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packet)
 {
     uint8_t bit_count = 0; // счетчик бит (позиция канала в байте)
     
@@ -382,6 +425,39 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* packet)
                 }
             }
         break;
+            
+        case 0x3D: // изменение длительности сигнала
+            if(data->size == 1)
+            {
+                io_inputs->in_set.Sdur = data->buffer[0];
+            }
+        break;
+            
+        case 0x3E: // изменение параметров фильтрации
+            if(data->size == 3)
+            {
+                io_inputs->in_set.Nac = data->buffer[0]; // количество периодов фильтрации
+                io_inputs->in_set.Dac = data->buffer[1]; // количество выборок на период
+                io_inputs->in_set.SGac = data->buffer[2]; // длительность сигнала считаемая, что сигнал валидный
+            }
+        break;
+            
+        case 0x3F: // изменение входа
+            if(data->size == 3)
+            {
+                uint8_t in_num = data->buffer[0]; // номер настраиваемого входа
+                io_inputs->in_arr[in_num].mode  = data->buffer[1]; // режим работы входа AC или DC
+                
+                if(io_inputs->in_arr[in_num].mode == IN_MODE_AC)
+                {
+                    io_inputs->in_arr[in_num].fault = data->buffer[2]; // погрешность допускаемая за один период - в процентах
+                }
+                else
+                {
+                    io_inputs->in_set.P0dc = io_inputs->in_set.P1dc = data->buffer[2];
+                }
+            }
+        break;
         
         default: 
             return false;
@@ -410,6 +486,11 @@ void DEV_Input_Scan(void)
     for(uint8_t i = 0; i < io_inputs->size; ++i)
     {
         DEV_Input_Filter(i);
+    }
+    
+    if(Input_Changed)
+    {
+        TIM_INT_Start();
     }
 }
 //----------------------------------
@@ -571,7 +652,7 @@ void DEV_Input_Set_Default(void)
     io_inputs->in_set.Dac  = 10;
     io_inputs->in_set.NSac = 4;
     io_inputs->in_set.SGac = 5;
-    io_inputs->in_set.Sdur = 20;
+    io_inputs->in_set.Sdur = 10;
     io_inputs->in_set.Ndc  = 3;
     io_inputs->in_set.Ddc  = 10;
     io_inputs->in_set.P0dc = 80;
@@ -603,5 +684,17 @@ void TIM16_IRQHandler(void)
         DEV_Input_Scan();
         
         TIM16->SR &= ~TIM_SR_UIF;
+    }
+}
+//-------------------------
+void TIM17_IRQHandler(void)
+{
+    if((TIM17->SR & TIM_SR_UIF) == TIM_SR_UIF)
+    {
+        GPIO_INT->BSRR |= GPIO_INT_SET; // отключить выход INT
+        
+        Input_Changed = false;
+        
+        TIM17->SR &= ~TIM_SR_UIF;
     }
 }

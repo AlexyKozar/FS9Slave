@@ -22,6 +22,11 @@
     //---------------------
     #define IN_MODE_AC 0x00
     #define IN_MODE_DC 0x01
+    //--------------------------
+    #define GPIO_INT       GPIOB
+    #define GPIO_INT_PIN   GPIO_PIN_5
+    #define GPIO_INT_SET   GPIO_BSRR_BS_5
+    #define GPIO_INT_RESET GPIO_BSRR_BR_5
     //-------------------
     struct INPUT_Set_Type
     {
@@ -83,7 +88,7 @@
     void    DEV_Init(struct PORT_Input_Type* inputs, struct PORT_Output_Type* outputs);
     uint8_t DEV_Address(void);
     bool    DEV_Request(struct FS9Packet_t* source, struct FS9Packet_t* dest);
-    bool    DEV_Driver(uint8_t cmd, struct FS9Packet_t* packet);
+    bool    DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packet);
     uint8_t DEV_Checksum(struct FS9Packet_t* packet, uint8_t size);
     void    DEV_Input_Scan(void);
     void    DEV_Input_Set_Default(void);
