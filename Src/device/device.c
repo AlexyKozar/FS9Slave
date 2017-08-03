@@ -13,6 +13,29 @@ struct PORT_Output_Type* io_outputs;
 uint8_t devAddr = 0xFF;
 //-------------------------
 bool Input_Changed = false;
+//------------------------
+uint16_t AIN_TEMP[19][3] = 
+{
+    { 0, 13, 18 },
+    { 1, 170, 170 },
+    { 2, 330, 340 },
+    { 10, 1650, 1650 },
+    { 20, 3280, 3270 },
+    { 37, 6080, 6070 },
+    { 48, 8010, 7980 },
+    { 66, 10800, 10780 },
+    { 80, 13230, 13190 },
+    { 92, 15080, 15040 },
+    { 100, 16470, 16420 },
+    { 115, 18850, 18790 },
+    { 127, 20800, 20700 },
+    { 166, 27200, 27100 },
+    { 178, 29200, 29100 },
+    { 187, 30800, 30700 },
+    { 189, 31000, 30900 },
+    { 195, 32200, 32100 },
+    { 200, 32900, 32900 }
+};
 //-----------------------------------------------------
 void DEV_Create(GPIO_TypeDef* gpio, uint16_t addr_pins)
 {
@@ -244,6 +267,18 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
                 
                 t.number = ((float)(ain1/1000.0f))*k;
             }
+            else if(devAddr == 1)
+            {
+                uint8_t index = 0;
+                
+                for(index = 0; index < 19 - 1; index++)
+                {
+                    if(ain1*10 >= AIN_TEMP[index][1] && ain1*10 <= AIN_TEMP[index + 1][1])
+                        break;
+                }
+                
+                t.number = 3383.8098f - 8658.0088f*sqrtf(0.1758481f - 0.000231f*AIN_TEMP[index][0]);
+            }
             
             packet->buffer[0] = t.byte[0];
             packet->buffer[1] = t.byte[1];
@@ -254,6 +289,18 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
             {
                 t.number = ain2/1000.0f;
                 t.number /= 0.1f;
+            }
+            else if(devAddr == 1)
+            {
+                uint8_t index = 0;
+                
+                for(index = 0; index < 19 - 1; index++)
+                {
+                    if(ain2*10 >= AIN_TEMP[index][2] && ain2*10 <= AIN_TEMP[index + 1][2])
+                        break;
+                }
+                
+                t.number = 3383.8098f - 8658.0088f*sqrtf(0.1758481f - 0.000231f*AIN_TEMP[index][0]);
             }
             
             packet->buffer[4] = t.byte[0];
