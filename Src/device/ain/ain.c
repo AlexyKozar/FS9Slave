@@ -110,3 +110,8 @@ void DMA1_Ch1_IRQHandler(void)
         DMA1_Channel1->CCR |= DMA_CCR_TCIE; // подключаем прерывания DMA
     }
 }
+//-------------------------
+uint16_t AIN_Get_VDDA(void)
+{
+    return VDDA;
+}

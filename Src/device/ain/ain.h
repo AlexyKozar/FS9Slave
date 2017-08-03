@@ -16,4 +16,5 @@
     int32_t  AIN_Get_Temperature(void);
     uint16_t AIN_Get_Channel_1(void);
     uint16_t AIN_Get_Channel_2(void);
+    uint16_t AIN_Get_VDDA(void);
 #endif
