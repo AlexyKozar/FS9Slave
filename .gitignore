@@ -1,6 +1,7 @@
 .mxproject
 *.TMP
 *.uvoptx
+*.uvprojx
 *.scvd
 MDK-ARM/FS9Slave/
 *.*.*

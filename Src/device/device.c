@@ -6,6 +6,8 @@ void TIM_Scan_Init(void);
 void TIM_Scan_Update(void);
 void TIM_INT_Init(void);
 void TIM_INT_Start(void);
+float Get_Temp(uint16_t val, uint8_t in_num);
+float UAIN_to_TResistance(uint16_t val, uint8_t in_num); // преобразование напряжения в сопротивление температуры
 //---------------------------------
 struct PORT_Input_Type*  io_inputs;
 struct PORT_Output_Type* io_outputs;
@@ -269,15 +271,7 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
             }
             else if(devAddr == 1)
             {
-                uint8_t index = 0;
-                
-                for(index = 0; index < 19 - 1; index++)
-                {
-                    if(ain1*10 >= AIN_TEMP[index][1] && ain1*10 <= AIN_TEMP[index + 1][1])
-                        break;
-                }
-                
-                t.number = 3383.8098f - 8658.0088f*sqrtf(0.1758481f - 0.000231f*AIN_TEMP[index][0]);
+                t.number = Get_Temp(ain1*10, 1);
             }
             
             packet->buffer[0] = t.byte[0];
@@ -292,15 +286,7 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
             }
             else if(devAddr == 1)
             {
-                uint8_t index = 0;
-                
-                for(index = 0; index < 19 - 1; index++)
-                {
-                    if(ain2*10 >= AIN_TEMP[index][2] && ain2*10 <= AIN_TEMP[index + 1][2])
-                        break;
-                }
-                
-                t.number = 3383.8098f - 8658.0088f*sqrtf(0.1758481f - 0.000231f*AIN_TEMP[index][0]);
+                t.number = Get_Temp(ain2*10, 2);
             }
             
             packet->buffer[4] = t.byte[0];
@@ -754,4 +740,48 @@ void TIM17_IRQHandler(void)
         
         TIM17->SR &= ~TIM_SR_UIF;
     }
+}
+//------------------------------------------
+float Get_Temp(uint16_t val, uint8_t in_num)
+{
+    float Rt = UAIN_to_TResistance(val, in_num);
+    
+    if(Rt == -100.0f)
+        return Rt;
+    
+    float Pt100 = 3383.8098f - 8658.0088f*sqrtf(0.1758481f - 0.000231f*Rt);
+    
+    return Pt100;
+}
+//-----------------------------------------------------
+float UAIN_to_TResistance(uint16_t val, uint8_t in_num)
+{
+    // значение val приходит умноженное на 10 (значение ацп целочисленное, т.е. ацп*1000), т.к. в таблице значения
+    // хранятся умноженные на 10000 для приведения к целочисленному виду
+    float res_beg = 0;
+    float res_end = 0;
+    float ain_beg = 0;
+    float ain_end = 0;
+    
+    for(uint8_t i = 1; i < 19; ++i)
+    {
+        if(AIN_TEMP[i - 1][in_num] == val)
+            return AIN_TEMP[i - 1][0];
+        else if(val > AIN_TEMP[i - 1][in_num] && val < AIN_TEMP[i][in_num])
+        {
+            res_beg = AIN_TEMP[i - 1][0];
+            res_end = AIN_TEMP[i][0];
+            ain_beg = AIN_TEMP[i - 1][in_num];
+            ain_end = AIN_TEMP[i][in_num];
+            
+            break;
+        }
+    }
+    
+    if(res_beg == 0 && res_end == 0)
+        return -100.0f;
+    
+    float Rt = res_beg + ((val - ain_beg)/(ain_end - ain_beg))*(res_end - res_beg);
+    
+    return Rt;
 }
