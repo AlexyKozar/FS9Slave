@@ -15,10 +15,10 @@ struct PORT_Output_Type* io_outputs;
 uint8_t devAddr = 0xFF;
 //-------------------------
 bool Input_Changed = false;
-//------------------------
-uint16_t AIN_TEMP[19][3] = 
+//---------------------------------------
+uint16_t AIN_TEMP[MAX_SIZE_AIN_TEMP][3] = 
 {
-    { 0, 13, 18 },
+    { 0, 13, 18 }, // сопротивление термодатчика, напряжение AIN1, напряжение AIN2 (напряжения умножены на 10000)
     { 1, 170, 170 },
     { 2, 330, 340 },
     { 10, 1650, 1650 },
@@ -267,11 +267,12 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
                 uint16_t vdda = AIN_Get_VDDA();
                 float    k    = 5.0f/(vdda/1000.0f);
                 
-                t.number = ((float)(ain1/1000.0f))*k;
+                t.number = ((float)(ain1/4095*vdda/1000.0f))*k;
             }
             else if(devAddr == 1)
             {
-                t.number = Get_Temp(ain1*10, 1);
+                uint16_t temp = ((float)ain1/4095)*AIN_TEMP[MAX_SIZE_AIN_TEMP - 1][1];
+                t.number = Get_Temp(temp, 1);
             }
             
             packet->buffer[0] = t.byte[0];
@@ -281,12 +282,14 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
         
             if(devAddr == 0)
             {
-                t.number = ain2/1000.0f;
+                uint16_t vdda = AIN_Get_VDDA();
+                t.number = ((float)ain2/4095)*vdda/1000.0f;
                 t.number /= 0.1f;
             }
             else if(devAddr == 1)
             {
-                t.number = Get_Temp(ain2*10, 2);
+                uint16_t temp = ((float)ain2/4095)*AIN_TEMP[MAX_SIZE_AIN_TEMP - 1][2];
+                t.number = Get_Temp(temp, 2);
             }
             
             packet->buffer[4] = t.byte[0];

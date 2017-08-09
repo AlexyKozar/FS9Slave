@@ -28,6 +28,8 @@
     #define GPIO_INT_PIN   GPIO_PIN_5
     #define GPIO_INT_SET   GPIO_BSRR_BS_5
     #define GPIO_INT_RESET GPIO_BSRR_BR_5
+    //--------------------------
+    #define MAX_SIZE_AIN_TEMP 19 // максимальный размер массива для калибровочной таблицы температуры
     //-------------------
     struct INPUT_Set_Type
     {

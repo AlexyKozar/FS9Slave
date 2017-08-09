@@ -1,5 +1,5 @@
 #include "ain.h"
-//--------------------------------------
+//-----------------------------------------------
 volatile uint16_t AIN_channels[MAX_NUM_CHANNELS];
 volatile uint16_t AIN_buffer[MAX_NUM_CHANNELS];
 volatile uint16_t AIN_result[MAX_NUM_CHANNELS];
@@ -65,12 +65,12 @@ int32_t AIN_Get_Temperature(void)
 //------------------------------
 uint16_t AIN_Get_Channel_1(void)
 {
-    return ((float)AIN_result[0]/4095)*VDDA;
+    return AIN_result[0];
 }
 //------------------------------
 uint16_t AIN_Get_Channel_2(void)
 {
-    return ((float)AIN_result[1]/4095)*VDDA;
+    return AIN_result[1];
 }
 //----------------------------
 void DMA1_Ch1_IRQHandler(void)
