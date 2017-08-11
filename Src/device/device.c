@@ -576,7 +576,9 @@ void DEV_Input_Filter(uint8_t index)
             
             if(input->mode == IN_MODE_AC)
             {
-                if(count >= io_inputs->in_set.SGac)
+                uint8_t tcount = (act_level == true)?io_inputs->in_set.SGac:(imp_count - io_inputs->in_set.SGac);
+                
+                if(count >= tcount)
                 {
                     is_valid = true;
                 }
@@ -587,27 +589,15 @@ void DEV_Input_Filter(uint8_t index)
             }
             else if(input->mode == IN_MODE_DC)
             {
-                if(act_level == true)
+                uint8_t tcount = (act_level == true)?io_inputs->in_set.P1dc:io_inputs->in_set.P0dc;
+                
+                if(count >= tcount)
                 {
-                    if(count >= io_inputs->in_set.P1dc)
-                    {
-                        is_valid = true;
-                    }
-                    else
-                    {
-                        is_valid = false;
-                    }
+                    is_valid = true;
                 }
-                else if(act_level == false)
+                else
                 {
-                    if(count >= io_inputs->in_set.P0dc)
-                    {
-                        is_valid = true;
-                    }
-                    else
-                    {
-                        is_valid = false;
-                    }
+                    is_valid = false;
                 }
             }
             
@@ -633,8 +623,7 @@ void DEV_Input_Filter(uint8_t index)
                 {
                     uint8_t dur_fault_beg = imp_count - (imp_count*input->fault)/100;
                     uint8_t dur_fault_end = imp_count + (imp_count*input->fault)/100;
-                    
-                    
+                            
                     if(duration >= dur_fault_beg && duration <= dur_fault_end) // проверка сигнала на вхождение в пределы
                         is_valid = true;
                 }
