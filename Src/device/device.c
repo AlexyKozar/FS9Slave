@@ -6,11 +6,13 @@ void TIM_Scan_Init(void);
 void TIM_Scan_Update(void);
 void TIM_INT_Init(void);
 void TIM_INT_Start(void);
+void PWROK_Init(void);
 float Get_Temp(uint16_t val, uint8_t in_num);
 float UAIN_to_TResistance(uint16_t val, uint8_t in_num); // преобразование напряжения в сопротивление температуры
 //---------------------------------
 struct PORT_Input_Type*  io_inputs;
 struct PORT_Output_Type* io_outputs;
+struct PWROK_Type        pwr_ok = { false };
 //---------------------
 uint8_t devAddr = 0xFF;
 //-------------------------
@@ -74,6 +76,11 @@ void DEV_Init(struct PORT_Input_Type* inputs, struct PORT_Output_Type* outputs)
     IO_Init(GPIO_INT, GPIO_INT_PIN, DEV_IO_OUTPUT); // вывод INT как выход
     
     GPIO_INT->BSRR |= GPIO_INT_SET; // включить выход INT (default state)
+    
+    if(devAddr == 0x00)
+    {
+        PWROK_Init();
+    }
     
     DEV_Input_Set_Default();
     
@@ -143,6 +150,31 @@ void TIM_INT_Start(void)
 {
     GPIO_INT->BSRR |= GPIO_INT_RESET;
     TIM17->CR1 |= TIM_CR1_CEN;
+}
+//-------------------
+void PWROK_Init(void)
+{
+    IO_Clock_Enable(GPIO_PWROK);
+    
+    RCC->APB1ENR |= RCC_APB1ENR_TIM14EN;
+
+    SYSCFG->EXTICR[3] &= ~SYSCFG_EXTICR1_EXTI2;
+    
+    EXTI->IMR  |= GPIO_PWROK_PIN;
+    EXTI->RTSR |= GPIO_PWROK_PIN;
+    
+    NVIC_EnableIRQ(EXTI4_15_IRQn);
+    
+    TIM14->PSC = F_CPU/1000000UL - 1;
+    TIM14->ARR = 10100 - 1;
+    
+    TIM14->CR1  |= TIM_CR1_ARPE;
+    TIM14->EGR  |= TIM_EGR_UG;
+    TIM14->SR   &= ~TIM_SR_UIF;
+    TIM14->DIER |= TIM_DIER_UIE;
+    TIM14->CR1  |= TIM_CR1_CEN;
+    
+    NVIC_EnableIRQ(TIM14_IRQn);
 }
 //-----------------------
 uint8_t DEV_Address(void)
@@ -776,4 +808,32 @@ float UAIN_to_TResistance(uint16_t val, uint8_t in_num)
     float Rt = res_beg + ((val - ain_beg)/(ain_end - ain_beg))*(res_end - res_beg);
     
     return Rt;
+}
+//----------------------------
+void EXTI4_15_IRQHandler(void)
+{
+    if(EXTI->PR & GPIO_PWROK_PIN)
+    {
+        EXTI->PR |= GPIO_PWROK_PIN;
+        
+        pwr_ok.is_pwrok = true;
+        TIM14->EGR |= TIM_EGR_UG;
+    }
+}
+//-------------------------
+void TIM14_IRQHandler(void)
+{
+    if(TIM14->SR & TIM_SR_UIF)
+    {
+        TIM14->SR &= ~TIM_SR_UIF;
+        
+        if(!pwr_ok.is_pwrok)
+        {
+            TIM14->CR1 &= ~TIM_CR1_CEN;
+            NVIC_DisableIRQ(TIM14_IRQn);
+            NVIC_DisableIRQ(EXTI4_15_IRQn);
+        }
+        else
+            pwr_ok.is_pwrok = false;
+    }
 }

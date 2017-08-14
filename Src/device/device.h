@@ -29,6 +29,9 @@
     #define GPIO_INT_SET   GPIO_BSRR_BS_5
     #define GPIO_INT_RESET GPIO_BSRR_BR_5
     //--------------------------
+    #define GPIO_PWROK     GPIOA
+    #define GPIO_PWROK_PIN GPIO_PIN_12
+    //--------------------------
     #define MAX_SIZE_AIN_TEMP 19 // максимальный размер массива для калибровочной таблицы температуры
     //-------------------
     struct INPUT_Set_Type
@@ -79,6 +82,11 @@
         GPIO_TypeDef* gpio;
         uint16_t      out_arr[MAX_SIZE_DS_OUTPUT];
         uint8_t       size;
+    };
+    //---------------
+    struct PWROK_Type
+    {
+        bool is_pwrok;
     };
     //-----------
     union float_t
