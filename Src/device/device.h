@@ -31,6 +31,11 @@
     //--------------------------
     #define GPIO_PWROK     GPIOA
     #define GPIO_PWROK_PIN GPIO_PIN_12
+    //-------------------------------------
+    #define DSDIN_TRIGGER_ON_0         0xA1 // срабатывание зафиксировано, установлен уровень «0»
+    #define DSDIN_TRIGGER_ON_1         0xF5 // срабатывание зафиксировано, установлен уровень «1»
+    #define DSDIN_TRIGGER_OFF          0xB8 // срабатывание не зафиксировано
+    #define DSDIN_FUNCTION_NOT_SUPPORT 0xEA // функция не поддерживается
     //--------------------------
     #define MAX_SIZE_AIN_TEMP 19 // максимальный размер массива для калибровочной таблицы температуры
     //-------------------
@@ -86,7 +91,11 @@
     //---------------
     struct PWROK_Type
     {
-        bool is_pwrok;
+        bool     is_pwrok; // присутствие/отсутствие сигнала PWR_OK
+        bool     is_dsdin; // режим "отключение питания" при отсутствии сигнала PWR_OK
+        uint16_t dsdin_time; // время от включения режима "отключения питания" до изменения уровня на входе DSDIN
+        bool     dsdin_level; // уровень сигнала на входе DSDIN
+        bool     dsdin_lev_changed; // уровень сигнала изменился
     };
     //-----------
     union float_t

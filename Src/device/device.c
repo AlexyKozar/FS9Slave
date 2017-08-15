@@ -12,7 +12,7 @@ float UAIN_to_TResistance(uint16_t val, uint8_t in_num); // преобразов
 //---------------------------------
 struct PORT_Input_Type*  io_inputs;
 struct PORT_Output_Type* io_outputs;
-struct PWROK_Type        pwr_ok = { false };
+struct PWROK_Type        pwr_ok = { false, false, 0, false, false };
 //---------------------
 uint8_t devAddr = 0xFF;
 //-------------------------
@@ -165,8 +165,8 @@ void PWROK_Init(void)
     
     NVIC_EnableIRQ(EXTI4_15_IRQn);
     
-    TIM14->PSC = F_CPU/1000000UL - 1;
-    TIM14->ARR = 10100 - 1;
+    TIM14->PSC = F_CPU/1000L - 1;
+    TIM14->ARR = 11 - 1;
     
     TIM14->CR1  |= TIM_CR1_ARPE;
     TIM14->EGR  |= TIM_EGR_UG;
@@ -504,6 +504,44 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
             }
         break;
             
+        case 0x1F: // чтение времени срабатывания выделенного входного дискретного канала
+            if(devAddr == 0x00) // если модуль МДВВ-01
+            {
+                if(pwr_ok.dsdin_lev_changed)
+                {
+                    if(pwr_ok.dsdin_level)
+                        packet->buffer[0] = DSDIN_TRIGGER_ON_1;
+                    else
+                        packet->buffer[0] = DSDIN_TRIGGER_ON_0;
+                }
+                else
+                    packet->buffer[0] = DSDIN_TRIGGER_OFF;
+                
+                union
+                {
+                    uint16_t time;
+                    uint8_t  buffer[2];
+                } dsdin_time;
+                
+                dsdin_time.time = pwr_ok.dsdin_time;
+                
+                // установка для теста - должно вернуть 0xA13C011E
+                //packet->buffer[0] = DSDIN_TRIGGER_ON_0;
+                //dsdin_time.time = 316;
+                
+                packet->buffer[1] = dsdin_time.buffer[0];
+                packet->buffer[2] = dsdin_time.buffer[1];
+            }
+            else // иначе, если другие модули
+            {
+                packet->buffer[0] = DSDIN_FUNCTION_NOT_SUPPORT;
+                packet->buffer[1] = 0x00;
+                packet->buffer[2] = 0x00;
+            }
+            
+            packet->size = 3;
+        break;
+            
         case 0x3D: // изменение длительности сигнала
             if(data->size == 1)
             {
@@ -561,9 +599,16 @@ uint8_t DEV_Checksum(struct FS9Packet_t* packet, uint8_t size)
 //-----------------------
 void DEV_Input_Scan(void)
 {
-    for(uint8_t i = 0; i < io_inputs->size; ++i)
+    if(!pwr_ok.is_dsdin)
     {
-        DEV_Input_Filter(i);
+        for(uint8_t i = 0; i < io_inputs->size; ++i)
+        {
+            DEV_Input_Filter(i);
+        }
+    }
+    else // если режим "отключение питания"
+    { 
+        DEV_Input_Filter(4); // проверяем только вход DSDIN
     }
     
     if(Input_Changed)
@@ -693,6 +738,17 @@ void DEV_Input_Filter(uint8_t index)
                 
                 if(Input_Changed == false) // выставляем флаг изменения на входах
                     Input_Changed = true;
+                
+                if(pwr_ok.is_dsdin) // режим "отключение питания"
+                {
+                    pwr_ok.dsdin_time        = TIM14->CNT; // сохраняем время
+                    pwr_ok.dsdin_lev_changed = true; // уровень изменился
+                    pwr_ok.dsdin_level       = input->state; // сохраняем состояние на входе DSDIN
+                    
+                    TIM14->CR1 &= ~TIM_CR1_CEN; // отключаем таймер DSDIN
+                    // здесь необходима запись в память контроллера последнего состояния входа DSDIN (если изменилось)
+                    // и времени этого изменения (параметры dsdin_time и dsdin_level)
+                }
             }
             else if(input->filter.с_error >= (io_inputs->in_set.Nac - 1)) // иначе, если счетчик ошибок равен
             {                                                              // количеству периодов - 1, то
@@ -815,6 +871,19 @@ void EXTI4_15_IRQHandler(void)
     if(EXTI->PR & GPIO_PWROK_PIN)
     {
         EXTI->PR |= GPIO_PWROK_PIN;
+
+        if(pwr_ok.is_dsdin == true)
+        {
+            pwr_ok.is_dsdin = false;
+            
+            TIM14->DIER &= ~TIM_DIER_UIE;
+            TIM14->ARR   = 11 - 1;
+            TIM14->EGR  |= TIM_EGR_UG;
+            TIM14->SR   &= ~TIM_SR_UIF;
+            TIM14->CR1  &= ~TIM_CR1_OPM;
+            TIM14->DIER |= TIM_DIER_UIE;
+            TIM14->CR1  |= TIM_CR1_CEN;
+        }
         
         pwr_ok.is_pwrok = true;
         TIM14->EGR |= TIM_EGR_UG;
@@ -827,13 +896,18 @@ void TIM14_IRQHandler(void)
     {
         TIM14->SR &= ~TIM_SR_UIF;
         
-        if(!pwr_ok.is_pwrok)
+        if(pwr_ok.is_dsdin == false && pwr_ok.is_pwrok == false)
         {
-            TIM14->CR1 &= ~TIM_CR1_CEN;
-            NVIC_DisableIRQ(TIM14_IRQn);
-            NVIC_DisableIRQ(EXTI4_15_IRQn);
+            pwr_ok.is_dsdin = true; // включаем режим обработки "отключение питания"
+            
+            TIM14->DIER &= ~TIM_DIER_UIE;
+            TIM14->ARR   = 500 - 1;
+            TIM14->EGR  |= TIM_EGR_UG;
+            TIM14->SR   &= ~TIM_SR_UIF;
+            TIM14->DIER |= TIM_DIER_UIE;
+            TIM14->CR1  |= TIM_CR1_OPM;
         }
-        else
+        else if(pwr_ok.is_dsdin == false)
             pwr_ok.is_pwrok = false;
     }
 }
