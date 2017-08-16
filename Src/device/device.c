@@ -297,9 +297,8 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
             if(devAddr == 0)
             {
                 uint16_t vdda = AIN_Get_VDDA();
-                float    k    = 5.0f/(vdda/1000.0f);
                 
-                t.number = ((float)(ain1/4095*vdda/1000.0f))*k;
+                t.number = ((float)(ain1/4095.0f*vdda/1000.0f));
             }
             else if(devAddr == 1)
             {
