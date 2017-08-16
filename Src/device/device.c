@@ -315,8 +315,8 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
             if(devAddr == 0)
             {
                 uint16_t vdda = AIN_Get_VDDA();
-                t.number = ((float)ain2/4095)*vdda/1000.0f;
-                t.number /= 0.1f;
+                t.number = ((float)ain2/4095)*vdda/1000.0f; // шунт 0.1 Ом, усиление ОУ 20, делитель 2
+                //t.number /= 0.1f;                         // т.е. значение пропорционально току
             }
             else if(devAddr == 1)
             {
