@@ -725,8 +725,8 @@ void DEV_Input_Filter(uint8_t index)
         {
             if(input->filter.c_state >= (io_inputs->set.Nperiod - 1))
             {
-                input->state = act_level;
-                
+                input->error  = false;
+                input->state  = act_level;
                 Input_Changed = true;
             }
             else if(input->filter.c_error >= io_inputs->set.Nperiod)
