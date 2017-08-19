@@ -30,54 +30,51 @@
     #define GPIO_INT_RESET GPIO_BSRR_BR_5
     //--------------------------
     #define MAX_SIZE_AIN_TEMP 19 // максимальный размер массива для калибровочной таблицы температуры
+    //----------------
+    struct input_set_t
+    {
+        uint8_t Nperiod; // количество периодов накопления информации
+        uint8_t Ndiscret; // количество выборок на период
+        uint8_t SGac; // длина валидного импульса
+        uint8_t P0dc; // процент нулей фильтра для постоянного сигнала
+        uint8_t P1dc; // процент единиц фильтра для постоянного сигнала
+    };
     //-------------------
-    struct INPUT_Set_Type
+    struct input_filter_t
     {
-        uint8_t Nac;
-        uint8_t Dac;
-        float   SGac;
-        uint8_t Sdur;   // длительность сигнала в мс
-        float   NSac;
-        uint8_t Ndc;
-        uint8_t Ddc;
-        uint8_t P0dc;
-        uint8_t P1dc;
-    };
-    //----------------------
-    struct INPUT_Filter_Type
-    {
-        uint8_t c_clock;    // счетчик тактов
-        uint8_t c_period;   // счетчик периодов для фильтрации
-        uint8_t c_high_lev; // счетчик импульсов лог. "1"
-        uint8_t c_low_lev;  // счетчик импульсов лог. "0"
-        uint8_t c_state;    // счетчик состояний входа
-        bool    с_error;    // счетчик ошибок канала
+        uint8_t c_clock; // такты после захвата входа
+        uint8_t c_error; // счетчик ошибок
         bool    is_capture; // флаг захвата входа
+        uint8_t c_lev_0; // количество импульсов лог. "0"
+        uint8_t c_lev_1; // количество импульсов лог. "1"
+        uint8_t c_period; // количество периодов
+        uint8_t c_state; // количество валидных состояний
     };
-    //---------------
-    struct INPUT_Type
+    //------------
+    struct input_t
     {
-        uint16_t                 pin;    // номер входа
-        bool                     state;  // состояние входа (вкл или выкл)
-        bool                     error;  // ошибка канала
-        struct INPUT_Filter_Type filter; // параметры входа
-        uint8_t                  fault;  // погрешность в %
-        uint8_t                  mode;   // режим входа (AC/DC)
-        uint8_t                  dir;    // направление (прямой/инверсный)
+        uint16_t              pin;    // номер входа
+        bool                  state;  // состояние входа (вкл или выкл)
+        bool                  error;  // ошибка канала
+        struct input_filter_t filter; // параметры фильтрации входа
+        uint8_t               fault;  // погрешность длительности периода в %
+        uint8_t               mode;   // режим входа (AC/DC)
+        uint8_t               dir;    // направление (прямой/инверсный)
+        uint16_t              duration; // длительность периода
     };
     //--------------------
     struct PORT_Input_Type
     {
-        GPIO_TypeDef*         gpio;
-        struct INPUT_Type     in_arr[MAX_SIZE_DS_INPUT];
-        struct INPUT_Set_Type in_set;
-        uint8_t               size;
+        GPIO_TypeDef*      gpio;
+        struct input_t     list[MAX_SIZE_DS_INPUT];
+        struct input_set_t set;
+        uint8_t            size;
     };
     //---------------------
     struct PORT_Output_Type
     {
         GPIO_TypeDef* gpio;
-        uint16_t      out_arr[MAX_SIZE_DS_OUTPUT];
+        uint16_t      list[MAX_SIZE_DS_OUTPUT];
         uint8_t       size;
     };
     //-----------

@@ -57,12 +57,12 @@ void DEV_Init(struct PORT_Input_Type* inputs, struct PORT_Output_Type* outputs)
     
     for(uint8_t i = 0; i < io_inputs->size; ++i)
     {
-        in |= io_inputs->in_arr[i].pin;
+        in |= io_inputs->list[i].pin;
     }
     
     for(uint8_t i = 0; i < io_outputs->size; ++i)
     {
-        out |= io_outputs->out_arr[i];
+        out |= io_outputs->list[i];
     }
     
     IO_Clock_Enable(io_inputs->gpio);
@@ -121,7 +121,7 @@ void TIM_Scan_Init(void)
 //------------------------
 void TIM_Scan_Update(void)
 {
-    TIM16->ARR   = 10000/io_inputs->in_set.Dac - 1;
+    TIM16->ARR   = 10000/io_inputs->set.Ndiscret - 1;
     TIM16->DIER &= ~TIM_DIER_UIE;
     TIM16->EGR  |= TIM_EGR_UG;
     TIM16->DIER |= TIM_DIER_UIE;
@@ -220,11 +220,11 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
                 
                 uint8_t channel_state = 0x00;
                 
-                if(io_inputs->in_arr[i].state == true && io_inputs->in_arr[i].error == false)
+                if(io_inputs->list[i].state == true && io_inputs->list[i].error == false)
                 {
                     channel_state = 0x01;
                 }
-                else if(io_inputs->in_arr[i].error == true)
+                else if(io_inputs->list[i].error == true)
                 {
                     channel_state = 0x02;
                 }
@@ -242,7 +242,7 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
         
             for(uint8_t i = 0; i < io_outputs->size; ++i)
             {
-                uint16_t pin = io_outputs->out_arr[i];
+                uint16_t pin = io_outputs->list[i];
                 
                 if((io_outputs->gpio->ODR & pin) == pin)
                 {
@@ -315,9 +315,9 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
         case 0x06: // установка значения 0 на выходе канала 0
             if(io_outputs->size > 0)
             {
-                if(io_outputs->gpio->ODR & io_outputs->out_arr[0])
+                if(io_outputs->gpio->ODR & io_outputs->list[0])
                 {
-                    io_outputs->gpio->ODR &= ~io_outputs->out_arr[0];
+                    io_outputs->gpio->ODR &= ~io_outputs->list[0];
                 }
             }
         break;
@@ -325,9 +325,9 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
         case 0x07: // установка значения 0 на выходе канала 1
             if(io_outputs->size > 1)
             {
-                if(io_outputs->gpio->ODR & io_outputs->out_arr[1])
+                if(io_outputs->gpio->ODR & io_outputs->list[1])
                 {
-                    io_outputs->gpio->ODR &= ~io_outputs->out_arr[1];
+                    io_outputs->gpio->ODR &= ~io_outputs->list[1];
                 }
             }
         break;
@@ -335,9 +335,9 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
         case 0x08: // установка значения 0 на выходе канала 2
             if(io_outputs->size > 2)
             {
-                if(io_outputs->gpio->ODR & io_outputs->out_arr[2])
+                if(io_outputs->gpio->ODR & io_outputs->list[2])
                 {
-                    io_outputs->gpio->ODR &= ~io_outputs->out_arr[2];
+                    io_outputs->gpio->ODR &= ~io_outputs->list[2];
                 }
             }
         break;
@@ -345,9 +345,9 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
         case 0x09: // установка значения 0 на выходе канала 3
             if(io_outputs->size > 3)
             {
-                if(io_outputs->gpio->ODR & io_outputs->out_arr[3])
+                if(io_outputs->gpio->ODR & io_outputs->list[3])
                 {
-                    io_outputs->gpio->ODR &= ~io_outputs->out_arr[3];
+                    io_outputs->gpio->ODR &= ~io_outputs->list[3];
                 }
             }
         break;
@@ -355,9 +355,9 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
         case 0x0A: // установка значения 0 на выходе канала 4
             if(io_outputs->size > 4)
             {
-                if(io_outputs->gpio->ODR & io_outputs->out_arr[4])
+                if(io_outputs->gpio->ODR & io_outputs->list[4])
                 {
-                    io_outputs->gpio->ODR &= ~io_outputs->out_arr[4];
+                    io_outputs->gpio->ODR &= ~io_outputs->list[4];
                 }
             }
             break;
@@ -365,9 +365,9 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
         case 0x0B: // установка значения 0 на выходе канала 5
             if(io_outputs->size > 5)
             {
-                if(io_outputs->gpio->ODR & io_outputs->out_arr[5])
+                if(io_outputs->gpio->ODR & io_outputs->list[5])
                 {
-                    io_outputs->gpio->ODR &= ~io_outputs->out_arr[5];
+                    io_outputs->gpio->ODR &= ~io_outputs->list[5];
                 }
             }
         break;
@@ -375,9 +375,9 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
         case 0x0C: // установка значения 0 на выходе канала 6
             if(io_outputs->size > 6)
             {
-                if(io_outputs->gpio->ODR & io_outputs->out_arr[6])
+                if(io_outputs->gpio->ODR & io_outputs->list[6])
                 {
-                    io_outputs->gpio->ODR &= ~io_outputs->out_arr[6];
+                    io_outputs->gpio->ODR &= ~io_outputs->list[6];
                 }
             }
         break;
@@ -385,9 +385,9 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
         case 0x0D: // установка значения 0 на выходе канала 7
             if(io_outputs->size > 7)
             {
-                if(io_outputs->gpio->ODR & io_outputs->out_arr[7])
+                if(io_outputs->gpio->ODR & io_outputs->list[7])
                 {
-                    io_outputs->gpio->ODR &= ~io_outputs->out_arr[7];
+                    io_outputs->gpio->ODR &= ~io_outputs->list[7];
                 }
             }
         break;
@@ -395,9 +395,9 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
         case 0x0E: // установка значения 1 на выходе канала 0
             if(io_outputs->size > 0)
             {
-                if(!(io_outputs->gpio->ODR & io_outputs->out_arr[0]))
+                if(!(io_outputs->gpio->ODR & io_outputs->list[0]))
                 {
-                    io_outputs->gpio->ODR |= io_outputs->out_arr[0];
+                    io_outputs->gpio->ODR |= io_outputs->list[0];
                 }
             }
         break;
@@ -405,9 +405,9 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
         case 0x0F: // установка значения 1 на выходе канала 1
             if(io_outputs->size > 1)
             {
-                if(!(io_outputs->gpio->ODR & io_outputs->out_arr[1]))
+                if(!(io_outputs->gpio->ODR & io_outputs->list[1]))
                 {
-                    io_outputs->gpio->ODR |= io_outputs->out_arr[1];
+                    io_outputs->gpio->ODR |= io_outputs->list[1];
                 }
             }
         break;
@@ -415,9 +415,9 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
         case 0x10: // установка значения 1 на выходе канала 2
             if(io_outputs->size > 2)
             {
-                if(!(io_outputs->gpio->ODR & io_outputs->out_arr[2]))
+                if(!(io_outputs->gpio->ODR & io_outputs->list[2]))
                 {
-                    io_outputs->gpio->ODR |= io_outputs->out_arr[2];
+                    io_outputs->gpio->ODR |= io_outputs->list[2];
                 }
             }
         break;
@@ -425,9 +425,9 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
         case 0x11: // установка значения 1 на выходе канала 3
             if(io_outputs->size > 3)
             {
-                if(!(io_outputs->gpio->ODR & io_outputs->out_arr[3]))
+                if(!(io_outputs->gpio->ODR & io_outputs->list[3]))
                 {
-                    io_outputs->gpio->ODR |= io_outputs->out_arr[3];
+                    io_outputs->gpio->ODR |= io_outputs->list[3];
                 }
             }
         break;
@@ -435,9 +435,9 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
         case 0x12: // установка значения 1 на выходе канала 4
             if(io_outputs->size > 4)
             {
-                if(!(io_outputs->gpio->ODR & io_outputs->out_arr[4]))
+                if(!(io_outputs->gpio->ODR & io_outputs->list[4]))
                 {
-                    io_outputs->gpio->ODR |= io_outputs->out_arr[4];
+                    io_outputs->gpio->ODR |= io_outputs->list[4];
                 }
             }
         break;
@@ -445,9 +445,9 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
         case 0x13: // установка значения 1 на выходе канала 5
             if(io_outputs->size > 5)
             {
-                if(!(io_outputs->gpio->ODR & io_outputs->out_arr[5]))
+                if(!(io_outputs->gpio->ODR & io_outputs->list[5]))
                 {
-                    io_outputs->gpio->ODR |= io_outputs->out_arr[5];
+                    io_outputs->gpio->ODR |= io_outputs->list[5];
                 }
             }
         break;
@@ -455,9 +455,9 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
         case 0x14: // установка значения 1 на выходе канала 6
             if(io_outputs->size > 6)
             {
-                if(!(io_outputs->gpio->ODR & io_outputs->out_arr[6]))
+                if(!(io_outputs->gpio->ODR & io_outputs->list[6]))
                 {
-                    io_outputs->gpio->ODR |= io_outputs->out_arr[6];
+                    io_outputs->gpio->ODR |= io_outputs->list[6];
                 }
             }
         break;
@@ -465,9 +465,9 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
         case 0x15: // установка значения 1 на выходе канала 7
             if(io_outputs->size > 7)
             {
-                if(!(io_outputs->gpio->ODR & io_outputs->out_arr[7]))
+                if(!(io_outputs->gpio->ODR & io_outputs->list[7]))
                 {
-                    io_outputs->gpio->ODR |= io_outputs->out_arr[7];
+                    io_outputs->gpio->ODR |= io_outputs->list[7];
                 }
             }
         break;
@@ -475,16 +475,16 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
         case 0x3D: // изменение длительности сигнала
             if(data->size == 1)
             {
-                io_inputs->in_set.Sdur = data->buffer[0];
+                //io_inputs->in_set.Sdur = data->buffer[0];
             }
         break;
             
         case 0x3E: // изменение параметров фильтрации
             if(data->size == 3)
             {
-                io_inputs->in_set.Nac = data->buffer[0]; // количество периодов фильтрации
-                io_inputs->in_set.Dac = data->buffer[1]; // количество выборок на период
-                io_inputs->in_set.SGac = data->buffer[2]; // длительность сигнала считаемая, что сигнал валидный
+                io_inputs->set.Nperiod  = data->buffer[0]; // количество периодов фильтрации
+                io_inputs->set.Ndiscret = data->buffer[1]; // количество выборок на период
+                io_inputs->set.SGac     = data->buffer[2]; // длительность сигнала считаемая, что сигнал валидный
             }
         break;
             
@@ -492,15 +492,15 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
             if(data->size == 3)
             {
                 uint8_t in_num = data->buffer[0]; // номер настраиваемого входа
-                io_inputs->in_arr[in_num].mode  = data->buffer[1]; // режим работы входа AC или DC
+                io_inputs->list[in_num].mode  = data->buffer[1]; // режим работы входа AC или DC
                 
-                if(io_inputs->in_arr[in_num].mode == IN_MODE_AC)
+                if(io_inputs->list[in_num].mode == IN_MODE_AC)
                 {
-                    io_inputs->in_arr[in_num].fault = data->buffer[2]; // погрешность допускаемая за один период - в процентах
+                    io_inputs->list[in_num].fault = data->buffer[2]; // погрешность допускаемая за один период - в процентах
                 }
                 else
                 {
-                    io_inputs->in_set.P0dc = io_inputs->in_set.P1dc = data->buffer[2];
+                    io_inputs->set.P0dc = io_inputs->set.P1dc = data->buffer[2];
                 }
             }
         break;
@@ -529,10 +529,12 @@ uint8_t DEV_Checksum(struct FS9Packet_t* packet, uint8_t size)
 //-----------------------
 void DEV_Input_Scan(void)
 {
-    for(uint8_t i = 0; i < io_inputs->size; ++i)
-    {
-        DEV_Input_Filter(i);
-    }
+//    for(uint8_t i = 0; i < io_inputs->size; ++i)
+//    {
+//        DEV_Input_Filter(i);
+//    }
+    
+    DEV_Input_Filter(0);
     
     if(Input_Changed)
     {
@@ -542,138 +544,122 @@ void DEV_Input_Scan(void)
 //----------------------------------
 void DEV_Input_Filter(uint8_t index)
 {
-    struct INPUT_Type* input = &io_inputs->in_arr[index];
+    struct input_t* input = &io_inputs->list[index];
     
     bool in_state  = io_inputs->gpio->IDR & input->pin;
     bool act_level = !input->state; // ожидаемый уровень (при выключенном входе - лог "1", при включенном лог "0")
     
-    // счетчик импульсов на окно - введен для работы со стендом, т.к. частота сигнала 50Гц вместо 100Гц
-    uint8_t imp_count = io_inputs->in_set.Sdur/10*io_inputs->in_set.Dac;
-    
-    if(input->filter.is_capture == false && in_state == act_level) // если захвата не было и на входе ожидаемый уровень
+    // если уровень на входе равен ожидаемому уровню (обратное значение от состояния входа)
+    if(in_state == act_level && input->filter.is_capture == false)
     {
-        input->filter.c_clock++;
-        input->filter.is_capture = true;
+        input->filter.is_capture = true; // захватываем вход
         
-        if(act_level == true)
-            input->filter.c_high_lev++;
+        if(in_state == true)
+            input->filter.c_lev_1++;
         else
-            input->filter.c_low_lev++;
+            input->filter.c_lev_0++;
+        
+        input->filter.c_clock++;
     }
-    else if(input->filter.is_capture == true) // захват произведен - накопление данных
+    else if(input->filter.is_capture == true) // если вход захвачен, то набираем данные для фильтрации
     {
         if(in_state == true)
-            input->filter.c_high_lev++;
-        else if(in_state == false)
-            input->filter.c_low_lev++;
+            input->filter.c_lev_1++;
+        else
+            input->filter.c_lev_0++;
         
         input->filter.c_clock++;
         
-        if(input->filter.c_clock >= imp_count) // счетчик тактирования равен длительности сигнала
+        if(input->filter.c_clock >= input->duration) // набрали данные на очередной период
         {
-            uint8_t count = (act_level == true)?input->filter.c_high_lev:input->filter.c_low_lev;
-            bool is_valid = false;
+            input->filter.c_period++;
             
-            if(input->mode == IN_MODE_AC)
+            if(input->mode == IN_MODE_AC) // режим входа АС
             {
-                uint8_t tcount = (act_level == true)?io_inputs->in_set.SGac:(imp_count - io_inputs->in_set.SGac);
-                
-                if(count >= tcount)
+                // если ожидаемый уровень лог "1" и количество лог "0" равно нулю, то это либо постоянный
+                // сигнал, либо сигнал с частотой меньше установленно, т.е. это ошибка
+                if(act_level == true && input->filter.c_lev_0 == 0)
                 {
-                    is_valid = true;
-                }
-                else
-                {
-                    is_valid = false;
-                }
-            }
-            else if(input->mode == IN_MODE_DC)
-            {
-                uint8_t tcount = (act_level == true)?io_inputs->in_set.P1dc:io_inputs->in_set.P0dc;
-                
-                if(count >= tcount)
-                {
-                    is_valid = true;
-                }
-                else
-                {
-                    is_valid = false;
-                }
-            }
-            
-            if(is_valid == true)
-            {
-                // расчет полученной длительности сигнала
-                uint8_t duration;
-                
-                if(input->mode == IN_MODE_AC)
-                {
-                    duration = (act_level == true)?input->filter.c_high_lev + input->filter.c_low_lev:
-                                                   input->filter.c_low_lev;
-                }
-                else
-                {
-                    duration = (act_level == true)?input->filter.c_high_lev:input->filter.c_low_lev;
+                    input->filter.c_error++;
+
+                    input->filter.c_clock = 0;
+                    input->filter.c_lev_0 = 0;
+                    input->filter.c_lev_1 = 0;
+
+                    return;
                 }
                 
-                // расчет пределов погрешности
-                is_valid = false;
-                
-                if(input->mode == IN_MODE_AC)
+                // если ожидаемый уровень лог "1" и длительность сигнала меньше пороговой, то это ошибка
+                if(act_level == true && input->filter.c_lev_1 < io_inputs->set.SGac)
                 {
-                    uint8_t dur_fault_beg = imp_count - (imp_count*input->fault)/100;
-                    uint8_t dur_fault_end = imp_count + (imp_count*input->fault)/100;
-                            
-                    if(duration >= dur_fault_beg && duration <= dur_fault_end) // проверка сигнала на вхождение в пределы
-                        is_valid = true;
+                    input->filter.c_error++;
+
+                    input->filter.c_clock = 0;
+                    input->filter.c_lev_0 = 0;
+                    input->filter.c_lev_1 = 0;
+
+                    return;
                 }
-                else
+                
+                // если ожидаемый уровень лог "0" (снятие сигнала со входа) и длительность лог "1"
+                // больше нуля, то значит это не снятие сигнала и нет смысла дальше анализировать
+                if(act_level == false && input->filter.c_lev_1 > 0)
                 {
-                    uint8_t fault = (act_level == true)?(duration*io_inputs->in_set.P1dc)/100:
-                                                        (duration*io_inputs->in_set.P0dc)/100;
+                    input->filter.c_clock    = 0;
+                    input->filter.c_error    = 0;
+                    input->filter.c_lev_0    = 0;
+                    input->filter.c_lev_1    = 0;
+                    input->filter.c_period   = 0;
+                    input->filter.c_state    = 0;
+                    input->filter.is_capture = false;
                     
-                    if(duration >= fault) // проверка сигнала на вхождение в предел погрешности
-                        is_valid = true;
+                    return;
                 }
                 
-                if(is_valid == true) // проверка сигнала на вхождение в пределы
+                uint16_t tdur = (act_level == true)?(input->filter.c_lev_0 + input->filter.c_lev_1):
+                                                     input->filter.c_lev_0;
+                
+                uint16_t tfault     = input->duration*input->fault/100;
+                uint16_t trange_beg = input->duration - tfault;
+                uint16_t trange_end = input->duration + tfault;
+                
+                if(tdur >= trange_beg && tdur <= trange_end)
                 {
                     input->filter.c_state++;
                 }
                 else
-                {
-                    input->filter.с_error++; // иначе ошибка канала в текущем периоде
-                }
-                
-                input->filter.c_period++;
-                
-                input->filter.c_clock    = 0;
-                input->filter.c_high_lev = 0;
-                input->filter.c_low_lev  = 0;
+                    input->filter.c_error++;
             }
-        }
-        
-        if(input->filter.c_period >= io_inputs->in_set.Nac) // количество прошедших периодов равно установленному
-        {
-            if(input->filter.c_state >= (io_inputs->in_set.Nac - 1)) // количество изменений состояний входа за
-            {                                                        // прошедшие периоды равно (-1 - первый период не
-                input->state = act_level;                            // считаем (списываем на помеху)
+            else if(input->mode == IN_MODE_DC) // режим входа DC
+            {
+                uint16_t tfault_lev = (act_level == true)?input->duration*io_inputs->set.P1dc:
+                                                          input->duration*io_inputs->set.P0dc;
+                uint16_t tdur = (act_level == true)?input->filter.c_lev_1:input->filter.c_lev_0;
                 
-                if(Input_Changed == false) // выставляем флаг изменения на входах
-                    Input_Changed = true;
-            }
-            else if(input->filter.с_error >= (io_inputs->in_set.Nac - 1)) // иначе, если счетчик ошибок равен
-            {                                                              // количеству периодов - 1, то
-                input->error = true;                                       // ошибка канала
-                
-                if(Input_Changed == false) // выставляем флаг изменения на входах
-                    Input_Changed = true;
+                if(tdur >= tfault_lev)
+                    input->filter.c_state++;
             }
             
+            input->filter.c_clock = 0;
+            input->filter.c_lev_0 = 0;
+            input->filter.c_lev_1 = 0;
+        }
+        
+        if(input->filter.c_period >= io_inputs->set.Nperiod) // конец фильтрации - принятие решения
+        {
+            if(input->filter.c_state >= (io_inputs->set.Nperiod - 1))
+            {
+                input->state = act_level;
+                
+                Input_Changed = true;
+            }
+            else if(input->filter.c_error >= io_inputs->set.Nperiod)
+                input->error = true;
+            
             input->filter.c_clock    = 0;
-            input->filter.с_error    = 0;
-            input->filter.c_high_lev = 0;
-            input->filter.c_low_lev  = 0;
+            input->filter.c_error    = 0;
+            input->filter.c_lev_0    = 0;
+            input->filter.c_lev_1    = 0;
             input->filter.c_period   = 0;
             input->filter.c_state    = 0;
             input->filter.is_capture = false;
@@ -683,27 +669,24 @@ void DEV_Input_Filter(uint8_t index)
 //------------------------------
 void DEV_Input_Set_Default(void)
 {
-    io_inputs->in_set.Nac  = 3;
-    io_inputs->in_set.Dac  = 10;
-    io_inputs->in_set.NSac = 4;
-    io_inputs->in_set.SGac = 5;
-    io_inputs->in_set.Sdur = 10;
-    io_inputs->in_set.Ndc  = 3;
-    io_inputs->in_set.Ddc  = 10;
-    io_inputs->in_set.P0dc = 80;
-    io_inputs->in_set.P1dc = 80;
+    io_inputs->set.Ndiscret = 10;
+    io_inputs->set.Nperiod  = 3;
+    io_inputs->set.SGac     = 5;
+    io_inputs->set.P0dc     = 50;
+    io_inputs->set.P1dc     = 50;
     
     for(uint8_t i = 0; i < io_inputs->size; ++i)
     {
-        io_inputs->in_arr[i].mode              = IN_MODE_AC;
-        io_inputs->in_arr[i].fault             = 10;
-        io_inputs->in_arr[i].state             = false;
-        io_inputs->in_arr[i].error             = false;
-        io_inputs->in_arr[i].filter.c_clock    = 0;
-        io_inputs->in_arr[i].filter.c_period   = 0;
-        io_inputs->in_arr[i].filter.c_state    = 0;
-        io_inputs->in_arr[i].filter.с_error    = 0;
-        io_inputs->in_arr[i].filter.is_capture = false;
+        io_inputs->list[i].mode              = IN_MODE_AC;
+        io_inputs->list[i].fault             = 10;
+        io_inputs->list[i].state             = false;
+        io_inputs->list[i].error             = false;
+        io_inputs->list[i].duration          = 10;
+        io_inputs->list[i].filter.c_clock    = 0;
+        io_inputs->list[i].filter.c_period   = 0;
+        io_inputs->list[i].filter.c_state    = 0;
+        io_inputs->list[i].filter.c_error    = 0;
+        io_inputs->list[i].filter.is_capture = false;
     }
 }
 //----------------------------------
