@@ -602,17 +602,6 @@ void DEV_Input_Scan(void)
     {
         DEV_Input_Filter(i);
     }
-    /*if(!pwr_ok.is_dsdin)
-    {
-        for(uint8_t i = 0; i < io_inputs->size; ++i)
-        {
-            DEV_Input_Filter(i);
-        }
-    }
-    else // если режим "отключение питания"
-    { 
-        DEV_Input_Filter(4); // проверяем только вход DSDIN
-    }*/
     
     if(Input_Changed)
     {
@@ -844,22 +833,6 @@ void EXTI4_15_IRQHandler(void)
     if(EXTI->PR & GPIO_PWROK_PIN)
     {
         EXTI->PR |= GPIO_PWROK_PIN;
-
-        if(pwr_ok.is_dsdin == true)
-        {
-            pwr_ok.is_dsdin = false;
-            
-            TIM14->DIER &= ~TIM_DIER_UIE;
-            TIM14->ARR   = 11 - 1;
-            TIM14->EGR  |= TIM_EGR_UG;
-            TIM14->SR   &= ~TIM_SR_UIF;
-            TIM14->CR1  &= ~TIM_CR1_OPM;
-            TIM14->DIER |= TIM_DIER_UIE;
-            TIM14->CR1  |= TIM_CR1_CEN;
-        }
-        
-        pwr_ok.is_pwrok = true;
-        TIM14->EGR |= TIM_EGR_UG;
     }
 }
 //-------------------------
@@ -868,19 +841,5 @@ void TIM14_IRQHandler(void)
     if(TIM14->SR & TIM_SR_UIF)
     {
         TIM14->SR &= ~TIM_SR_UIF;
-        
-        if(pwr_ok.is_dsdin == false && pwr_ok.is_pwrok == false)
-        {
-            pwr_ok.is_dsdin = true; // включаем режим обработки "отключение питания"
-            
-            TIM14->DIER &= ~TIM_DIER_UIE;
-            TIM14->ARR   = 500 - 1;
-            TIM14->EGR  |= TIM_EGR_UG;
-            TIM14->SR   &= ~TIM_SR_UIF;
-            TIM14->DIER |= TIM_DIER_UIE;
-            TIM14->CR1  |= TIM_CR1_OPM;
-        }
-        else if(pwr_ok.is_dsdin == false)
-            pwr_ok.is_pwrok = false;
     }
 }
