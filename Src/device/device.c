@@ -597,9 +597,11 @@ uint8_t DEV_Checksum(struct FS9Packet_t* packet, uint8_t size)
 }
 //-----------------------
 void DEV_Input_Scan(void)
-{    
-    DEV_Input_Filter(0);
-
+{
+    for(uint8_t i = 0; i < io_inputs->size; ++i)
+    {
+        DEV_Input_Filter(i);
+    }
     /*if(!pwr_ok.is_dsdin)
     {
         for(uint8_t i = 0; i < io_inputs->size; ++i)
