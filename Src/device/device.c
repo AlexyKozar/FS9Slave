@@ -1,7 +1,7 @@
 #include "device.h"
 //---------------------------------------
 void IO_Clock_Enable(GPIO_TypeDef* gpio);
-void IO_Init(GPIO_TypeDef* gpio, uint16_t io, uint8_t io_dir);
+void IO_Init(struct pin_t io, uint8_t io_dir);
 void TIM_Scan_Init(void);
 void TIM_Scan_Update(void);
 void TIM_INT_Init(void);
@@ -43,8 +43,9 @@ uint16_t AIN_TEMP[MAX_SIZE_AIN_TEMP][3] =
 //-----------------------------------------------------
 void DEV_Create(GPIO_TypeDef* gpio, uint16_t addr_pins)
 {
-    IO_Clock_Enable(gpio);
-    IO_Init(gpio, addr_pins, DEV_IO_INPUT);
+    struct pin_t pin = { gpio, addr_pins };
+    
+    IO_Init(pin, DEV_IO_INPUT);
     
     devAddr = (uint8_t)((gpio->IDR & addr_pins) >> 14); // set the address device
 }
@@ -54,26 +55,22 @@ void DEV_Init(struct PORT_Input_Type* inputs, struct PORT_Output_Type* outputs)
     io_inputs  = inputs;
     io_outputs = outputs;
     
-    uint16_t in  = 0x0000;
-    uint16_t out = 0x0000;
-    
     for(uint8_t i = 0; i < io_inputs->size; ++i)
     {
-        in |= io_inputs->list[i].pin;
+        struct pin_t pin = io_inputs->list[i].pin;
+        
+        IO_Init(pin, DEV_IO_INPUT);
     }
     
     for(uint8_t i = 0; i < io_outputs->size; ++i)
     {
-        out |= io_outputs->list[i];
+        struct pin_t pin = io_outputs->list[i].pin;
+        
+        IO_Init(pin, DEV_IO_OUTPUT);
     }
     
-    IO_Clock_Enable(io_inputs->gpio);
-    IO_Clock_Enable(io_outputs->gpio);
-    IO_Clock_Enable(GPIOB); // подключение тактирования для вывода INT
-    
-    IO_Init(io_inputs->gpio, in, DEV_IO_INPUT);
-    IO_Init(io_outputs->gpio, out, DEV_IO_OUTPUT);
-    IO_Init(GPIO_INT, GPIO_INT_PIN, DEV_IO_OUTPUT); // вывод INT как выход
+    struct pin_t pin_int = { GPIO_INT, GPIO_INT_PIN };
+    IO_Init(pin_int, DEV_IO_OUTPUT); // вывод INT как выход
     
     GPIO_INT->BSRR |= GPIO_INT_SET; // включить выход INT (default state)
     
@@ -99,16 +96,18 @@ void IO_Clock_Enable(GPIO_TypeDef* gpio)
     else if(gpio == GPIOC)
         RCC->AHBENR |= RCC_AHBENR_GPIOCEN;
 }
-//-----------------------------------------------------------
-void IO_Init(GPIO_TypeDef* gpio, uint16_t io, uint8_t io_dir)
+//--------------------------------------------
+void IO_Init(struct pin_t pin, uint8_t io_dir)
 {
     GPIO_InitTypeDef GPIO_InitStruct;
     
+    IO_Clock_Enable(pin.gpio);
+    
     /*Configure GPIO pins*/
-    GPIO_InitStruct.Pin  = io;
+    GPIO_InitStruct.Pin  = pin.pin;
     GPIO_InitStruct.Mode = (io_dir == 0x01)?GPIO_MODE_OUTPUT_PP:GPIO_MODE_INPUT;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
-    HAL_GPIO_Init(gpio, &GPIO_InitStruct);
+    HAL_GPIO_Init(pin.gpio, &GPIO_InitStruct);
 }
 //----------------------
 void TIM_Scan_Init(void)
@@ -157,6 +156,8 @@ void PWROK_Init(void)
     IO_Clock_Enable(GPIO_PWROK);
     
     RCC->APB1ENR |= RCC_APB1ENR_TIM14EN;
+    
+    DBGMCU->APB1FZ |= DBGMCU_APB1_FZ_DBG_TIM14_STOP;
 
     SYSCFG->EXTICR[3] &= ~SYSCFG_EXTICR1_EXTI2;
     
@@ -274,9 +275,9 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
         
             for(uint8_t i = 0; i < io_outputs->size; ++i)
             {
-                uint16_t pin = io_outputs->list[i];
+                struct pin_t pin = io_outputs->list[i].pin;
                 
-                if((io_outputs->gpio->ODR & pin) == pin)
+                if((pin.gpio->ODR & pin.pin) == pin.pin)
                 {
                     packet->buffer[0] |= 0x01 << i;
                 }
@@ -346,9 +347,11 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
         case 0x06: // установка значения 0 на выходе канала 0
             if(io_outputs->size > 0)
             {
-                if(io_outputs->gpio->ODR & io_outputs->list[0])
+                struct pin_t pin = io_outputs->list[0].pin;
+                
+                if(pin.gpio->ODR & pin.pin)
                 {
-                    io_outputs->gpio->ODR &= ~io_outputs->list[0];
+                    pin.gpio->ODR &= ~pin.pin;
                 }
             }
         break;
@@ -356,9 +359,11 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
         case 0x07: // установка значения 0 на выходе канала 1
             if(io_outputs->size > 1)
             {
-                if(io_outputs->gpio->ODR & io_outputs->list[1])
+                struct pin_t pin = io_outputs->list[1].pin;
+                
+                if(pin.gpio->ODR & pin.pin)
                 {
-                    io_outputs->gpio->ODR &= ~io_outputs->list[1];
+                    pin.gpio->ODR &= ~pin.pin;
                 }
             }
         break;
@@ -366,9 +371,11 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
         case 0x08: // установка значения 0 на выходе канала 2
             if(io_outputs->size > 2)
             {
-                if(io_outputs->gpio->ODR & io_outputs->list[2])
+                struct pin_t pin = io_outputs->list[2].pin;
+                
+                if(pin.gpio->ODR & pin.pin)
                 {
-                    io_outputs->gpio->ODR &= ~io_outputs->list[2];
+                    pin.gpio->ODR &= ~pin.pin;
                 }
             }
         break;
@@ -376,9 +383,11 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
         case 0x09: // установка значения 0 на выходе канала 3
             if(io_outputs->size > 3)
             {
-                if(io_outputs->gpio->ODR & io_outputs->list[3])
+                struct pin_t pin = io_outputs->list[3].pin;
+                
+                if(pin.gpio->ODR & pin.pin)
                 {
-                    io_outputs->gpio->ODR &= ~io_outputs->list[3];
+                    pin.gpio->ODR &= ~pin.pin;
                 }
             }
         break;
@@ -386,9 +395,11 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
         case 0x0A: // установка значения 0 на выходе канала 4
             if(io_outputs->size > 4)
             {
-                if(io_outputs->gpio->ODR & io_outputs->list[4])
+                struct pin_t pin = io_outputs->list[4].pin;
+                
+                if(pin.gpio->ODR & pin.pin)
                 {
-                    io_outputs->gpio->ODR &= ~io_outputs->list[4];
+                    pin.gpio->ODR &= ~pin.pin;
                 }
             }
             break;
@@ -396,9 +407,11 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
         case 0x0B: // установка значения 0 на выходе канала 5
             if(io_outputs->size > 5)
             {
-                if(io_outputs->gpio->ODR & io_outputs->list[5])
+                struct pin_t pin = io_outputs->list[5].pin;
+                
+                if(pin.gpio->ODR & pin.pin)
                 {
-                    io_outputs->gpio->ODR &= ~io_outputs->list[5];
+                    pin.gpio->ODR &= ~pin.pin;
                 }
             }
         break;
@@ -406,9 +419,11 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
         case 0x0C: // установка значения 0 на выходе канала 6
             if(io_outputs->size > 6)
             {
-                if(io_outputs->gpio->ODR & io_outputs->list[6])
+                struct pin_t pin = io_outputs->list[6].pin;
+                
+                if(pin.gpio->ODR & pin.pin)
                 {
-                    io_outputs->gpio->ODR &= ~io_outputs->list[6];
+                    pin.gpio->ODR &= ~pin.pin;
                 }
             }
         break;
@@ -416,9 +431,11 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
         case 0x0D: // установка значения 0 на выходе канала 7
             if(io_outputs->size > 7)
             {
-                if(io_outputs->gpio->ODR & io_outputs->list[7])
+                struct pin_t pin = io_outputs->list[7].pin;
+                
+                if(pin.gpio->ODR & pin.pin)
                 {
-                    io_outputs->gpio->ODR &= ~io_outputs->list[7];
+                    pin.gpio->ODR &= ~pin.pin;
                 }
             }
         break;
@@ -426,9 +443,11 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
         case 0x0E: // установка значения 1 на выходе канала 0
             if(io_outputs->size > 0)
             {
-                if(!(io_outputs->gpio->ODR & io_outputs->list[0]))
+                struct pin_t pin = io_outputs->list[0].pin;
+                
+                if((pin.gpio->ODR & pin.pin) != pin.pin)
                 {
-                    io_outputs->gpio->ODR |= io_outputs->list[0];
+                    pin.gpio->ODR |= pin.pin;
                 }
             }
         break;
@@ -436,9 +455,11 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
         case 0x0F: // установка значения 1 на выходе канала 1
             if(io_outputs->size > 1)
             {
-                if(!(io_outputs->gpio->ODR & io_outputs->list[1]))
+                struct pin_t pin = io_outputs->list[1].pin;
+                
+                if((pin.gpio->ODR & pin.pin) != pin.pin)
                 {
-                    io_outputs->gpio->ODR |= io_outputs->list[1];
+                    pin.gpio->ODR |= pin.pin;
                 }
             }
         break;
@@ -446,9 +467,11 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
         case 0x10: // установка значения 1 на выходе канала 2
             if(io_outputs->size > 2)
             {
-                if(!(io_outputs->gpio->ODR & io_outputs->list[2]))
+                struct pin_t pin = io_outputs->list[2].pin;
+                
+                if((pin.gpio->ODR & pin.pin) != pin.pin)
                 {
-                    io_outputs->gpio->ODR |= io_outputs->list[2];
+                    pin.gpio->ODR |= pin.pin;
                 }
             }
         break;
@@ -456,9 +479,11 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
         case 0x11: // установка значения 1 на выходе канала 3
             if(io_outputs->size > 3)
             {
-                if(!(io_outputs->gpio->ODR & io_outputs->list[3]))
+                struct pin_t pin = io_outputs->list[3].pin;
+                
+                if((pin.gpio->ODR & pin.pin) != pin.pin)
                 {
-                    io_outputs->gpio->ODR |= io_outputs->list[3];
+                    pin.gpio->ODR |= pin.pin;
                 }
             }
         break;
@@ -466,9 +491,11 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
         case 0x12: // установка значения 1 на выходе канала 4
             if(io_outputs->size > 4)
             {
-                if(!(io_outputs->gpio->ODR & io_outputs->list[4]))
+                struct pin_t pin = io_outputs->list[4].pin;
+                
+                if((pin.gpio->ODR & pin.pin) != pin.pin)
                 {
-                    io_outputs->gpio->ODR |= io_outputs->list[4];
+                    pin.gpio->ODR |= pin.pin;
                 }
             }
         break;
@@ -476,9 +503,11 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
         case 0x13: // установка значения 1 на выходе канала 5
             if(io_outputs->size > 5)
             {
-                if(!(io_outputs->gpio->ODR & io_outputs->list[5]))
+                struct pin_t pin = io_outputs->list[5].pin;
+                
+                if((pin.gpio->ODR & pin.pin) != pin.pin)
                 {
-                    io_outputs->gpio->ODR |= io_outputs->list[5];
+                    pin.gpio->ODR |= pin.pin;
                 }
             }
         break;
@@ -486,9 +515,11 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
         case 0x14: // установка значения 1 на выходе канала 6
             if(io_outputs->size > 6)
             {
-                if(!(io_outputs->gpio->ODR & io_outputs->list[6]))
+                struct pin_t pin = io_outputs->list[6].pin;
+                
+                if((pin.gpio->ODR & pin.pin) != pin.pin)
                 {
-                    io_outputs->gpio->ODR |= io_outputs->list[6];
+                    pin.gpio->ODR |= pin.pin;
                 }
             }
         break;
@@ -496,9 +527,11 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
         case 0x15: // установка значения 1 на выходе канала 7
             if(io_outputs->size > 7)
             {
-                if(!(io_outputs->gpio->ODR & io_outputs->list[7]))
+                struct pin_t pin = io_outputs->list[7].pin;
+                
+                if((pin.gpio->ODR & pin.pin) != pin.pin)
                 {
-                    io_outputs->gpio->ODR |= io_outputs->list[7];
+                    pin.gpio->ODR |= pin.pin;
                 }
             }
         break;
@@ -598,9 +631,16 @@ uint8_t DEV_Checksum(struct FS9Packet_t* packet, uint8_t size)
 //-----------------------
 void DEV_Input_Scan(void)
 {
-    for(uint8_t i = 0; i < io_inputs->size; ++i)
+    if(pwr_ok.is_dsdin == false)
     {
-        DEV_Input_Filter(i);
+        for(uint8_t i = 0; i < io_inputs->size; ++i)
+        {
+            DEV_Input_Filter(i);
+        }
+    }
+    else
+    {
+        DEV_Input_Filter(4);
     }
     
     if(Input_Changed)
@@ -613,7 +653,7 @@ void DEV_Input_Filter(uint8_t index)
 {
     struct input_t* input = &io_inputs->list[index];
     
-    bool in_state  = io_inputs->gpio->IDR & input->pin;
+    bool in_state  = input->pin.gpio->IDR & input->pin.pin;
     bool act_level = !input->state; // ожидаемый уровень (при выключенном входе - лог "1", при включенном лог "0")
     
     // если уровень на входе равен ожидаемому уровню (обратное значение от состояния входа)
@@ -719,6 +759,15 @@ void DEV_Input_Filter(uint8_t index)
                 input->error  = false;
                 input->state  = act_level;
                 Input_Changed = true;
+                
+                if(pwr_ok.is_dsdin == true)
+                {
+                    pwr_ok.dsdin_level       = input->state;
+                    pwr_ok.dsdin_lev_changed = true;
+                    pwr_ok.dsdin_time        = TIM14->CNT;
+                    
+                    TIM14->CR1 &= ~TIM_CR1_CEN;
+                }
             }
             else if(input->filter.c_error >= io_inputs->set.Nperiod)
                 input->error = true;
@@ -833,6 +882,21 @@ void EXTI4_15_IRQHandler(void)
     if(EXTI->PR & GPIO_PWROK_PIN)
     {
         EXTI->PR |= GPIO_PWROK_PIN;
+        
+        pwr_ok.is_pwrok = true;
+        
+        if(pwr_ok.is_dsdin == true)
+        {
+            pwr_ok.is_dsdin          = false;
+            pwr_ok.dsdin_level       = false;
+            pwr_ok.dsdin_lev_changed = false;
+            pwr_ok.dsdin_time        = 0;
+            
+            TIM14->ARR  = 11 - 1;
+            TIM14->CR1 &= ~TIM_CR1_OPM;
+        }
+        
+        TIM14->EGR |= TIM_EGR_UG;
     }
 }
 //-------------------------
@@ -841,5 +905,21 @@ void TIM14_IRQHandler(void)
     if(TIM14->SR & TIM_SR_UIF)
     {
         TIM14->SR &= ~TIM_SR_UIF;
+        
+        if(pwr_ok.is_pwrok == false && pwr_ok.is_dsdin == false) // активация алгоритма обработки
+        {                                                        // отключения внешнего питания
+            pwr_ok.is_dsdin = true;
+            
+            TIM14->ARR   = 500 - 1; // запуск таймера на 500мс
+            TIM14->CR1  |= TIM_CR1_OPM; // в режиме одного импульса
+            TIM14->DIER &= TIM_DIER_UIE;
+            TIM14->EGR  |= TIM_EGR_UG;
+            TIM14->SR   &= ~TIM_SR_UIF;
+            TIM14->DIER |= TIM_DIER_UIE;
+        }
+        else
+        {
+            pwr_ok.is_pwrok = false;
+        }
     }
 }

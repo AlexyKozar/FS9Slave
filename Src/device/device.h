@@ -58,10 +58,16 @@
         uint8_t c_period; // количество периодов
         uint8_t c_state; // количество валидных состояний
     };
+    //----------
+    struct pin_t
+    {
+        GPIO_TypeDef* gpio;
+        uint16_t      pin;
+    };
     //------------
     struct input_t
     {
-        uint16_t              pin;    // номер входа
+        struct pin_t          pin;    // вход (номер входа и порт)
         bool                  state;  // состояние входа (вкл или выкл)
         bool                  error;  // ошибка канала
         struct input_filter_t filter; // параметры фильтрации входа
@@ -70,10 +76,14 @@
         uint8_t               dir;    // направление (прямой/инверсный)
         uint16_t              duration; // длительность периода
     };
+    //-------------
+    struct output_t
+    {
+        struct pin_t pin;
+    };
     //--------------------
     struct PORT_Input_Type
     {
-        GPIO_TypeDef*      gpio;
         struct input_t     list[MAX_SIZE_DS_INPUT];
         struct input_set_t set;
         uint8_t            size;
@@ -81,9 +91,8 @@
     //---------------------
     struct PORT_Output_Type
     {
-        GPIO_TypeDef* gpio;
-        uint16_t      list[MAX_SIZE_DS_OUTPUT];
-        uint8_t       size;
+        struct output_t list[MAX_SIZE_DS_OUTPUT];
+        uint8_t         size;
     };
     //---------------
     struct PWROK_Type

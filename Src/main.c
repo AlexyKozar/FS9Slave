@@ -100,44 +100,70 @@ int main(void)
     struct PORT_Input_Type  input; // the input channels
     struct PORT_Output_Type output; // the output channels
     
-    input.gpio  = GPIOA;
-    output.gpio = GPIOB;
+    input.list[0].pin.gpio = GPIOA;
+    input.list[1].pin.gpio = GPIOA;
+    input.list[2].pin.gpio = GPIOA;
+    input.list[3].pin.gpio = GPIOA;
+    input.list[4].pin.gpio = GPIOA;
+    input.list[5].pin.gpio = GPIOA;
+    input.list[6].pin.gpio = GPIOA;
+    input.list[7].pin.gpio = GPIOA;
+    input.list[8].pin.gpio = GPIOA;
+    input.list[9].pin.gpio = GPIOA;
     
-    input.list[0].pin = GPIO_PIN_0; // input channel 1
-    input.list[1].pin = GPIO_PIN_1; // input channel 2
-    input.list[2].pin = GPIO_PIN_2; // input channel 3
-    input.list[3].pin = GPIO_PIN_3; // input channel 4
-    input.list[4].pin = GPIO_PIN_4; // input channel 5
-    input.list[5].pin = GPIO_PIN_5; // input channel 6
-    input.list[6].pin = GPIO_PIN_6; // input channel 7
-    input.list[7].pin = GPIO_PIN_7; // input channel 8
-    input.list[8].pin = GPIO_PIN_8; // input channel 9
-    input.list[9].pin = GPIO_PIN_9; // input channel 10
-
+    input.list[0].pin.pin = GPIO_PIN_0; // input channel 1
+    input.list[1].pin.pin = GPIO_PIN_1; // input channel 2
+    input.list[2].pin.pin = GPIO_PIN_2; // input channel 3
+    input.list[3].pin.pin = GPIO_PIN_3; // input channel 4
+    input.list[4].pin.pin = GPIO_PIN_4; // input channel 5
+    input.list[5].pin.pin = GPIO_PIN_5; // input channel 6
+    input.list[6].pin.pin = GPIO_PIN_6; // input channel 7
+    input.list[7].pin.pin = GPIO_PIN_7; // input channel 8
+    input.list[8].pin.pin = GPIO_PIN_8; // input channel 9
+    input.list[9].pin.pin = GPIO_PIN_9; // input channel 10
+    
     if(addr == 0x00) // device-01
     {
-        input.list[10].pin = GPIO_PIN_10; // input channel 11
-        input.list[11].pin = GPIO_PIN_11; // input channel 12
+        input.list[10].pin.gpio = GPIOA;
+        input.list[11].pin.gpio = GPIOA;
         
-        output.list[0] = GPIO_PIN_10; // output chanel 1
-        output.list[1] = GPIO_PIN_15; // output chanel 2
-        output.list[2] = GPIO_PIN_14; // output chanel 3
-        output.list[3] = GPIO_PIN_13; // output chanel 4
-        output.list[4] = GPIO_PIN_12; // output chanel 5
-        output.list[5] = GPIO_PIN_11; // output chanel 6
+        input.list[10].pin.pin = GPIO_PIN_10; // input channel 11
+        input.list[11].pin.pin = GPIO_PIN_11; // input channel 12
+        
+        output.list[0].pin.gpio = GPIOB;
+        output.list[1].pin.gpio = GPIOB;
+        output.list[2].pin.gpio = GPIOB;
+        output.list[3].pin.gpio = GPIOB;
+        output.list[4].pin.gpio = GPIOB;
+        output.list[5].pin.gpio = GPIOB;
+        
+        output.list[0].pin.pin = GPIO_PIN_10; // output chanel 1
+        output.list[1].pin.pin = GPIO_PIN_15; // output chanel 2
+        output.list[2].pin.pin = GPIO_PIN_14; // output chanel 3
+        output.list[3].pin.pin = GPIO_PIN_13; // output chanel 4
+        output.list[4].pin.pin = GPIO_PIN_12; // output chanel 5
+        output.list[5].pin.pin = GPIO_PIN_11; // output chanel 6
         
         input.size  = 12;
         output.size = 6;
     }
     else if(addr == 0x01) // device-02
     {
-        output.list[0] = GPIO_PIN_11; // output chanel 1
-        output.list[1] = GPIO_PIN_12; // output chanel 2
-        output.list[2] = GPIO_PIN_13; // output chanel 3
-        output.list[3] = GPIO_PIN_14; // output chanel 4
-        output.list[4] = GPIO_PIN_15; // output chanel 5
-        output.list[5] = GPIO_PIN_10; // output chanel 6
-        output.list[6] = GPIO_PIN_2; // output chanel 7
+        output.list[0].pin.gpio = GPIOB;
+        output.list[1].pin.gpio = GPIOB;
+        output.list[2].pin.gpio = GPIOB;
+        output.list[3].pin.gpio = GPIOB;
+        output.list[4].pin.gpio = GPIOB;
+        output.list[5].pin.gpio = GPIOB;
+        output.list[6].pin.gpio = GPIOB;
+        
+        output.list[0].pin.pin = GPIO_PIN_11; // output chanel 1
+        output.list[1].pin.pin = GPIO_PIN_12; // output chanel 2
+        output.list[2].pin.pin = GPIO_PIN_13; // output chanel 3
+        output.list[3].pin.pin = GPIO_PIN_14; // output chanel 4
+        output.list[4].pin.pin = GPIO_PIN_15; // output chanel 5
+        output.list[5].pin.pin = GPIO_PIN_10; // output chanel 6
+        output.list[6].pin.pin = GPIO_PIN_2; // output chanel 7
         
         input.size  = 10;
         output.size = 7;
