@@ -13,7 +13,7 @@
     #define F_CPU 48000000UL
     //---------------------------
     #define MAX_SIZE_DS_INPUT  12
-    #define MAX_SIZE_DS_OUTPUT 8
+    #define MAX_SIZE_DS_OUTPUT 12
     //------------------------
     #define DEV_IO_INPUT  0x00
     #define DEV_IO_OUTPUT 0x01

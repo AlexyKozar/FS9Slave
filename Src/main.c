@@ -122,7 +122,7 @@ int main(void)
     input.list[8].pin.pin = GPIO_PIN_8; // input channel 9
     input.list[9].pin.pin = GPIO_PIN_9; // input channel 10
     
-    if(addr == 0x00) // device-01
+    if(addr == 0x00) // МДВВ-01
     {
         input.list[10].pin.gpio = GPIOA;
         input.list[11].pin.gpio = GPIOA;
@@ -147,7 +147,7 @@ int main(void)
         input.size  = 12;
         output.size = 6;
     }
-    else if(addr == 0x01) // device-02
+    else if(addr == 0x01) // МДВВ-02
     {
         output.list[0].pin.gpio = GPIOB;
         output.list[1].pin.gpio = GPIOB;
@@ -167,6 +167,34 @@ int main(void)
         
         input.size  = 10;
         output.size = 7;
+    }
+    else if(addr == 0x02) // МИК-01V1
+    {
+        output.list[0].pin.gpio  = GPIOB;
+        output.list[1].pin.gpio  = GPIOB;
+        output.list[2].pin.gpio  = GPIOB;
+        output.list[3].pin.gpio  = GPIOB;
+        output.list[4].pin.gpio  = GPIOB;
+        output.list[5].pin.gpio  = GPIOB;
+        output.list[6].pin.gpio  = GPIOB;
+        output.list[7].pin.gpio  = GPIOB;
+        output.list[8].pin.gpio  = GPIOB;
+        output.list[9].pin.gpio  = GPIOF;
+        output.list[10].pin.gpio = GPIOF;
+        output.list[11].pin.gpio = GPIOB;
+        
+        output.list[0].pin.pin  = GPIO_PIN_14;
+        output.list[1].pin.pin  = GPIO_PIN_13;
+        output.list[2].pin.pin  = GPIO_PIN_12;
+        output.list[3].pin.pin  = GPIO_PIN_11;
+        output.list[4].pin.pin  = GPIO_PIN_10;
+        output.list[5].pin.pin  = GPIO_PIN_2;
+        output.list[6].pin.pin  = GPIO_PIN_1;
+        output.list[7].pin.pin  = GPIO_PIN_0;
+        output.list[8].pin.pin  = GPIO_PIN_15;
+        output.list[9].pin.pin  = GPIO_PIN_6;
+        output.list[10].pin.pin = GPIO_PIN_7;
+        output.list[11].pin.pin = GPIO_PIN_4;
     }
     
     DEV_Init(&input, &output);
