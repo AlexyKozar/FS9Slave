@@ -13,6 +13,7 @@ float UAIN_to_TResistance(uint16_t val, uint8_t in_num); // преобразов
 struct PORT_Input_Type*  io_inputs;
 struct PORT_Output_Type* io_outputs;
 struct PWROK_Type        pwr_ok = { false, false, 0, false, false };
+volatile uint8_t time = 0;
 //---------------------
 uint8_t devAddr = 0xFF;
 //-------------------------
@@ -202,11 +203,11 @@ bool DEV_Request(struct FS9Packet_t* source, struct FS9Packet_t* dest)
     if(checksum != source->buffer[source->size - 1])
         return false;
     
-    struct FS9Packet_t packet;
+    struct FS9Packet_t packet; // пакет данных (т.е. чистые данные без контрольной суммы и команды)
     
-    packet.size = source->size - 2;
+    packet.size = source->size - 2; // размер пакета данных (минус команда и контрольная сумма)
     
-    for(uint8_t i = 0; i < packet.size; ++i)
+    for(uint8_t i = 0; i < packet.size; ++i) // заполнение данными пакета
     {
         packet.buffer[i] = source->buffer[i + 1];
     }
@@ -342,6 +343,16 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
             packet->buffer[15] = 0x00;
         
             packet->size = 16;
+        break;
+            
+        case 0x05: // запись регистра расширения дискретных каналов выходов
+            for(uint8_t i = 0; i < data->size; ++i)
+            {
+                for(uint8_t j = 0; j < 8; j += 2)
+                {
+                    
+                }
+            }
         break;
         
         case 0x06: // установка значения 0 на выходе канала 0

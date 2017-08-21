@@ -7,8 +7,8 @@
     #include "stm32f0xx_hal_gpio.h"
     #include "math.h"
     #include "fs9slave/fs9slave.h"
-    #include "registers/registers.h"
     #include "ain/ain.h"
+    #include "event/event.h"
     //----------------------
     #define F_CPU 48000000UL
     //---------------------------

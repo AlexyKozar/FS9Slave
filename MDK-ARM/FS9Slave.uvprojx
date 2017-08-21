@@ -310,7 +310,7 @@
           </ArmAdsMisc>
           <Cads>
             <interw>1</interw>
-            <Optim>4</Optim>
+            <Optim>1</Optim>
             <oTime>0</oTime>
             <SplitLS>0</SplitLS>
             <OneElfS>1</OneElfS>
@@ -508,6 +508,11 @@
               <FileName>ain.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\Src\device\ain\ain.c</FilePath>
+            </File>
+            <File>
+              <FileName>event.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\src\device\event\event.c</FilePath>
             </File>
           </Files>
         </Group>

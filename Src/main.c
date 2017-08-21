@@ -195,6 +195,8 @@ int main(void)
         output.list[9].pin.pin  = GPIO_PIN_6;
         output.list[10].pin.pin = GPIO_PIN_7;
         output.list[11].pin.pin = GPIO_PIN_4;
+        
+        output.size = 12;
     }
     
     DEV_Init(&input, &output);
@@ -220,6 +222,15 @@ int main(void)
             FS9_write(&packet_dest);
         }
     }
+    
+    // обработка события
+    event_t event = EVENT_Execute();
+    
+    if(event != NULL)
+    {
+        event();
+    }
+    // конец обработки события
   }
   /* USER CODE END 3 */
 
