@@ -7,10 +7,18 @@
     #include "stm32f0xx_hal_gpio.h"
     //-----------------------
     #define EVENT_MAX_SIZE 16
-    //----------------------------
-    typedef void (*event_t)(void);
-    //-----------------------
-    void    EVENT_Init(void);
-    bool    EVENT_Create(uint16_t time, event_t ev);
-    event_t EVENT_Execute(void);
+    //--------------------------
+    typedef void (*Event)(void);
+    //------------
+    struct event_t
+    { 
+        Event    event; // функция обработки события
+        bool     autorepeat; // автоповтор события
+        uint16_t time; // время задержки
+        uint8_t  id; // id события
+    };
+    //--------------------
+    void EVENT_Init(void);
+    bool EVENT_Create(uint16_t time, bool autorepeat, Event f);
+    void EVENT_Execute(void);
 #endif

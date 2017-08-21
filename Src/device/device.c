@@ -348,9 +348,37 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
         case 0x05: // запись регистра расширения дискретных каналов выходов
             for(uint8_t i = 0; i < data->size; ++i)
             {
+                uint8_t byte = data->buffer[i];
+                
                 for(uint8_t j = 0; j < 8; j += 2)
                 {
+                    uint8_t          state = (byte >> j)&0x03;
+                    uint8_t          n_out = i*4 + j/2; // номер канала
+                    struct output_t* out   = &io_outputs->list[n_out];
                     
+                    switch(state)
+                    {
+                        case 0x00: // отключение - на выходе лог. "1"
+                            if((out->pin.gpio->ODR & out->pin.pin) != out->pin.pin)
+                            {
+                                out->pin.gpio->ODR |= out->pin.pin;
+                                out->state = OUTPUT_STATE_OFF;
+                            }
+                        break;
+                        
+                        case 0x01: // включение - на выходе лог. "0"
+                            if((out->pin.gpio->ODR & out->pin.pin) == out->pin.pin)
+                            {
+                                out->pin.gpio->ODR &= ~out->pin.pin;
+                                out->state = OUTPUT_STATE_ON;
+                            }
+                        break;
+                        
+                        case 0x02: // включение - на выходе меандр 2Гц
+                        case 0x03: // резерв - на выходе меандр 2Гц
+                            out->state = OUTPUT_STATE_FREQ_2HZ;
+                        break;
+                    }
                 }
             }
         break;
