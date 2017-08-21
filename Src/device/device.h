@@ -63,16 +63,18 @@
         uint8_t c_period; // количество периодов
         uint8_t c_state; // количество валидных состояний
     };
-    //----------
-    struct pin_t
+    //---------
+    struct io_t
     {
-        GPIO_TypeDef* gpio;
-        uint16_t      pin;
+        GPIO_TypeDef* gpio; // порт канала
+        uint16_t      pin; // пин канала
+        uint8_t       num; // номер канала
+        uint8_t       param; // произвольный параметр
     };
     //------------
     struct input_t
     {
-        struct pin_t          pin;    // вход (номер входа и порт)
+        struct io_t           pin;    // вход (номер входа и порт)
         bool                  state;  // состояние входа (вкл или выкл)
         bool                  error;  // ошибка канала
         struct input_filter_t filter; // параметры фильтрации входа
@@ -84,7 +86,7 @@
     //-------------
     struct output_t
     {
-        struct pin_t pin;
+        struct io_t  pin;
         uint8_t      state;
     };
     //--------------------

@@ -21,4 +21,5 @@
     void EVENT_Init(void);
     bool EVENT_Create(uint16_t time, bool autorepeat, Event f);
     void EVENT_Execute(void);
+    void EVENT_Kill(uint8_t id);
 #endif

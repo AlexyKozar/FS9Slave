@@ -1,7 +1,7 @@
 #include "device.h"
 //---------------------------------------
 void IO_Clock_Enable(GPIO_TypeDef* gpio);
-void IO_Init(struct pin_t io, uint8_t io_dir);
+void IO_Init(struct io_t io, uint8_t io_dir);
 void TIM_Scan_Init(void);
 void TIM_Scan_Update(void);
 void TIM_INT_Init(void);
@@ -44,7 +44,7 @@ uint16_t AIN_TEMP[MAX_SIZE_AIN_TEMP][3] =
 //-----------------------------------------------------
 void DEV_Create(GPIO_TypeDef* gpio, uint16_t addr_pins)
 {
-    struct pin_t pin = { gpio, addr_pins };
+    struct io_t pin = { gpio, addr_pins };
     
     IO_Init(pin, DEV_IO_INPUT);
     
@@ -58,19 +58,17 @@ void DEV_Init(struct PORT_Input_Type* inputs, struct PORT_Output_Type* outputs)
     
     for(uint8_t i = 0; i < io_inputs->size; ++i)
     {
-        struct pin_t pin = io_inputs->list[i].pin;
-        
-        IO_Init(pin, DEV_IO_INPUT);
+        IO_Init(io_inputs->list[i].pin, DEV_IO_INPUT);
+        io_inputs->list[i].pin.num = i;
     }
     
     for(uint8_t i = 0; i < io_outputs->size; ++i)
     {
-        struct pin_t pin = io_outputs->list[i].pin;
-        
-        IO_Init(pin, DEV_IO_OUTPUT);
+        IO_Init(io_outputs->list[i].pin, DEV_IO_OUTPUT);
+        io_outputs->list[i].pin.num = i;
     }
     
-    struct pin_t pin_int = { GPIO_INT, GPIO_INT_PIN };
+    struct io_t pin_int = { GPIO_INT, GPIO_INT_PIN };
     IO_Init(pin_int, DEV_IO_OUTPUT); // вывод INT как выход
     
     GPIO_INT->BSRR |= GPIO_INT_SET; // включить выход INT (default state)
@@ -98,7 +96,7 @@ void IO_Clock_Enable(GPIO_TypeDef* gpio)
         RCC->AHBENR |= RCC_AHBENR_GPIOCEN;
 }
 //--------------------------------------------
-void IO_Init(struct pin_t pin, uint8_t io_dir)
+void IO_Init(struct io_t pin, uint8_t io_dir)
 {
     GPIO_InitTypeDef GPIO_InitStruct;
     
@@ -276,7 +274,7 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
         
             for(uint8_t i = 0; i < io_outputs->size; ++i)
             {
-                struct pin_t pin = io_outputs->list[i].pin;
+                struct io_t pin = io_outputs->list[i].pin;
                 
                 if((pin.gpio->ODR & pin.pin) == pin.pin)
                 {
@@ -386,7 +384,7 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
         case 0x06: // установка значения 0 на выходе канала 0
             if(io_outputs->size > 0)
             {
-                struct pin_t pin = io_outputs->list[0].pin;
+                struct io_t pin = io_outputs->list[0].pin;
                 
                 if(pin.gpio->ODR & pin.pin)
                 {
@@ -398,7 +396,7 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
         case 0x07: // установка значения 0 на выходе канала 1
             if(io_outputs->size > 1)
             {
-                struct pin_t pin = io_outputs->list[1].pin;
+                struct io_t pin = io_outputs->list[1].pin;
                 
                 if(pin.gpio->ODR & pin.pin)
                 {
@@ -410,7 +408,7 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
         case 0x08: // установка значения 0 на выходе канала 2
             if(io_outputs->size > 2)
             {
-                struct pin_t pin = io_outputs->list[2].pin;
+                struct io_t pin = io_outputs->list[2].pin;
                 
                 if(pin.gpio->ODR & pin.pin)
                 {
@@ -422,7 +420,7 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
         case 0x09: // установка значения 0 на выходе канала 3
             if(io_outputs->size > 3)
             {
-                struct pin_t pin = io_outputs->list[3].pin;
+                struct io_t pin = io_outputs->list[3].pin;
                 
                 if(pin.gpio->ODR & pin.pin)
                 {
@@ -434,7 +432,7 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
         case 0x0A: // установка значения 0 на выходе канала 4
             if(io_outputs->size > 4)
             {
-                struct pin_t pin = io_outputs->list[4].pin;
+                struct io_t pin = io_outputs->list[4].pin;
                 
                 if(pin.gpio->ODR & pin.pin)
                 {
@@ -446,7 +444,7 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
         case 0x0B: // установка значения 0 на выходе канала 5
             if(io_outputs->size > 5)
             {
-                struct pin_t pin = io_outputs->list[5].pin;
+                struct io_t pin = io_outputs->list[5].pin;
                 
                 if(pin.gpio->ODR & pin.pin)
                 {
@@ -458,7 +456,7 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
         case 0x0C: // установка значения 0 на выходе канала 6
             if(io_outputs->size > 6)
             {
-                struct pin_t pin = io_outputs->list[6].pin;
+                struct io_t pin = io_outputs->list[6].pin;
                 
                 if(pin.gpio->ODR & pin.pin)
                 {
@@ -470,7 +468,7 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
         case 0x0D: // установка значения 0 на выходе канала 7
             if(io_outputs->size > 7)
             {
-                struct pin_t pin = io_outputs->list[7].pin;
+                struct io_t pin = io_outputs->list[7].pin;
                 
                 if(pin.gpio->ODR & pin.pin)
                 {
@@ -482,7 +480,7 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
         case 0x0E: // установка значения 1 на выходе канала 0
             if(io_outputs->size > 0)
             {
-                struct pin_t pin = io_outputs->list[0].pin;
+                struct io_t pin = io_outputs->list[0].pin;
                 
                 if((pin.gpio->ODR & pin.pin) != pin.pin)
                 {
@@ -494,7 +492,7 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
         case 0x0F: // установка значения 1 на выходе канала 1
             if(io_outputs->size > 1)
             {
-                struct pin_t pin = io_outputs->list[1].pin;
+                struct io_t pin = io_outputs->list[1].pin;
                 
                 if((pin.gpio->ODR & pin.pin) != pin.pin)
                 {
@@ -506,7 +504,7 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
         case 0x10: // установка значения 1 на выходе канала 2
             if(io_outputs->size > 2)
             {
-                struct pin_t pin = io_outputs->list[2].pin;
+                struct io_t pin = io_outputs->list[2].pin;
                 
                 if((pin.gpio->ODR & pin.pin) != pin.pin)
                 {
@@ -518,7 +516,7 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
         case 0x11: // установка значения 1 на выходе канала 3
             if(io_outputs->size > 3)
             {
-                struct pin_t pin = io_outputs->list[3].pin;
+                struct io_t pin = io_outputs->list[3].pin;
                 
                 if((pin.gpio->ODR & pin.pin) != pin.pin)
                 {
@@ -530,7 +528,7 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
         case 0x12: // установка значения 1 на выходе канала 4
             if(io_outputs->size > 4)
             {
-                struct pin_t pin = io_outputs->list[4].pin;
+                struct io_t pin = io_outputs->list[4].pin;
                 
                 if((pin.gpio->ODR & pin.pin) != pin.pin)
                 {
@@ -542,7 +540,7 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
         case 0x13: // установка значения 1 на выходе канала 5
             if(io_outputs->size > 5)
             {
-                struct pin_t pin = io_outputs->list[5].pin;
+                struct io_t pin = io_outputs->list[5].pin;
                 
                 if((pin.gpio->ODR & pin.pin) != pin.pin)
                 {
@@ -554,7 +552,7 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
         case 0x14: // установка значения 1 на выходе канала 6
             if(io_outputs->size > 6)
             {
-                struct pin_t pin = io_outputs->list[6].pin;
+                struct io_t pin = io_outputs->list[6].pin;
                 
                 if((pin.gpio->ODR & pin.pin) != pin.pin)
                 {
@@ -566,7 +564,7 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
         case 0x15: // установка значения 1 на выходе канала 7
             if(io_outputs->size > 7)
             {
-                struct pin_t pin = io_outputs->list[7].pin;
+                struct io_t pin = io_outputs->list[7].pin;
                 
                 if((pin.gpio->ODR & pin.pin) != pin.pin)
                 {

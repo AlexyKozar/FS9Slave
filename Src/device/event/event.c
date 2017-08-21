@@ -92,6 +92,11 @@ bool EVENT_Insert(struct event_t evt)
     
     return true;
 }
+//-------------------------
+void EVENT_Kill(uint8_t id)
+{
+    timer[id].timer = TIMER_IDLE;
+}
 //------------------------
 void SysTick_Handler(void)
 {
