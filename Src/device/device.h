@@ -23,11 +23,11 @@
     //---------------------
     #define IN_MODE_AC 0x00
     #define IN_MODE_DC 0x01
-    
     //------------------------------------------
     #define OUTPUT_STATE_OFF      (uint8_t) 0x00 // выход выключен
     #define OUTPUT_STATE_ON       (uint8_t) 0x01 // выход включен (постоянно)
     #define OUTPUT_STATE_FREQ_2HZ (uint8_t) 0x02 // выход включен (мигает с частотой 2Гц)
+    #define OUTPUT_STATE_RESERVE  (uint8_t) 0x03 // резервное состояние (мигает с частотой 2Гц)
     //--------------------------
     #define GPIO_INT       GPIOB
     #define GPIO_INT_PIN   GPIO_PIN_5
@@ -69,7 +69,6 @@
         GPIO_TypeDef* gpio; // порт канала
         uint16_t      pin; // пин канала
         uint8_t       num; // номер канала
-        uint8_t       param; // произвольный параметр
     };
     //------------
     struct input_t
@@ -86,8 +85,9 @@
     //-------------
     struct output_t
     {
-        struct io_t  pin;
-        uint8_t      state;
+        struct io_t pin;
+        uint8_t     state; // состояние канала
+        uint8_t     param; // произвольный параметр
     };
     //--------------------
     struct PORT_Input_Type

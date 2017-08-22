@@ -34,8 +34,8 @@ void EVENT_Init(void)
                     SysTick_CTRL_TICKINT_Msk |
                     SysTick_CTRL_ENABLE_Msk;
 }
-//--------------------------------------------------------
-bool EVENT_Create(uint16_t time, bool autorepeat, Event f)
+//----------------------------------------------------------------------------------------------------
+uint8_t EVENT_Create(uint16_t time, bool autorepeat, Event function, GPIO_TypeDef* gpio, uint16_t pin)
 {
     for(uint8_t i = 0; i < EVENT_MAX_SIZE; ++i)
     {
@@ -44,13 +44,15 @@ bool EVENT_Create(uint16_t time, bool autorepeat, Event f)
             timer[i].timer            = time;
             timer[i].event.time       = time;
             timer[i].event.autorepeat = autorepeat;
-            timer[i].event.event      = f;
+            timer[i].event.event      = function;
+            timer[i].event.gpio       = gpio;
+            timer[i].event.pin        = pin;
             
-            return true;
+            return timer[i].event.id;
         }
     }
     
-    return false;
+    return 0xFF;
 }
 //----------------------
 void EVENT_Execute(void)
@@ -69,12 +71,12 @@ void EVENT_Execute(void)
     
     if(evt.event != NULL)
     {
-        evt.event(); // вызов функции обработки события
+        evt.event(evt.gpio, evt.pin); // вызов функции обработки события
     }
     
     if(evt.autorepeat == true) // включен автоповтор события
     {
-        EVENT_Create(evt.time, evt.autorepeat, evt.event);
+        EVENT_Create(evt.time, evt.autorepeat, evt.event, evt.gpio, evt.pin);
     }
 }
 //-----------------------------------

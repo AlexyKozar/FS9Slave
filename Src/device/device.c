@@ -9,11 +9,11 @@ void TIM_INT_Start(void);
 void PWROK_Init(void);
 float Get_Temp(uint16_t val, uint8_t in_num);
 float UAIN_to_TResistance(uint16_t val, uint8_t in_num); // преобразование напряжения в сопротивление температуры
+void  blink2Hz(GPIO_TypeDef* gpio, uint16_t pin);
 //---------------------------------
 struct PORT_Input_Type*  io_inputs;
 struct PORT_Output_Type* io_outputs;
 struct PWROK_Type        pwr_ok = { false, false, 0, false, false };
-volatile uint8_t time = 0;
 //---------------------
 uint8_t devAddr = 0xFF;
 //-------------------------
@@ -66,6 +66,16 @@ void DEV_Init(struct PORT_Input_Type* inputs, struct PORT_Output_Type* outputs)
     {
         IO_Init(io_outputs->list[i].pin, DEV_IO_OUTPUT);
         io_outputs->list[i].pin.num = i;
+        io_outputs->list[i].state   = OUTPUT_STATE_OFF;
+        
+        if(devAddr == 2) // только для устройства МИК-01
+        {
+            io_outputs->list[i].pin.gpio->ODR |= io_outputs->list[i].pin.pin; // выключается лог "1"
+        }
+        else // остальные выключаются лог "0"
+        {
+            io_outputs->list[i].pin.gpio->ODR &= ~io_outputs->list[i].pin.pin;
+        }
     }
     
     struct io_t pin_int = { GPIO_INT, GPIO_INT_PIN };
@@ -234,9 +244,13 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
 {
     uint8_t bit_count = 0; // счетчик бит (позиция канала в байте)
     
-    int32_t  temp;
-    uint16_t ain1;
-    uint16_t ain2;
+    int32_t          temp;
+    uint16_t         ain1;
+    uint16_t         ain2;
+    uint8_t          byte;
+    uint8_t          state;
+    uint8_t          n_out;
+    struct output_t* out = NULL;
     
     switch(cmd)
     {
@@ -344,37 +358,40 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
         break;
             
         case 0x05: // запись регистра расширения дискретных каналов выходов
-            for(uint8_t i = 0; i < data->size; ++i)
+            for(uint8_t i = 0; i < 1; ++i)
             {
-                uint8_t byte = data->buffer[i];
+                byte = data->buffer[i]; // текущий байт
                 
-                for(uint8_t j = 0; j < 8; j += 2)
+                for(uint8_t j = 0; j < 8; j += 2) // 8 бит по 2 на описание каждого канала
                 {
-                    uint8_t          state = (byte >> j)&0x03;
-                    uint8_t          n_out = i*4 + j/2; // номер канала
-                    struct output_t* out   = &io_outputs->list[n_out];
+                    state = (byte >> j)&0x03; // состояние текущего канал
+                    n_out = i*4 + j/2; // порядковый номер канала
+                    out   = &io_outputs->list[n_out];
+                    
+                    if(out->state == OUTPUT_STATE_FREQ_2HZ ||
+                       out->state == OUTPUT_STATE_RESERVE)
+                    {
+                        EVENT_Kill(out->param);
+                    }
                     
                     switch(state)
                     {
-                        case 0x00: // отключение - на выходе лог. "1"
-                            if((out->pin.gpio->ODR & out->pin.pin) != out->pin.pin)
-                            {
-                                out->pin.gpio->ODR |= out->pin.pin;
-                                out->state = OUTPUT_STATE_OFF;
-                            }
+                        case OUTPUT_STATE_OFF: // отключение выхода
+                            out->pin.gpio->ODR &= ~out->pin.pin;
+                            out->state = OUTPUT_STATE_OFF;
                         break;
                         
-                        case 0x01: // включение - на выходе лог. "0"
-                            if((out->pin.gpio->ODR & out->pin.pin) == out->pin.pin)
-                            {
-                                out->pin.gpio->ODR &= ~out->pin.pin;
-                                out->state = OUTPUT_STATE_ON;
-                            }
+                        case OUTPUT_STATE_ON: // включение выхода
+                            out->pin.gpio->ODR |= out->pin.pin;
+                            out->state = OUTPUT_STATE_ON;
                         break;
                         
-                        case 0x02: // включение - на выходе меандр 2Гц
-                        case 0x03: // резерв - на выходе меандр 2Гц
+                        case OUTPUT_STATE_FREQ_2HZ: // включение выхода с альтернативной функцией
+                        case OUTPUT_STATE_RESERVE:
+                            out->pin.gpio->ODR &= ~out->pin.pin;
                             out->state = OUTPUT_STATE_FREQ_2HZ;
+                        
+                            EVENT_Create(1000, true, blink2Hz, out->pin.gpio, out->pin.pin);
                         break;
                     }
                 }
@@ -611,13 +628,6 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
             packet->size = 3;
         break;
             
-        case 0x3D: // изменение длительности сигнала
-            if(data->size == 1)
-            {
-                //io_inputs->in_set.Sdur = data->buffer[0];
-            }
-        break;
-            
         case 0x3E: // изменение параметров фильтрации
             if(data->size == 3)
             {
@@ -628,18 +638,20 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
         break;
             
         case 0x3F: // изменение входа
-            if(data->size == 3)
+            if(data->size == 4)
             {
                 uint8_t in_num = data->buffer[0]; // номер настраиваемого входа
                 io_inputs->list[in_num].mode  = data->buffer[1]; // режим работы входа AC или DC
+              
+                io_inputs->list[in_num].duration = data->buffer[2]; // длительность периода
                 
                 if(io_inputs->list[in_num].mode == IN_MODE_AC)
                 {
-                    io_inputs->list[in_num].fault = data->buffer[2]; // погрешность допускаемая за один период - в процентах
+                    io_inputs->list[in_num].fault = data->buffer[3]; // погрешность допускаемая за один период - в процентах
                 }
                 else
                 {
-                    io_inputs->set.P0dc = io_inputs->set.P1dc = data->buffer[2];
+                    io_inputs->set.P0dc = io_inputs->set.P1dc = data->buffer[3];
                 }
             }
         break;
@@ -958,5 +970,17 @@ void TIM14_IRQHandler(void)
         {
             pwr_ok.is_pwrok = false;
         }
+    }
+}
+//---------------------------------------------
+void blink2Hz(GPIO_TypeDef* gpio, uint16_t pin)
+{
+    if((gpio->ODR & pin) == pin)
+    {
+        gpio->ODR &= ~pin;
+    }
+    else
+    {
+        gpio->ODR |= pin;
     }
 }

@@ -56,11 +56,22 @@ static void MX_USART1_UART_Init(void);
 
 /* USER CODE BEGIN PFP */
 /* Private function prototypes -----------------------------------------------*/
-void blink(void);
+
 /* USER CODE END PFP */
 
 /* USER CODE BEGIN 0 */
-
+//---------------------------------------------
+void blink(GPIO_TypeDef* gpio, uint16_t pin)
+{
+    if((gpio->ODR & pin) == pin)
+    {
+        gpio->ODR &= ~pin;
+    }
+    else
+    {
+        gpio->ODR |= pin;
+    }
+}
 /* USER CODE END 0 */
 
 int main(void)
@@ -202,7 +213,7 @@ int main(void)
     DEV_Init(&input, &output);
     
     EVENT_Init();
-    EVENT_Create(1000, true, blink);
+    //EVENT_Create(1000, true, blink, GPIOB, GPIO_PIN_13); // test
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
@@ -231,18 +242,6 @@ int main(void)
   }
   /* USER CODE END 3 */
 
-}
-
-void blink(void)
-{
-    if((GPIOB->ODR & GPIO_PIN_11) == GPIO_PIN_11)
-    {
-        GPIOB->ODR &= ~GPIO_PIN_11;
-    }
-    else
-    {
-        GPIOB->ODR |= GPIO_PIN_11;
-    }
 }
 
 /** System Clock Configuration
