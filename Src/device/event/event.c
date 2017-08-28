@@ -1,14 +1,15 @@
 #include "event.h"
 //---------------------------------
 const uint16_t TIMER_IDLE = 0xFFFF;
-//----
-struct
+//------------
+struct timer_t
 {
     uint16_t        timer;
     struct event_t  event;
-} timer[EVENT_MAX_SIZE]; // очередь таймеров
+};
 //-----------------------------------
 struct event_t event[EVENT_MAX_SIZE]; // очередь событий
+struct timer_t timer[EVENT_MAX_SIZE]; // очередь таймеров
 //----------------------
 uint8_t event_count = 0;
 uint8_t event_head  = 0;
@@ -34,22 +35,36 @@ void EVENT_Init(void)
                     SysTick_CTRL_TICKINT_Msk |
                     SysTick_CTRL_ENABLE_Msk;
 }
-//----------------------------------------------------------------------------------------------------
-uint8_t EVENT_Create(uint16_t time, bool autorepeat, Event function, GPIO_TypeDef* gpio, uint16_t pin)
+//----------------------------------------------------------------------------------------------------------------
+uint8_t EVENT_Create(uint16_t time, bool autorepeat, Event function, GPIO_TypeDef* gpio, uint16_t pin, uint8_t id)
 {
-    for(uint8_t i = 0; i < EVENT_MAX_SIZE; ++i)
+    struct timer_t* tim = NULL;
+    
+    if(id != 0xFF) // задан определенный таймер
     {
-        if(timer[i].timer == TIMER_IDLE)
+        tim = &timer[id]; // получаем заданный таймер
+    }
+    else if(id == 0xFF) // таймер не задан
+    {
+        for(uint8_t i = 0; i < EVENT_MAX_SIZE; ++i)
         {
-            timer[i].timer            = time;
-            timer[i].event.time       = time;
-            timer[i].event.autorepeat = autorepeat;
-            timer[i].event.event      = function;
-            timer[i].event.gpio       = gpio;
-            timer[i].event.pin        = pin;
-            
-            return timer[i].event.id;
+            if(timer[i].timer == TIMER_IDLE)
+            {
+                tim = &timer[i];
+            }
         }
+    }
+
+    if(tim != NULL)
+    {
+        tim->timer            = time;
+        tim->event.time       = time;
+        tim->event.autorepeat = autorepeat;
+        tim->event.event      = function;
+        tim->event.gpio       = gpio;
+        tim->event.pin        = pin;
+        
+        return tim->event.id;
     }
     
     return 0xFF;
@@ -76,7 +91,7 @@ void EVENT_Execute(void)
     
     if(evt.autorepeat == true) // включен автоповтор события
     {
-        EVENT_Create(evt.time, evt.autorepeat, evt.event, evt.gpio, evt.pin);
+        EVENT_Create(evt.time, evt.autorepeat, evt.event, evt.gpio, evt.pin, evt.id);
     }
 }
 //-----------------------------------

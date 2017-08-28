@@ -358,7 +358,7 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
         break;
             
         case 0x05: // запись регистра расширения дискретных каналов выходов
-            for(uint8_t i = 0; i < 1; ++i)
+            for(uint8_t i = 0; i < data->size; ++i)
             {
                 byte = data->buffer[i]; // текущий байт
                 
@@ -368,30 +368,51 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
                     n_out = i*4 + j/2; // порядковый номер канала
                     out   = &io_outputs->list[n_out];
                     
-                    if(out->state == OUTPUT_STATE_FREQ_2HZ ||
-                       out->state == OUTPUT_STATE_RESERVE)
-                    {
-                        EVENT_Kill(out->param);
-                    }
-                    
                     switch(state)
                     {
                         case OUTPUT_STATE_OFF: // отключение выхода
-                            out->pin.gpio->ODR &= ~out->pin.pin;
+                            if(out->state == OUTPUT_STATE_OFF)
+                            {
+                                break;
+                            }
+                            else if(out->state == OUTPUT_STATE_FREQ_2HZ || out->state == OUTPUT_STATE_RESERVE)
+                            {
+                                EVENT_Kill(out->param);
+                            }
+                            
                             out->state = OUTPUT_STATE_OFF;
+                            out->pin.gpio->ODR &= ~out->pin.pin;
                         break;
                         
                         case OUTPUT_STATE_ON: // включение выхода
-                            out->pin.gpio->ODR |= out->pin.pin;
+                            if(out->state == OUTPUT_STATE_ON)
+                            {
+                                break;
+                            }
+                            else if(out->state == OUTPUT_STATE_FREQ_2HZ || out->state == OUTPUT_STATE_RESERVE)
+                            {
+                                EVENT_Kill(out->param);
+                                out->pin.gpio->ODR &= ~out->pin.pin;
+                            }
+                            
                             out->state = OUTPUT_STATE_ON;
+                            out->pin.gpio->ODR |= out->pin.pin;
                         break;
                         
                         case OUTPUT_STATE_FREQ_2HZ: // включение выхода с альтернативной функцией
                         case OUTPUT_STATE_RESERVE:
-                            out->pin.gpio->ODR &= ~out->pin.pin;
+                            if(out->state == OUTPUT_STATE_FREQ_2HZ || out->state == OUTPUT_STATE_RESERVE)
+                            {
+                                break;
+                            }
+                            else if(out->state == OUTPUT_STATE_ON)
+                            {
+                                out->pin.gpio->ODR &= ~out->pin.pin;
+                            }
+                            
                             out->state = OUTPUT_STATE_FREQ_2HZ;
-                        
-                            EVENT_Create(1000, true, blink2Hz, out->pin.gpio, out->pin.pin);
+                            
+                            out->param = EVENT_Create(1000, true, blink2Hz, out->pin.gpio, out->pin.pin, 0xFF);
                         break;
                     }
                 }
@@ -634,6 +655,8 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
                 io_inputs->set.Nperiod  = data->buffer[0]; // количество периодов фильтрации
                 io_inputs->set.Ndiscret = data->buffer[1]; // количество выборок на период
                 io_inputs->set.SGac     = data->buffer[2]; // длительность сигнала считаемая, что сигнал валидный
+                
+                TIM_Scan_Update();
             }
         break;
             

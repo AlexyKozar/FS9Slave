@@ -21,7 +21,7 @@
     };
     //-----------------------
     void    EVENT_Init(void);
-    uint8_t EVENT_Create(uint16_t time, bool autorepeat, Event function, GPIO_TypeDef* gpio, uint16_t pin);
+    uint8_t EVENT_Create(uint16_t time, bool autorepeat, Event function, GPIO_TypeDef* gpio, uint16_t pin, uint8_t id);
     void    EVENT_Execute(void);
     void    EVENT_Kill(uint8_t id);
 #endif
