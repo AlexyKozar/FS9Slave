@@ -19,14 +19,14 @@
     #define MAX_SIZE_PACK_BUF 20
     //--------------
     #define ACK 0x06
-    //----------------
-    struct FS9Packet_t
+    //-------------------------
+    typedef struct _FS9Packet_t
     {
         uint8_t buffer[MAX_SIZE_PACK_BUF];
         uint8_t size;
-    };
-    //----------------------------------------
-    bool FS9_read(struct FS9Packet_t* packet);
-    bool FS9_write(struct FS9Packet_t* packet);
+    } FS9Packet_t;
+    //---------------------------------
+    bool FS9_read(FS9Packet_t* packet);
+    bool FS9_write(FS9Packet_t* packet);
     bool FS9_Is_Ready(void);
 #endif

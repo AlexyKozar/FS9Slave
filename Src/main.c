@@ -60,18 +60,8 @@ static void MX_USART1_UART_Init(void);
 /* USER CODE END PFP */
 
 /* USER CODE BEGIN 0 */
-//---------------------------------------------
-void blink(GPIO_TypeDef* gpio, uint16_t pin)
-{
-    if((gpio->ODR & pin) == pin)
-    {
-        gpio->ODR &= ~pin;
-    }
-    else
-    {
-        gpio->ODR |= pin;
-    }
-}
+//---------------------------------------------------------------------------
+void IODevice_Init(uint8_t addr, PORT_Input_Type* in, PORT_Output_Type* out);
 /* USER CODE END 0 */
 
 int main(void)
@@ -108,107 +98,10 @@ int main(void)
     uint8_t addr = DEV_Address();
     
     // Declaration struct inputs and outputs
-    struct PORT_Input_Type  input; // the input channels
-    struct PORT_Output_Type output; // the output channels
+    PORT_Input_Type  input; // the input channels
+    PORT_Output_Type output; // the output channels
     
-    input.list[0].pin.gpio = GPIOA;
-    input.list[1].pin.gpio = GPIOA;
-    input.list[2].pin.gpio = GPIOA;
-    input.list[3].pin.gpio = GPIOA;
-    input.list[4].pin.gpio = GPIOA;
-    input.list[5].pin.gpio = GPIOA;
-    input.list[6].pin.gpio = GPIOA;
-    input.list[7].pin.gpio = GPIOA;
-    input.list[8].pin.gpio = GPIOA;
-    input.list[9].pin.gpio = GPIOA;
-    
-    input.list[0].pin.pin = GPIO_PIN_0; // input channel 1
-    input.list[1].pin.pin = GPIO_PIN_1; // input channel 2
-    input.list[2].pin.pin = GPIO_PIN_2; // input channel 3
-    input.list[3].pin.pin = GPIO_PIN_3; // input channel 4
-    input.list[4].pin.pin = GPIO_PIN_4; // input channel 5
-    input.list[5].pin.pin = GPIO_PIN_5; // input channel 6
-    input.list[6].pin.pin = GPIO_PIN_6; // input channel 7
-    input.list[7].pin.pin = GPIO_PIN_7; // input channel 8
-    input.list[8].pin.pin = GPIO_PIN_8; // input channel 9
-    input.list[9].pin.pin = GPIO_PIN_9; // input channel 10
-    
-    if(addr == 0x00) // МДВВ-01
-    {
-        input.list[10].pin.gpio = GPIOA;
-        input.list[11].pin.gpio = GPIOA;
-        
-        input.list[10].pin.pin = GPIO_PIN_10; // input channel 11
-        input.list[11].pin.pin = GPIO_PIN_11; // input channel 12
-        
-        output.list[0].pin.gpio = GPIOB;
-        output.list[1].pin.gpio = GPIOB;
-        output.list[2].pin.gpio = GPIOB;
-        output.list[3].pin.gpio = GPIOB;
-        output.list[4].pin.gpio = GPIOB;
-        output.list[5].pin.gpio = GPIOB;
-        
-        output.list[0].pin.pin = GPIO_PIN_10; // output chanel 1
-        output.list[1].pin.pin = GPIO_PIN_15; // output chanel 2
-        output.list[2].pin.pin = GPIO_PIN_14; // output chanel 3
-        output.list[3].pin.pin = GPIO_PIN_13; // output chanel 4
-        output.list[4].pin.pin = GPIO_PIN_12; // output chanel 5
-        output.list[5].pin.pin = GPIO_PIN_11; // output chanel 6
-        
-        input.size  = 12;
-        output.size = 6;
-    }
-    else if(addr == 0x01) // МДВВ-02
-    {
-        output.list[0].pin.gpio = GPIOB;
-        output.list[1].pin.gpio = GPIOB;
-        output.list[2].pin.gpio = GPIOB;
-        output.list[3].pin.gpio = GPIOB;
-        output.list[4].pin.gpio = GPIOB;
-        output.list[5].pin.gpio = GPIOB;
-        output.list[6].pin.gpio = GPIOB;
-        
-        output.list[0].pin.pin = GPIO_PIN_11; // output chanel 1
-        output.list[1].pin.pin = GPIO_PIN_12; // output chanel 2
-        output.list[2].pin.pin = GPIO_PIN_13; // output chanel 3
-        output.list[3].pin.pin = GPIO_PIN_14; // output chanel 4
-        output.list[4].pin.pin = GPIO_PIN_15; // output chanel 5
-        output.list[5].pin.pin = GPIO_PIN_10; // output chanel 6
-        output.list[6].pin.pin = GPIO_PIN_2; // output chanel 7
-        
-        input.size  = 10;
-        output.size = 7;
-    }
-    else if(addr == 0x02) // МИК-01V1
-    {
-        output.list[0].pin.gpio  = GPIOB;
-        output.list[1].pin.gpio  = GPIOB;
-        output.list[2].pin.gpio  = GPIOB;
-        output.list[3].pin.gpio  = GPIOB;
-        output.list[4].pin.gpio  = GPIOB;
-        output.list[5].pin.gpio  = GPIOB;
-        output.list[6].pin.gpio  = GPIOB;
-        output.list[7].pin.gpio  = GPIOB;
-        output.list[8].pin.gpio  = GPIOB;
-        output.list[9].pin.gpio  = GPIOF;
-        output.list[10].pin.gpio = GPIOF;
-        output.list[11].pin.gpio = GPIOB;
-        
-        output.list[0].pin.pin  = GPIO_PIN_14;
-        output.list[1].pin.pin  = GPIO_PIN_13;
-        output.list[2].pin.pin  = GPIO_PIN_12;
-        output.list[3].pin.pin  = GPIO_PIN_11;
-        output.list[4].pin.pin  = GPIO_PIN_10;
-        output.list[5].pin.pin  = GPIO_PIN_2;
-        output.list[6].pin.pin  = GPIO_PIN_1;
-        output.list[7].pin.pin  = GPIO_PIN_0;
-        output.list[8].pin.pin  = GPIO_PIN_15;
-        output.list[9].pin.pin  = GPIO_PIN_6;
-        output.list[10].pin.pin = GPIO_PIN_7;
-        output.list[11].pin.pin = GPIO_PIN_4;
-        
-        output.size = 12;
-    }
+    IODevice_Init(addr, &input, &output);
     
     EVENT_Init();
     DEV_Init(&input, &output);
@@ -223,8 +116,8 @@ int main(void)
       
     if(FS9_Is_Ready())
     {
-        struct FS9Packet_t packet_source = { 0, 0 };
-        struct FS9Packet_t packet_dest = { 0, 0 };
+        FS9Packet_t packet_source = { 0, 0 };
+        FS9Packet_t packet_dest = { 0, 0 };
         
         if(FS9_read(&packet_source))
             DEV_Request(&packet_source, &packet_dest);
@@ -322,7 +215,134 @@ static void MX_USART1_UART_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-
+void IODevice_Init(uint8_t addr, PORT_Input_Type* in, PORT_Output_Type* out)
+{
+    in->list[0].pin.gpio = GPIOA;
+    in->list[1].pin.gpio = GPIOA;
+    in->list[2].pin.gpio = GPIOA;
+    in->list[3].pin.gpio = GPIOA;
+    in->list[4].pin.gpio = GPIOA;
+    in->list[5].pin.gpio = GPIOA;
+    in->list[6].pin.gpio = GPIOA;
+    in->list[7].pin.gpio = GPIOA;
+    in->list[8].pin.gpio = GPIOA;
+    in->list[9].pin.gpio = GPIOA;
+    
+    in->list[0].pin.pin = GPIO_PIN_0; // input channel 1
+    in->list[1].pin.pin = GPIO_PIN_1; // input channel 2
+    in->list[2].pin.pin = GPIO_PIN_2; // input channel 3
+    in->list[3].pin.pin = GPIO_PIN_3; // input channel 4
+    in->list[4].pin.pin = GPIO_PIN_4; // input channel 5
+    in->list[5].pin.pin = GPIO_PIN_5; // input channel 6
+    in->list[6].pin.pin = GPIO_PIN_6; // input channel 7
+    in->list[7].pin.pin = GPIO_PIN_7; // input channel 8
+    in->list[8].pin.pin = GPIO_PIN_8; // input channel 9
+    in->list[9].pin.pin = GPIO_PIN_9; // input channel 10
+    
+    if(addr == 0x00) // МДВВ-01
+    {
+        in->list[10].pin.gpio = GPIOA;
+        in->list[11].pin.gpio = GPIOA;
+        
+        in->list[10].pin.pin = GPIO_PIN_10; // input channel 11
+        in->list[11].pin.pin = GPIO_PIN_11; // input channel 12
+        
+        out->list[0].pin.gpio = GPIOB;
+        out->list[1].pin.gpio = GPIOB;
+        out->list[2].pin.gpio = GPIOB;
+        out->list[3].pin.gpio = GPIOB;
+        out->list[4].pin.gpio = GPIOB;
+        out->list[5].pin.gpio = GPIOB;
+        
+        out->list[0].pin.pin = GPIO_PIN_10; // output chanel 1
+        out->list[1].pin.pin = GPIO_PIN_15; // output chanel 2
+        out->list[2].pin.pin = GPIO_PIN_14; // output chanel 3
+        out->list[3].pin.pin = GPIO_PIN_13; // output chanel 4
+        out->list[4].pin.pin = GPIO_PIN_12; // output chanel 5
+        out->list[5].pin.pin = GPIO_PIN_11; // output chanel 6
+        
+        out->list[0].level = true;
+        out->list[1].level = true;
+        out->list[2].level = true;
+        out->list[3].level = true;
+        out->list[4].level = true;
+        out->list[5].level = true;
+        
+        in->size  = 12;
+        out->size = 6;
+    }
+    else if(addr == 0x01) // МДВВ-02
+    {
+        out->list[0].pin.gpio = GPIOB;
+        out->list[1].pin.gpio = GPIOB;
+        out->list[2].pin.gpio = GPIOB;
+        out->list[3].pin.gpio = GPIOB;
+        out->list[4].pin.gpio = GPIOB;
+        out->list[5].pin.gpio = GPIOB;
+        out->list[6].pin.gpio = GPIOB;
+        
+        out->list[0].pin.pin = GPIO_PIN_11; // output chanel 1
+        out->list[1].pin.pin = GPIO_PIN_12; // output chanel 2
+        out->list[2].pin.pin = GPIO_PIN_13; // output chanel 3
+        out->list[3].pin.pin = GPIO_PIN_14; // output chanel 4
+        out->list[4].pin.pin = GPIO_PIN_15; // output chanel 5
+        out->list[5].pin.pin = GPIO_PIN_10; // output chanel 6
+        out->list[6].pin.pin = GPIO_PIN_2; // output chanel 7
+        
+        out->list[0].level = true;
+        out->list[1].level = true;
+        out->list[2].level = true;
+        out->list[3].level = true;
+        out->list[4].level = true;
+        out->list[5].level = true;
+        
+        in->size  = 10;
+        out->size = 7;
+    }
+    else if(addr == 0x02) // МИК-01V1
+    {
+        out->list[0].pin.gpio  = GPIOB;
+        out->list[1].pin.gpio  = GPIOB;
+        out->list[2].pin.gpio  = GPIOB;
+        out->list[3].pin.gpio  = GPIOB;
+        out->list[4].pin.gpio  = GPIOB;
+        out->list[5].pin.gpio  = GPIOB;
+        out->list[6].pin.gpio  = GPIOB;
+        out->list[7].pin.gpio  = GPIOB;
+        out->list[8].pin.gpio  = GPIOB;
+        out->list[9].pin.gpio  = GPIOF;
+        out->list[10].pin.gpio = GPIOF;
+        out->list[11].pin.gpio = GPIOB;
+        
+        out->list[0].pin.pin  = GPIO_PIN_14;
+        out->list[1].pin.pin  = GPIO_PIN_13;
+        out->list[2].pin.pin  = GPIO_PIN_12;
+        out->list[3].pin.pin  = GPIO_PIN_11;
+        out->list[4].pin.pin  = GPIO_PIN_10;
+        out->list[5].pin.pin  = GPIO_PIN_2;
+        out->list[6].pin.pin  = GPIO_PIN_1;
+        out->list[7].pin.pin  = GPIO_PIN_0;
+        out->list[8].pin.pin  = GPIO_PIN_15;
+        out->list[9].pin.pin  = GPIO_PIN_6;
+        out->list[10].pin.pin = GPIO_PIN_7;
+        out->list[11].pin.pin = GPIO_PIN_4;
+        
+        out->list[0].level  = false;
+        out->list[1].level  = false;
+        out->list[2].level  = false;
+        out->list[3].level  = false;
+        out->list[4].level  = false;
+        out->list[5].level  = false;
+        out->list[6].level  = false;
+        out->list[7].level  = false;
+        out->list[8].level  = false;
+        out->list[9].level  = false;
+        out->list[10].level = false;
+        out->list[11].level = false;
+        
+        out->size = 12;
+    }
+}
 /* USER CODE END 4 */
 
 /**

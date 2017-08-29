@@ -335,7 +335,7 @@
               <MiscControls>--C99</MiscControls>
               <Define>USE_HAL_DRIVER,STM32F030x6</Define>
               <Undefine></Undefine>
-              <IncludePath>../Inc;  ../Drivers/STM32F0xx_HAL_Driver/Inc;  ../Drivers/STM32F0xx_HAL_Driver/Inc/Legacy;  ../Drivers/CMSIS/Device/ST/STM32F0xx/Include;  ../Drivers/CMSIS/Include</IncludePath>
+              <IncludePath>../Inc;../Drivers/STM32F0xx_HAL_Driver/Inc;../Drivers/STM32F0xx_HAL_Driver/Inc/Legacy;../Drivers/CMSIS/Device/ST/STM32F0xx/Include;../Drivers/CMSIS/Include;..\Src\device;..\Src\device\ain;..\Src\device\event;..\Src\device\fs9slave;..\Src\device\fs9slave\cmd</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -495,11 +495,6 @@
               <FilePath>..\Src\device\device.c</FilePath>
             </File>
             <File>
-              <FileName>fs9slave.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Src\device\fs9slave\fs9slave.c</FilePath>
-            </File>
-            <File>
               <FileName>cmd.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\Src\device\fs9slave\cmd\cmd.c</FilePath>
@@ -513,6 +508,11 @@
               <FileName>event.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\src\device\event\event.c</FilePath>
+            </File>
+            <File>
+              <FileName>fs9slave.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Src\device\fs9slave\fs9slave.c</FilePath>
             </File>
           </Files>
         </Group>

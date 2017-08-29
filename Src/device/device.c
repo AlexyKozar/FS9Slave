@@ -1,7 +1,9 @@
 #include "device.h"
 //---------------------------------------
 void IO_Clock_Enable(GPIO_TypeDef* gpio);
-void IO_Init(struct io_t io, uint8_t io_dir);
+void IO_Init(io_t io, uint8_t io_dir);
+void IO_Set(output_t output, bool state);
+void CHANNEL_Out_Set(uint8_t index, bool state);
 void TIM_Scan_Init(void);
 void TIM_Scan_Update(void);
 void TIM_INT_Init(void);
@@ -12,17 +14,17 @@ float Get_Temp(uint16_t val, uint8_t in_num);
 float UAIN_to_TResistance(uint16_t val, uint8_t in_num); // преобразование напряжения в сопротивление температуры
 void  blink2Hz(GPIO_TypeDef* gpio, uint16_t pin); // мигание с частотой 2Гц (для МИК-01)
 void  crash(GPIO_TypeDef* gpio, uint16_t pin); // для обработки аварийной ситуации (нет запросов от ЦП 5 сек)
-//---------------------------------
-struct PORT_Input_Type*  io_inputs;
-struct PORT_Output_Type* io_outputs;
-struct PWROK_Type        pwr_ok = { false, false, 0, false, false };
+//----------------------
+PORT_Input_Type*  io_in;
+PORT_Output_Type* io_out;
+PWROK_Type        pwr_ok = { false, false, 0, false, false };
 //---------------------
 uint8_t devAddr = 0xFF;
 //-------------------------
 bool Input_Changed = false;
 //--------------------
 bool is_crash = false; // авария - отключение выхода (происходит в случае отсутствия запросов от ЦП 5 сек)
-struct output_t out_crash; // выход аварийной сигнализации
+output_t out_crash; // выход аварийной сигнализации
 //---------------------------------------
 uint16_t AIN_TEMP[MAX_SIZE_AIN_TEMP][3] = 
 {
@@ -49,41 +51,34 @@ uint16_t AIN_TEMP[MAX_SIZE_AIN_TEMP][3] =
 //-----------------------------------------------------
 void DEV_Create(GPIO_TypeDef* gpio, uint16_t addr_pins)
 {
-    struct io_t pin = { gpio, addr_pins };
+    io_t pin = { gpio, addr_pins };
     
     IO_Init(pin, DEV_IO_INPUT);
     
     devAddr = (uint8_t)((gpio->IDR & addr_pins) >> 14); // set the address device
 }
-//-----------------------------------------------------------------------------
-void DEV_Init(struct PORT_Input_Type* inputs, struct PORT_Output_Type* outputs)
+//---------------------------------------------------------------
+void DEV_Init(PORT_Input_Type* inputs, PORT_Output_Type* outputs)
 {
-    io_inputs  = inputs;
-    io_outputs = outputs;
+    io_in  = inputs;
+    io_out = outputs;
     
-    for(uint8_t i = 0; i < io_inputs->size; ++i)
+    for(uint8_t i = 0; i < io_in->size; ++i)
     {
-        IO_Init(io_inputs->list[i].pin, DEV_IO_INPUT);
-        io_inputs->list[i].pin.num = i;
+        IO_Init(io_in->list[i].pin, DEV_IO_INPUT);
+        io_in->list[i].pin.num = i;
     }
     
-    for(uint8_t i = 0; i < io_outputs->size; ++i)
+    for(uint8_t i = 0; i < io_out->size; ++i)
     {
-        IO_Init(io_outputs->list[i].pin, DEV_IO_OUTPUT);
-        io_outputs->list[i].pin.num = i;
-        io_outputs->list[i].state   = OUTPUT_STATE_OFF;
+        IO_Init(io_out->list[i].pin, DEV_IO_OUTPUT);
+        io_out->list[i].pin.num = i;
+        io_out->list[i].state   = OUTPUT_STATE_OFF;
         
-        if(devAddr == 2) // только для устройства МИК-01
-        {
-            io_outputs->list[i].pin.gpio->ODR |= io_outputs->list[i].pin.pin; // выключается лог "1"
-        }
-        else // остальные выключаются лог "0"
-        {
-            io_outputs->list[i].pin.gpio->ODR &= ~io_outputs->list[i].pin.pin;
-        }
+        IO_Set(io_out->list[i], false); // выключить выход - состояние по умолчанию
     }
     
-    struct io_t pin_int = { GPIO_INT, GPIO_INT_PIN };
+    io_t pin_int = { GPIO_INT, GPIO_INT_PIN };
     IO_Init(pin_int, DEV_IO_OUTPUT); // вывод INT как выход
     
     GPIO_INT->BSRR |= GPIO_INT_SET; // включить выход INT (default state)
@@ -112,8 +107,8 @@ void IO_Clock_Enable(GPIO_TypeDef* gpio)
     else if(gpio == GPIOC)
         RCC->AHBENR |= RCC_AHBENR_GPIOCEN;
 }
-//--------------------------------------------
-void IO_Init(struct io_t pin, uint8_t io_dir)
+//------------------------------------
+void IO_Init(io_t pin, uint8_t io_dir)
 {
     GPIO_InitTypeDef GPIO_InitStruct;
     
@@ -124,6 +119,42 @@ void IO_Init(struct io_t pin, uint8_t io_dir)
     GPIO_InitStruct.Mode = (io_dir == 0x01)?GPIO_MODE_OUTPUT_PP:GPIO_MODE_INPUT;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     HAL_GPIO_Init(pin.gpio, &GPIO_InitStruct);
+}
+//--------------------------------------
+void IO_Set(output_t output, bool state)
+{
+    if(output.level == true)
+    {
+        if(state == true)
+        {
+            output.pin.gpio->ODR |= output.pin.pin;
+        }
+        else
+        {
+            output.pin.gpio->ODR &= ~output.pin.pin;
+        }
+    }
+    else if(output.level == false)
+    {
+        if(state == true)
+        {
+            output.pin.gpio->ODR &= ~output.pin.pin;
+        }
+        else
+        {
+            output.pin.gpio->ODR |= output.pin.pin;
+        }
+    }
+}
+//---------------------------------------------
+void CHANNEL_Out_Set(uint8_t index, bool state)
+{
+    if(index < io_out->size)
+    {
+        output_t out = io_out->list[index];
+        
+        IO_Set(out, state);
+    }
 }
 //----------------------
 void TIM_Scan_Init(void)
@@ -143,7 +174,7 @@ void TIM_Scan_Init(void)
 //------------------------
 void TIM_Scan_Update(void)
 {
-    TIM16->ARR   = 10000/io_inputs->set.Ndiscret - 1;
+    TIM16->ARR   = 10000/io_in->set.Ndiscret - 1;
     TIM16->DIER &= ~TIM_DIER_UIE;
     TIM16->EGR  |= TIM_EGR_UG;
     TIM16->DIER |= TIM_DIER_UIE;
@@ -197,17 +228,17 @@ void PWROK_Init(void)
 void CRASH_Init(void)
 {
     // настройка аварийного выхода
-    out_crash.pin   = io_outputs->list[2].pin;
+    out_crash       = io_out->list[2];
     out_crash.param = EVENT_Create(5000, true, crash, out_crash.pin.gpio, out_crash.pin.pin, 0xFF);
-    out_crash.pin.gpio->ODR |= out_crash.pin.pin; // включаем аварийный выход - только для теста
+    IO_Set(out_crash, true); // включаем аварийный выход - только для теста
 }
 //-----------------------
 uint8_t DEV_Address(void)
 {
     return devAddr;
 }
-//--------------------------------------------------------------------
-bool DEV_Request(struct FS9Packet_t* source, struct FS9Packet_t* dest)
+//------------------------------------------------------
+bool DEV_Request(FS9Packet_t* source, FS9Packet_t* dest)
 {
     is_crash = true; // получили запрос от ЦП - сброс аварийной ситуации
     
@@ -218,7 +249,7 @@ bool DEV_Request(struct FS9Packet_t* source, struct FS9Packet_t* dest)
     
     uint8_t cmd = source->buffer[0]&CMD_CODE_MASK; // get the command for device
     
-    struct cmd_t tcmd = CMD_get(cmd); // verification command
+    cmd_t tcmd = CMD_get(cmd); // verification command
     
     if(tcmd.n == 0 || tcmd.m == 0)
         return false; // command is not valid
@@ -228,7 +259,7 @@ bool DEV_Request(struct FS9Packet_t* source, struct FS9Packet_t* dest)
     if(checksum != source->buffer[source->size - 1])
         return false;
     
-    struct FS9Packet_t packet; // пакет данных (т.е. чистые данные без контрольной суммы и команды)
+    FS9Packet_t packet; // пакет данных (т.е. чистые данные без контрольной суммы и команды)
     
     packet.size = source->size - 2; // размер пакета данных (минус команда и контрольная сумма)
     
@@ -256,23 +287,23 @@ bool DEV_Request(struct FS9Packet_t* source, struct FS9Packet_t* dest)
     
     return true;
 }
-//--------------------------------------------------------------------------------
-bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packet)
+//------------------------------------------------------------------
+bool DEV_Driver(uint8_t cmd, FS9Packet_t* data, FS9Packet_t* packet)
 {
     uint8_t bit_count = 0; // счетчик бит (позиция канала в байте)
     
-    int32_t          temp;
-    uint16_t         ain1;
-    uint16_t         ain2;
-    uint8_t          byte;
-    uint8_t          state;
-    uint8_t          n_out;
-    struct output_t* out = NULL;
+    int32_t   temp;
+    uint16_t  ain1;
+    uint16_t  ain2;
+    uint8_t   byte;
+    uint8_t   state;
+    uint8_t   n_out;
+    output_t* out = NULL;
     
     switch(cmd)
     {
         case 0x00: // чтение дискретных каналов входов
-            for(uint8_t i = 0; i < io_inputs->size; ++i)
+            for(uint8_t i = 0; i < io_in->size; ++i)
             {
                 if(bit_count == 8)
                 {
@@ -283,11 +314,11 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
                 
                 uint8_t channel_state = 0x00;
                 
-                if(io_inputs->list[i].state == true && io_inputs->list[i].error == false)
+                if(io_in->list[i].state == true && io_in->list[i].error == false)
                 {
                     channel_state = 0x01;
                 }
-                else if(io_inputs->list[i].error == true)
+                else if(io_in->list[i].error == true)
                 {
                     channel_state = 0x02;
                 }
@@ -303,9 +334,9 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
         case 0x01: // чтение дискретных каналов выходов
             packet->buffer[0] = 0x00;
         
-            for(uint8_t i = 0; i < io_outputs->size; ++i)
+            for(uint8_t i = 0; i < io_out->size; ++i)
             {
-                struct io_t pin = io_outputs->list[i].pin;
+                io_t pin = io_out->list[i].pin;
                 
                 if((pin.gpio->ODR & pin.pin) == pin.pin)
                 {
@@ -383,7 +414,7 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
                 {
                     state = (byte >> j)&0x03; // состояние текущего канал
                     n_out = i*4 + j/2; // порядковый номер канала
-                    out   = &io_outputs->list[n_out];
+                    out   = &io_out->list[n_out];
                     
                     switch(state)
                     {
@@ -398,7 +429,8 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
                             }
                             
                             out->state = OUTPUT_STATE_OFF;
-                            out->pin.gpio->ODR &= ~out->pin.pin;
+                            
+                            IO_Set(*out, false);
                         break;
                         
                         case OUTPUT_STATE_ON: // включение выхода
@@ -409,11 +441,11 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
                             else if(out->state == OUTPUT_STATE_FREQ_2HZ || out->state == OUTPUT_STATE_RESERVE)
                             {
                                 EVENT_Kill(out->param);
-                                out->pin.gpio->ODR &= ~out->pin.pin;
+                                IO_Set(*out, false);
                             }
                             
                             out->state = OUTPUT_STATE_ON;
-                            out->pin.gpio->ODR |= out->pin.pin;
+                            IO_Set(*out, true);
                         break;
                         
                         case OUTPUT_STATE_FREQ_2HZ: // включение выхода с альтернативной функцией
@@ -424,7 +456,7 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
                             }
                             else if(out->state == OUTPUT_STATE_ON)
                             {
-                                out->pin.gpio->ODR &= ~out->pin.pin;
+                                IO_Set(*out, false);
                             }
                             
                             out->state = OUTPUT_STATE_FREQ_2HZ;
@@ -437,195 +469,67 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
         break;
         
         case 0x06: // установка значения 0 на выходе канала 0
-            if(io_outputs->size > 0)
-            {
-                struct io_t pin = io_outputs->list[0].pin;
-                
-                if(pin.gpio->ODR & pin.pin)
-                {
-                    pin.gpio->ODR &= ~pin.pin;
-                }
-            }
+            CHANNEL_Out_Set(0, false);
         break;
             
         case 0x07: // установка значения 0 на выходе канала 1
-            if(io_outputs->size > 1)
-            {
-                struct io_t pin = io_outputs->list[1].pin;
-                
-                if(pin.gpio->ODR & pin.pin)
-                {
-                    pin.gpio->ODR &= ~pin.pin;
-                }
-            }
+            CHANNEL_Out_Set(1, false);
         break;
             
         case 0x08: // установка значения 0 на выходе канала 2
-            if(io_outputs->size > 2)
-            {
-                struct io_t pin = io_outputs->list[2].pin;
-                
-                if(pin.gpio->ODR & pin.pin)
-                {
-                    pin.gpio->ODR &= ~pin.pin;
-                }
-            }
+            CHANNEL_Out_Set(2, false);
         break;
             
         case 0x09: // установка значения 0 на выходе канала 3
-            if(io_outputs->size > 3)
-            {
-                struct io_t pin = io_outputs->list[3].pin;
-                
-                if(pin.gpio->ODR & pin.pin)
-                {
-                    pin.gpio->ODR &= ~pin.pin;
-                }
-            }
+            CHANNEL_Out_Set(3, false);
         break;
             
         case 0x0A: // установка значения 0 на выходе канала 4
-            if(io_outputs->size > 4)
-            {
-                struct io_t pin = io_outputs->list[4].pin;
-                
-                if(pin.gpio->ODR & pin.pin)
-                {
-                    pin.gpio->ODR &= ~pin.pin;
-                }
-            }
-            break;
+            CHANNEL_Out_Set(4, false);
+        break;
             
         case 0x0B: // установка значения 0 на выходе канала 5
-            if(io_outputs->size > 5)
-            {
-                struct io_t pin = io_outputs->list[5].pin;
-                
-                if(pin.gpio->ODR & pin.pin)
-                {
-                    pin.gpio->ODR &= ~pin.pin;
-                }
-            }
+            CHANNEL_Out_Set(5, false);
         break;
             
         case 0x0C: // установка значения 0 на выходе канала 6
-            if(io_outputs->size > 6)
-            {
-                struct io_t pin = io_outputs->list[6].pin;
-                
-                if(pin.gpio->ODR & pin.pin)
-                {
-                    pin.gpio->ODR &= ~pin.pin;
-                }
-            }
+            CHANNEL_Out_Set(6, false);
         break;
             
         case 0x0D: // установка значения 0 на выходе канала 7
-            if(io_outputs->size > 7)
-            {
-                struct io_t pin = io_outputs->list[7].pin;
-                
-                if(pin.gpio->ODR & pin.pin)
-                {
-                    pin.gpio->ODR &= ~pin.pin;
-                }
-            }
+            CHANNEL_Out_Set(7, false);
         break;
             
         case 0x0E: // установка значения 1 на выходе канала 0
-            if(io_outputs->size > 0)
-            {
-                struct io_t pin = io_outputs->list[0].pin;
-                
-                if((pin.gpio->ODR & pin.pin) != pin.pin)
-                {
-                    pin.gpio->ODR |= pin.pin;
-                }
-            }
+            CHANNEL_Out_Set(0, true);
         break;
             
         case 0x0F: // установка значения 1 на выходе канала 1
-            if(io_outputs->size > 1)
-            {
-                struct io_t pin = io_outputs->list[1].pin;
-                
-                if((pin.gpio->ODR & pin.pin) != pin.pin)
-                {
-                    pin.gpio->ODR |= pin.pin;
-                }
-            }
+            CHANNEL_Out_Set(1, true);
         break;
             
         case 0x10: // установка значения 1 на выходе канала 2
-            if(io_outputs->size > 2)
-            {
-                struct io_t pin = io_outputs->list[2].pin;
-                
-                if((pin.gpio->ODR & pin.pin) != pin.pin)
-                {
-                    pin.gpio->ODR |= pin.pin;
-                }
-            }
+            CHANNEL_Out_Set(2, true);
         break;
             
         case 0x11: // установка значения 1 на выходе канала 3
-            if(io_outputs->size > 3)
-            {
-                struct io_t pin = io_outputs->list[3].pin;
-                
-                if((pin.gpio->ODR & pin.pin) != pin.pin)
-                {
-                    pin.gpio->ODR |= pin.pin;
-                }
-            }
+            CHANNEL_Out_Set(3, true);
         break;
             
         case 0x12: // установка значения 1 на выходе канала 4
-            if(io_outputs->size > 4)
-            {
-                struct io_t pin = io_outputs->list[4].pin;
-                
-                if((pin.gpio->ODR & pin.pin) != pin.pin)
-                {
-                    pin.gpio->ODR |= pin.pin;
-                }
-            }
+            CHANNEL_Out_Set(4, true);
         break;
             
         case 0x13: // установка значения 1 на выходе канала 5
-            if(io_outputs->size > 5)
-            {
-                struct io_t pin = io_outputs->list[5].pin;
-                
-                if((pin.gpio->ODR & pin.pin) != pin.pin)
-                {
-                    pin.gpio->ODR |= pin.pin;
-                }
-            }
+            CHANNEL_Out_Set(5, true);
         break;
             
         case 0x14: // установка значения 1 на выходе канала 6
-            if(io_outputs->size > 6)
-            {
-                struct io_t pin = io_outputs->list[6].pin;
-                
-                if((pin.gpio->ODR & pin.pin) != pin.pin)
-                {
-                    pin.gpio->ODR |= pin.pin;
-                }
-            }
+            CHANNEL_Out_Set(6, true);
         break;
             
         case 0x15: // установка значения 1 на выходе канала 7
-            if(io_outputs->size > 7)
-            {
-                struct io_t pin = io_outputs->list[7].pin;
-                
-                if((pin.gpio->ODR & pin.pin) != pin.pin)
-                {
-                    pin.gpio->ODR |= pin.pin;
-                }
-            }
+            CHANNEL_Out_Set(7, true);
         break;
             
         case 0x1F: // чтение времени срабатывания выделенного входного дискретного канала
@@ -669,9 +573,9 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
         case 0x3E: // изменение параметров фильтрации
             if(data->size == 3)
             {
-                io_inputs->set.Nperiod  = data->buffer[0]; // количество периодов фильтрации
-                io_inputs->set.Ndiscret = data->buffer[1]; // количество выборок на период
-                io_inputs->set.SGac     = data->buffer[2]; // длительность сигнала считаемая, что сигнал валидный
+                io_in->set.Nperiod  = data->buffer[0]; // количество периодов фильтрации
+                io_in->set.Ndiscret = data->buffer[1]; // количество выборок на период
+                io_in->set.SGac     = data->buffer[2]; // длительность сигнала считаемая, что сигнал валидный
                 
                 TIM_Scan_Update();
             }
@@ -681,17 +585,17 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
             if(data->size == 4)
             {
                 uint8_t in_num = data->buffer[0]; // номер настраиваемого входа
-                io_inputs->list[in_num].mode  = data->buffer[1]; // режим работы входа AC или DC
+                io_in->list[in_num].mode  = data->buffer[1]; // режим работы входа AC или DC
               
-                io_inputs->list[in_num].duration = data->buffer[2]; // длительность периода
+                io_in->list[in_num].duration = data->buffer[2]; // длительность периода
                 
-                if(io_inputs->list[in_num].mode == IN_MODE_AC)
+                if(io_in->list[in_num].mode == IN_MODE_AC)
                 {
-                    io_inputs->list[in_num].fault = data->buffer[3]; // погрешность допускаемая за один период - в процентах
+                    io_in->list[in_num].fault = data->buffer[3]; // погрешность допускаемая за один период - в процентах
                 }
                 else
                 {
-                    io_inputs->set.P0dc = io_inputs->set.P1dc = data->buffer[3];
+                    io_in->set.P0dc = io_in->set.P1dc = data->buffer[3];
                 }
             }
         break;
@@ -702,8 +606,8 @@ bool DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packe
     
     return true;
 }
-//------------------------------------------------------------
-uint8_t DEV_Checksum(struct FS9Packet_t* packet, uint8_t size)
+//-----------------------------------------------------
+uint8_t DEV_Checksum(FS9Packet_t* packet, uint8_t size)
 {
     uint8_t checksum = 0;
     
@@ -722,7 +626,7 @@ void DEV_Input_Scan(void)
 {
     if(pwr_ok.is_dsdin == false)
     {
-        for(uint8_t i = 0; i < io_inputs->size; ++i)
+        for(uint8_t i = 0; i < io_in->size; ++i)
         {
             DEV_Input_Filter(i);
         }
@@ -740,7 +644,7 @@ void DEV_Input_Scan(void)
 //----------------------------------
 void DEV_Input_Filter(uint8_t index)
 {
-    struct input_t* input = &io_inputs->list[index];
+    input_t* input = &io_in->list[index];
     
     bool in_state  = input->pin.gpio->IDR & input->pin.pin;
     bool act_level = !input->state; // ожидаемый уровень (при выключенном входе - лог "1", при включенном лог "0")
@@ -786,7 +690,7 @@ void DEV_Input_Filter(uint8_t index)
                 }
                 
                 // если ожидаемый уровень лог "1" и длительность сигнала меньше пороговой, то это ошибка
-                if(act_level == true && input->filter.c_lev_1 < io_inputs->set.SGac)
+                if(act_level == true && input->filter.c_lev_1 < io_in->set.SGac)
                 {
                     input->filter.c_error++;
 
@@ -828,8 +732,8 @@ void DEV_Input_Filter(uint8_t index)
             }
             else if(input->mode == IN_MODE_DC) // режим входа DC
             {
-                uint16_t tfault_lev = (act_level == true)?input->duration*io_inputs->set.P1dc:
-                                                          input->duration*io_inputs->set.P0dc;
+                uint16_t tfault_lev = (act_level == true)?input->duration*io_in->set.P1dc:
+                                                          input->duration*io_in->set.P0dc;
                 uint16_t tdur = (act_level == true)?input->filter.c_lev_1:input->filter.c_lev_0;
                 
                 if(tdur >= tfault_lev)
@@ -841,9 +745,9 @@ void DEV_Input_Filter(uint8_t index)
             input->filter.c_lev_1 = 0;
         }
         
-        if(input->filter.c_period >= io_inputs->set.Nperiod) // конец фильтрации - принятие решения
+        if(input->filter.c_period >= io_in->set.Nperiod) // конец фильтрации - принятие решения
         {
-            if(input->filter.c_state >= (io_inputs->set.Nperiod - 1))
+            if(input->filter.c_state >= (io_in->set.Nperiod - 1))
             {
                 input->error  = false;
                 input->state  = act_level;
@@ -858,7 +762,7 @@ void DEV_Input_Filter(uint8_t index)
                     TIM14->CR1 &= ~TIM_CR1_CEN;
                 }
             }
-            else if(input->filter.c_error >= io_inputs->set.Nperiod)
+            else if(input->filter.c_error >= io_in->set.Nperiod)
                 input->error = true;
             
             input->filter.c_clock    = 0;
@@ -874,24 +778,24 @@ void DEV_Input_Filter(uint8_t index)
 //------------------------------
 void DEV_Input_Set_Default(void)
 {
-    io_inputs->set.Ndiscret = 10;
-    io_inputs->set.Nperiod  = 3;
-    io_inputs->set.SGac     = 5;
-    io_inputs->set.P0dc     = 50;
-    io_inputs->set.P1dc     = 50;
+    io_in->set.Ndiscret = 10;
+    io_in->set.Nperiod  = 3;
+    io_in->set.SGac     = 5;
+    io_in->set.P0dc     = 50;
+    io_in->set.P1dc     = 50;
     
-    for(uint8_t i = 0; i < io_inputs->size; ++i)
+    for(uint8_t i = 0; i < io_in->size; ++i)
     {
-        io_inputs->list[i].mode              = IN_MODE_AC;
-        io_inputs->list[i].fault             = 10;
-        io_inputs->list[i].state             = false;
-        io_inputs->list[i].error             = false;
-        io_inputs->list[i].duration          = 10;
-        io_inputs->list[i].filter.c_clock    = 0;
-        io_inputs->list[i].filter.c_period   = 0;
-        io_inputs->list[i].filter.c_state    = 0;
-        io_inputs->list[i].filter.c_error    = 0;
-        io_inputs->list[i].filter.is_capture = false;
+        io_in->list[i].mode              = IN_MODE_AC;
+        io_in->list[i].fault             = 10;
+        io_in->list[i].state             = false;
+        io_in->list[i].error             = false;
+        io_in->list[i].duration          = 10;
+        io_in->list[i].filter.c_clock    = 0;
+        io_in->list[i].filter.c_period   = 0;
+        io_in->list[i].filter.c_state    = 0;
+        io_in->list[i].filter.c_error    = 0;
+        io_in->list[i].filter.is_capture = false;
     }
 }
 //----------------------------------
@@ -1033,6 +937,6 @@ void crash(GPIO_TypeDef* gpio, uint16_t pin)
     }
     else // запроса нет - отключаем выход
     {
-        out_crash.pin.gpio->ODR &= ~out_crash.pin.pin;
+        IO_Set(out_crash, false);
     }
 }

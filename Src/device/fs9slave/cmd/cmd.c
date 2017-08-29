@@ -1,6 +1,6 @@
 #include "cmd.h"
-//----------------------------------
-struct cmd_t cmd_list[MAX_CMD_NUM] =
+//---------------------------
+cmd_t cmd_list[MAX_CMD_NUM] =
 {
     { 2, 4, false },
     { 2, 2, false },
@@ -67,10 +67,10 @@ struct cmd_t cmd_list[MAX_CMD_NUM] =
     { 5, 2, true }, // установка параметров фильтрации (кол-во периодов, дискретность, сигнал в мс)
     { 6, 2, true } // настройка входа по его номеру
 };
-//--------------------------------
-struct cmd_t CMD_get(uint8_t code)
+//-------------------------
+cmd_t CMD_get(uint8_t code)
 {
-    struct cmd_t cmd = { 0, 0, false };
+    cmd_t cmd = { 0, 0, false };
     
     if(code > 0x3F)
         return cmd;

@@ -106,8 +106,8 @@ bool tx_is_empty(void)
 {
     return (tx_count == 0);
 }
-//---------------------------------------
-bool FS9_read(struct FS9Packet_t* packet)
+//--------------------------------
+bool FS9_read(FS9Packet_t* packet)
 {   
     if(!rx_is_empty())
     {
@@ -125,8 +125,8 @@ bool FS9_read(struct FS9Packet_t* packet)
     
     return true;
 }
-//----------------------------------------
-bool FS9_write(struct FS9Packet_t* packet)
+//---------------------------------
+bool FS9_write(FS9Packet_t* packet)
 {
     for(uint8_t i = 0; i < packet->size; ++i)
     {
@@ -156,7 +156,7 @@ void FS9_IRQHandler(void)
         {
             if((byte & CMD_MASK) == CMD_MASK)
             {
-                struct cmd_t cmd = CMD_get(byte&CMD_CODE_MASK);
+                cmd_t cmd = CMD_get(byte&CMD_CODE_MASK);
                 
                 rx_bytes = cmd.n; // get size packet
                 

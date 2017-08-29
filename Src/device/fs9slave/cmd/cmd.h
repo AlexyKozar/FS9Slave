@@ -42,17 +42,17 @@
     //--------------------------------------
     /** @brief Description structure command
      */
-    //----------
-    struct cmd_t
+    //-------------------
+    typedef struct _cmd_t
     {
         uint8_t n; // the count bytes in command
         uint8_t m; // the count bytes in response
         bool    is_ack; // need ack
-    };
+    } cmd_t;
     //-----------------------------------
     /** @brief get configuration a command
         @param a code command
         @return struct with parameters a command (return the type RESERVE if command is not find in list or it RESERVE type)
      */
-    struct cmd_t CMD_get(uint8_t code);
+    cmd_t CMD_get(uint8_t code);
 #endif

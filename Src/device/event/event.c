@@ -1,21 +1,21 @@
 #include "event.h"
 //---------------------------------
 const uint16_t TIMER_IDLE = 0xFFFF;
-//------------
-struct timer_t
+//---------------------
+typedef struct _timer_t
 {
-    uint16_t        timer;
-    struct event_t  event;
-};
+    uint16_t timer;
+    event_t  event;
+} timer_t;
 //-----------------------------------
-struct event_t event[EVENT_MAX_SIZE]; // очередь событий
-struct timer_t timer[EVENT_MAX_SIZE]; // очередь таймеров
+event_t event[EVENT_MAX_SIZE]; // очередь событий
+timer_t timer[EVENT_MAX_SIZE]; // очередь таймеров
 //----------------------
 uint8_t event_count = 0;
 uint8_t event_head  = 0;
 uint8_t event_tail  = 0;
-//------------------------------------
-bool EVENT_Insert(struct event_t evt);
+//-----------------------------
+bool EVENT_Insert(event_t evt);
 //-------------------
 void EVENT_Init(void)
 {
@@ -38,7 +38,7 @@ void EVENT_Init(void)
 //----------------------------------------------------------------------------------------------------------------
 uint8_t EVENT_Create(uint16_t time, bool autorepeat, Event function, GPIO_TypeDef* gpio, uint16_t pin, uint8_t id)
 {
-    struct timer_t* tim = NULL;
+    timer_t* tim = NULL;
     
     if(id != 0xFF) // задан определенный таймер
     {
@@ -51,6 +51,8 @@ uint8_t EVENT_Create(uint16_t time, bool autorepeat, Event function, GPIO_TypeDe
             if(timer[i].timer == TIMER_IDLE)
             {
                 tim = &timer[i];
+                
+                break;
             }
         }
     }
@@ -75,7 +77,7 @@ void EVENT_Execute(void)
     if(event_count == 0)
         return;
     
-    struct event_t evt;
+    event_t evt;
     
     evt = event[event_head++];
     
@@ -94,8 +96,8 @@ void EVENT_Execute(void)
         EVENT_Create(evt.time, evt.autorepeat, evt.event, evt.gpio, evt.pin, evt.id);
     }
 }
-//-----------------------------------
-bool EVENT_Insert(struct event_t evt)
+//----------------------------
+bool EVENT_Insert(event_t evt)
 {
     if(event_count == EVENT_MAX_SIZE)
         return false;

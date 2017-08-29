@@ -5,8 +5,8 @@
     #include <stdbool.h>
     #include "stm32f0xx_hal.h"
     #include "stm32f0xx_hal_gpio.h"
-    #include "math.h"
     #include "fs9slave/fs9slave.h"
+    #include "math.h"
     #include "ain/ain.h"
     #include "event/event.h"
     //----------------------
@@ -43,17 +43,19 @@
     #define DSDIN_FUNCTION_NOT_SUPPORT 0xEA // функция не поддерживается
     //--------------------------
     #define MAX_SIZE_AIN_TEMP 19 // максимальный размер массива для калибровочной таблицы температуры
-    //----------------
-    struct input_set_t
+    //--------------------------------------
+    typedef struct _FS9Packet_t FS9Packet_t;
+    //-------------------------
+    typedef struct _input_set_t
     {
         uint8_t Nperiod; // количество периодов накопления информации
         uint8_t Ndiscret; // количество выборок на период
         uint8_t SGac; // длина валидного импульса
         uint8_t P0dc; // процент нулей фильтра для постоянного сигнала
         uint8_t P1dc; // процент единиц фильтра для постоянного сигнала
-    };
-    //-------------------
-    struct input_filter_t
+    } input_set_t;
+    //----------------------------
+    typedef struct _input_filter_t
     {
         uint8_t c_clock; // такты после захвата входа
         uint8_t c_error; // счетчик ошибок
@@ -62,55 +64,56 @@
         uint8_t c_lev_1; // количество импульсов лог. "1"
         uint8_t c_period; // количество периодов
         uint8_t c_state; // количество валидных состояний
-    };
-    //---------
-    struct io_t
+    } input_filter_t;
+    //------------------
+    typedef struct _io_t
     {
         GPIO_TypeDef* gpio; // порт канала
         uint16_t      pin; // пин канала
         uint8_t       num; // номер канала
-    };
-    //------------
-    struct input_t
-    {
-        struct io_t           pin;    // вход (номер входа и порт)
-        bool                  state;  // состояние входа (вкл или выкл)
-        bool                  error;  // ошибка канала
-        struct input_filter_t filter; // параметры фильтрации входа
-        uint8_t               fault;  // погрешность длительности периода в %
-        uint8_t               mode;   // режим входа (AC/DC)
-        uint8_t               dir;    // направление (прямой/инверсный)
-        uint16_t              duration; // длительность периода
-    };
-    //-------------
-    struct output_t
-    {
-        struct io_t pin;
-        uint8_t     state; // состояние канала
-        uint8_t     param; // произвольный параметр
-    };
-    //--------------------
-    struct PORT_Input_Type
-    {
-        struct input_t     list[MAX_SIZE_DS_INPUT];
-        struct input_set_t set;
-        uint8_t            size;
-    };
+    } io_t;
     //---------------------
-    struct PORT_Output_Type
+    typedef struct _input_t
     {
-        struct output_t list[MAX_SIZE_DS_OUTPUT];
-        uint8_t         size;
-    };
-    //---------------
-    struct PWROK_Type
+        io_t           pin;    // вход (номер входа и порт)
+        bool           state;  // состояние входа (вкл или выкл)
+        bool           error;  // ошибка канала
+        input_filter_t filter; // параметры фильтрации входа
+        uint8_t        fault;  // погрешность длительности периода в %
+        uint8_t        mode;   // режим входа (AC/DC)
+        uint8_t        dir;    // направление (прямой/инверсный)
+        uint16_t       duration; // длительность периода
+    } input_t;
+    //----------------------
+    typedef struct _output_t
+    {
+        io_t    pin;
+        uint8_t state; // состояние канала
+        uint8_t param; // произвольный параметр
+        bool    level; // активный уровень (прямой - лог "1" и инверсный - лог "0")
+    } output_t;
+    //-----------------------------
+    typedef struct _PORT_Input_Type
+    {
+        input_t     list[MAX_SIZE_DS_INPUT];
+        input_set_t set;
+        uint8_t     size;
+    } PORT_Input_Type;
+    //------------------------------
+    typedef struct _PORT_Output_Type
+    {
+        output_t list[MAX_SIZE_DS_OUTPUT];
+        uint8_t  size;
+    } PORT_Output_Type;
+    //------------------------
+    typedef struct _PWROK_Type
     {
         bool     is_pwrok; // присутствие/отсутствие сигнала PWR_OK
         bool     is_dsdin; // режим "отключение питания" при отсутствии сигнала PWR_OK
         uint16_t dsdin_time; // время от включения режима "отключения питания" до изменения уровня на входе DSDIN
         bool     dsdin_level; // уровень сигнала на входе DSDIN
         bool     dsdin_lev_changed; // уровень сигнала изменился
-    };
+    } PWROK_Type;
     //-----------
     union float_t
     {
@@ -119,11 +122,11 @@
     };
     //---------------------------------------------------------
     void    DEV_Create(GPIO_TypeDef* gpio, uint16_t addr_pins);
-    void    DEV_Init(struct PORT_Input_Type* inputs, struct PORT_Output_Type* outputs);
+    void    DEV_Init(PORT_Input_Type* inputs, PORT_Output_Type* outputs);
     uint8_t DEV_Address(void);
-    bool    DEV_Request(struct FS9Packet_t* source, struct FS9Packet_t* dest);
-    bool    DEV_Driver(uint8_t cmd, struct FS9Packet_t* data, struct FS9Packet_t* packet);
-    uint8_t DEV_Checksum(struct FS9Packet_t* packet, uint8_t size);
+    bool    DEV_Request(FS9Packet_t* source, FS9Packet_t* dest);
+    bool    DEV_Driver(uint8_t cmd, FS9Packet_t* data, FS9Packet_t* packet);
+    uint8_t DEV_Checksum(FS9Packet_t* packet, uint8_t size);
     void    DEV_Input_Scan(void);
     void    DEV_Input_Set_Default(void);
     void    DEV_Input_Filter(uint8_t index);
