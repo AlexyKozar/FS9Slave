@@ -301,6 +301,12 @@ void IODevice_Init(uint8_t addr, PORT_Input_Type* in, PORT_Output_Type* out)
     }
     else if(addr == 0x02) // МИК-01V1
     {
+        in->list[10].pin.gpio = GPIOA;
+        in->list[11].pin.gpio = GPIOA;
+        
+        in->list[10].pin.pin = GPIO_PIN_10; // input channel 11 (scan1)
+        in->list[11].pin.pin = GPIO_PIN_11; // input channel 12 (scan2)
+        
         out->list[0].pin.gpio  = GPIOB;
         out->list[1].pin.gpio  = GPIOB;
         out->list[2].pin.gpio  = GPIOB;
@@ -340,6 +346,7 @@ void IODevice_Init(uint8_t addr, PORT_Input_Type* in, PORT_Output_Type* out)
         out->list[10].level = false;
         out->list[11].level = false;
         
+        in->size  = 12;
         out->size = 12;
     }
 }

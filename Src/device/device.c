@@ -405,6 +405,57 @@ bool DEV_Driver(uint8_t cmd, FS9Packet_t* data, FS9Packet_t* packet)
             packet->size = 16;
         break;
             
+        case 0x03: // чтение регистра расширения дискретных каналов входов
+            for(uint8_t i = 0; i < io_in->size; ++i)
+            {
+                if(bit_count == 8)
+                {
+                    bit_count = 0;
+                    packet->buffer[++packet->size] = 0x00;
+                }
+                
+                uint8_t channel_state = (io_in->list[i].state == true)?0x01:0x00;
+                
+                packet->buffer[packet->size] |= channel_state << bit_count++;
+            }
+            
+            packet->size = 3;
+        break;
+            
+        case 0x04: // чтение регистра расширения дискретных каналов выходов
+            for(uint8_t i = 0; i < io_out->size; ++i)
+            {
+                out = &io_out->list[i];
+                
+                if(bit_count == 8)
+                {
+                    bit_count = 0;
+                    packet->buffer[++packet->size] = 0x00;
+                }
+                
+                uint8_t channel_state = 0x00;
+                
+                if(out->state == OUTPUT_STATE_ON)
+                {
+                    channel_state = 0x01;
+                }
+                else if(out->state == OUTPUT_STATE_FREQ_2HZ)
+                {
+                    channel_state = 0x02;
+                }
+                else if(out->state == OUTPUT_STATE_RESERVE)
+                {
+                    channel_state = 0x03;
+                }
+                
+                packet->buffer[packet->size] |= channel_state << bit_count;
+                
+                bit_count += 2;
+            }
+                
+            packet->size = 3;
+        break;
+            
         case 0x05: // запись регистра расширения дискретных каналов выходов
             for(uint8_t i = 0; i < data->size; ++i)
             {
