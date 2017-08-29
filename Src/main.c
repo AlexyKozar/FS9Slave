@@ -210,10 +210,9 @@ int main(void)
         output.size = 12;
     }
     
-    DEV_Init(&input, &output);
-    
     EVENT_Init();
-    //EVENT_Create(1000, true, blink, GPIOB, GPIO_PIN_13); // test
+    DEV_Init(&input, &output);
+
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)

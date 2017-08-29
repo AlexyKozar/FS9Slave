@@ -7,9 +7,11 @@ void TIM_Scan_Update(void);
 void TIM_INT_Init(void);
 void TIM_INT_Start(void);
 void PWROK_Init(void);
+void CRASH_Init(void);
 float Get_Temp(uint16_t val, uint8_t in_num);
 float UAIN_to_TResistance(uint16_t val, uint8_t in_num); // преобразование напряжения в сопротивление температуры
-void  blink2Hz(GPIO_TypeDef* gpio, uint16_t pin);
+void  blink2Hz(GPIO_TypeDef* gpio, uint16_t pin); // мигание с частотой 2Гц (для МИК-01)
+void  crash(GPIO_TypeDef* gpio, uint16_t pin); // для обработки аварийной ситуации (нет запросов от ЦП 5 сек)
 //---------------------------------
 struct PORT_Input_Type*  io_inputs;
 struct PORT_Output_Type* io_outputs;
@@ -18,6 +20,9 @@ struct PWROK_Type        pwr_ok = { false, false, 0, false, false };
 uint8_t devAddr = 0xFF;
 //-------------------------
 bool Input_Changed = false;
+//--------------------
+bool is_crash = false; // авария - отключение выхода (происходит в случае отсутствия запросов от ЦП 5 сек)
+struct output_t out_crash; // выход аварийной сигнализации
 //---------------------------------------
 uint16_t AIN_TEMP[MAX_SIZE_AIN_TEMP][3] = 
 {
@@ -94,6 +99,8 @@ void DEV_Init(struct PORT_Input_Type* inputs, struct PORT_Output_Type* outputs)
     TIM_INT_Init();
     
     AIN_Init();
+    
+    CRASH_Init();
 }
 //--------------------------------------
 void IO_Clock_Enable(GPIO_TypeDef* gpio)
@@ -186,6 +193,14 @@ void PWROK_Init(void)
     
     NVIC_EnableIRQ(TIM14_IRQn);
 }
+//-------------------
+void CRASH_Init(void)
+{
+    // настройка аварийного выхода
+    out_crash.pin   = io_outputs->list[2].pin;
+    out_crash.param = EVENT_Create(5000, true, crash, out_crash.pin.gpio, out_crash.pin.pin, 0xFF);
+    out_crash.pin.gpio->ODR |= out_crash.pin.pin; // включаем аварийный выход - только для теста
+}
 //-----------------------
 uint8_t DEV_Address(void)
 {
@@ -194,6 +209,8 @@ uint8_t DEV_Address(void)
 //--------------------------------------------------------------------
 bool DEV_Request(struct FS9Packet_t* source, struct FS9Packet_t* dest)
 {
+    is_crash = true; // получили запрос от ЦП - сброс аварийной ситуации
+    
     uint8_t addr = ((source->buffer[0]&CMD_ADDR_MASK) >> 6);
     
     if(addr != devAddr)
@@ -1005,5 +1022,17 @@ void blink2Hz(GPIO_TypeDef* gpio, uint16_t pin)
     else
     {
         gpio->ODR |= pin;
+    }
+}
+//------------------------------------------
+void crash(GPIO_TypeDef* gpio, uint16_t pin)
+{
+    if(is_crash == true) // запрос пришел
+    {
+        is_crash = false;
+    }
+    else // запроса нет - отключаем выход
+    {
+        out_crash.pin.gpio->ODR &= ~out_crash.pin.pin;
     }
 }
