@@ -12,8 +12,8 @@ void PWROK_Init(void);
 void CRASH_Init(void);
 float Get_Temp(uint16_t val, uint8_t in_num);
 float UAIN_to_TResistance(uint16_t val, uint8_t in_num); // преобразование напряжения в сопротивление температуры
-void  blink2Hz(GPIO_TypeDef* gpio, uint16_t pin); // мигание с частотой 2Гц (для МИК-01)
-void  crash(GPIO_TypeDef* gpio, uint16_t pin); // для обработки аварийной ситуации (нет запросов от ЦП 5 сек)
+void  blink2Hz(void* output); // мигание с частотой 2Гц (для МИК-01)
+void  crash(void* output); // для обработки аварийной ситуации (нет запросов от ЦП 5 сек)
 //----------------------
 PORT_Input_Type*  io_in;
 PORT_Output_Type* io_out;
@@ -229,7 +229,7 @@ void CRASH_Init(void)
 {
     // настройка аварийного выхода
     out_crash       = io_out->list[2];
-    out_crash.param = EVENT_Create(5000, true, crash, out_crash.pin.gpio, out_crash.pin.pin, 0xFF);
+    out_crash.param = EVENT_Create(5000, true, crash, &out_crash, 0xFF);
     IO_Set(out_crash, true); // включаем аварийный выход - только для теста
 }
 //-----------------------
@@ -512,7 +512,7 @@ bool DEV_Driver(uint8_t cmd, FS9Packet_t* data, FS9Packet_t* packet)
                             
                             out->state = OUTPUT_STATE_FREQ_2HZ;
                             
-                            out->param = EVENT_Create(1000, true, blink2Hz, out->pin.gpio, out->pin.pin, 0xFF);
+                            out->param = EVENT_Create(1000, true, blink2Hz, out, 0xFF);
                         break;
                     }
                 }
@@ -967,20 +967,22 @@ void TIM14_IRQHandler(void)
         }
     }
 }
-//---------------------------------------------
-void blink2Hz(GPIO_TypeDef* gpio, uint16_t pin)
-{
-    if((gpio->ODR & pin) == pin)
+//-------------------------
+void blink2Hz(void* output)
+{    
+    output_t out = *((output_t*)output);
+    
+    if(out.pin.gpio->ODR & out.pin.pin)
     {
-        gpio->ODR &= ~pin;
+        IO_Set(out, false);
     }
     else
     {
-        gpio->ODR |= pin;
+        IO_Set(out, true);
     }
 }
-//------------------------------------------
-void crash(GPIO_TypeDef* gpio, uint16_t pin)
+//----------------------
+void crash(void* output)
 {
     if(is_crash == true) // запрос пришел
     {
@@ -988,6 +990,8 @@ void crash(GPIO_TypeDef* gpio, uint16_t pin)
     }
     else // запроса нет - отключаем выход
     {
-        IO_Set(out_crash, false);
+        output_t out = *((output_t*)output);
+        
+        IO_Set(out, false);
     }
 }
