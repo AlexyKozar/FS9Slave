@@ -114,6 +114,13 @@
         bool     dsdin_level; // уровень сигнала на входе DSDIN
         bool     dsdin_lev_changed; // уровень сигнала изменился
     } PWROK_Type;
+    //---------------------
+    typedef struct _error_t // структура ошибкок приема данных по протоколу
+    {
+        uint16_t address; // ошибка адресации
+        uint16_t command; // ошибка команды
+        uint16_t checksum; // ошибка контрольной суммы
+    } error_t;
     //-----------
     union float_t
     {

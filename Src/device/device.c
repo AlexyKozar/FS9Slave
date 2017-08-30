@@ -25,6 +25,8 @@ bool Input_Changed = false;
 //--------------------
 bool is_crash = false; // авария - отключение выхода (происходит в случае отсутствия запросов от ЦП 5 сек)
 output_t out_crash; // выход аварийной сигнализации
+//--------------------------
+error_t error = { 0, 0, 0 };
 //---------------------------------------
 uint16_t AIN_TEMP[MAX_SIZE_AIN_TEMP][3] = 
 {
@@ -244,20 +246,32 @@ bool DEV_Request(FS9Packet_t* source, FS9Packet_t* dest)
     
     uint8_t addr = ((source->buffer[0]&CMD_ADDR_MASK) >> 6);
     
-    if(addr != devAddr)
+    if(addr != devAddr) // ошибка адресации
+    {
+        error.address++; // увеличиваем счетчик ошибок адресации
+        
         return false;
+    }
     
     uint8_t cmd = source->buffer[0]&CMD_CODE_MASK; // get the command for device
     
     cmd_t tcmd = CMD_get(cmd); // verification command
     
-    if(tcmd.n == 0 || tcmd.m == 0)
+    if(tcmd.n == 0 || tcmd.m == 0) // нет такой команды или она зарезервирована
+    {
+        error.command++; // увеличиваем счетчик ошибок команд
+        
         return false; // command is not valid
+    }
     
     uint8_t checksum = DEV_Checksum(source, source->size - 1);
     
-    if(checksum != source->buffer[source->size - 1])
+    if(checksum != source->buffer[source->size - 1]) // ошибка контрольной суммы
+    {
+        error.checksum++; // увеличиваем счетчик ошибок контрольной суммы
+        
         return false;
+    }
     
     FS9Packet_t packet; // пакет данных (т.е. чистые данные без контрольной суммы и команды)
     
@@ -619,6 +633,33 @@ bool DEV_Driver(uint8_t cmd, FS9Packet_t* data, FS9Packet_t* packet)
             }
             
             packet->size = 3;
+        break;
+            
+        case 0x3D: // чтение счетчиков ошибок
+        {
+            union
+            {
+                uint8_t  byte[2];
+                uint16_t count;
+            } err_count;
+            
+            err_count.count = error.address; // чтение счетчика ошибок адресации
+            
+            packet->buffer[0] = err_count.byte[0];
+            packet->buffer[1] = err_count.byte[1];
+            
+            err_count.count = error.command; // чтение счетчика ошибок команд
+            
+            packet->buffer[2] = err_count.byte[0];
+            packet->buffer[3] = err_count.byte[1];
+            
+            err_count.count = error.command; // чтение счетчика ошибок контрольной суммы
+            
+            packet->buffer[4] = err_count.byte[0];
+            packet->buffer[5] = err_count.byte[1];
+            
+            packet->size = 6;
+        }
         break;
             
         case 0x3E: // изменение параметров фильтрации
