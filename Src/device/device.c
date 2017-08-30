@@ -108,6 +108,10 @@ void IO_Clock_Enable(GPIO_TypeDef* gpio)
         RCC->AHBENR |= RCC_AHBENR_GPIOBEN;
     else if(gpio == GPIOC)
         RCC->AHBENR |= RCC_AHBENR_GPIOCEN;
+    else if(gpio == GPIOD)
+        RCC->AHBENR |= RCC_AHBENR_GPIODEN;
+    else if(gpio == GPIOF)
+        RCC->AHBENR |= RCC_AHBENR_GPIOFEN;
 }
 //------------------------------------
 void IO_Init(io_t pin, uint8_t io_dir)
