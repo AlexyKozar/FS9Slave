@@ -100,10 +100,21 @@ int main(void)
     PORT_Input_Type  input; // the input channels
     PORT_Output_Type output; // the output channels
     
-    IODevice_Init(addr, &input, &output);
-    
     EVENT_Init();
+    IODevice_Init(addr, &input, &output);
     DEV_Init(&input, &output);
+
+    if(addr == 0x00)
+    {
+        AIN_Init();
+        DEV_Crash_Init();
+        DEV_PWROK_Init();
+    }
+
+    if(addr == 0x01)
+    {
+       AIN_Init(); 
+    }
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */

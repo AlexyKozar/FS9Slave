@@ -2,14 +2,14 @@
 //---------------------------------------
 void IO_Clock_Enable(GPIO_TypeDef* gpio);
 void IO_Init(io_t io, uint8_t io_dir);
-void IO_Set(output_t output, bool state);
-void CHANNEL_Out_Set(uint8_t index, bool state);
+void IO_Set(output_t* out);
+void IO_Reset(output_t* out);
+void CHANNEL_Out_Set(uint8_t index);
+void CHANNEL_Out_Reset(uint8_t index);
 void TIM_Scan_Init(void);
 void TIM_Scan_Update(void);
 void TIM_INT_Init(void);
 void TIM_INT_Start(void);
-void PWROK_Init(void);
-void CRASH_Init(void);
 float Get_Temp(uint16_t val, uint8_t in_num);
 float UAIN_to_TResistance(uint16_t val, uint8_t in_num); // преобразование напряжения в сопротивление температуры
 void  blink2Hz(void* output); // мигание с частотой 2Гц (для МИК-01)
@@ -24,7 +24,7 @@ uint8_t devAddr = 0xFF;
 bool Input_Changed = false;
 //--------------------
 bool is_crash = false; // авария - отключение выхода (происходит в случае отсутствия запросов от ЦП 5 сек)
-output_t out_crash; // выход аварийной сигнализации
+output_t* out_crash = NULL; // выход аварийной сигнализации
 //--------------------------
 error_t error = { 0, 0, 0 };
 //---------------------------------------
@@ -77,7 +77,7 @@ void DEV_Init(PORT_Input_Type* inputs, PORT_Output_Type* outputs)
         io_out->list[i].pin.num = i;
         io_out->list[i].state   = OUTPUT_STATE_OFF;
         
-        IO_Set(io_out->list[i], false); // выключить выход - состояние по умолчанию
+        IO_Reset(&io_out->list[i]); // выключить выход - состояние по умолчанию
     }
     
     io_t pin_int = { GPIO_INT, GPIO_INT_PIN };
@@ -85,19 +85,10 @@ void DEV_Init(PORT_Input_Type* inputs, PORT_Output_Type* outputs)
     
     GPIO_INT->BSRR |= GPIO_INT_SET; // включить выход INT (default state)
     
-    if(devAddr == 0x00)
-    {
-        PWROK_Init();
-    }
-    
     DEV_Input_Set_Default();
     
     TIM_Scan_Init();
     TIM_INT_Init();
-    
-    AIN_Init();
-    
-    CRASH_Init();
 }
 //--------------------------------------
 void IO_Clock_Enable(GPIO_TypeDef* gpio)
@@ -126,40 +117,48 @@ void IO_Init(io_t pin, uint8_t io_dir)
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     HAL_GPIO_Init(pin.gpio, &GPIO_InitStruct);
 }
-//--------------------------------------
-void IO_Set(output_t output, bool state)
+//---------------------------
+void IO_Set(output_t* output)
 {
-    if(output.level == true)
+    if(output->level == true)
     {
-        if(state == true)
-        {
-            output.pin.gpio->ODR |= output.pin.pin;
-        }
-        else
-        {
-            output.pin.gpio->ODR &= ~output.pin.pin;
-        }
+        output->pin.gpio->ODR |= output->pin.pin;
     }
-    else if(output.level == false)
+    else if(output->level == false)
     {
-        if(state == true)
-        {
-            output.pin.gpio->ODR &= ~output.pin.pin;
-        }
-        else
-        {
-            output.pin.gpio->ODR |= output.pin.pin;
-        }
+        output->pin.gpio->ODR &= ~output->pin.pin;
     }
 }
-//---------------------------------------------
-void CHANNEL_Out_Set(uint8_t index, bool state)
+//-----------------------------
+void IO_Reset(output_t* output)
+{
+    if(output->level == true)
+    {
+        output->pin.gpio->ODR &= ~output->pin.pin;
+    }
+    else if(output->level == false)
+    {
+        output->pin.gpio->ODR |= output->pin.pin;
+    }
+}
+//---------------------------------
+void CHANNEL_Out_Set(uint8_t index)
 {
     if(index < io_out->size)
     {
-        output_t out = io_out->list[index];
+        output_t* out = &io_out->list[index];
         
-        IO_Set(out, state);
+        IO_Set(out);
+    }
+}
+//-----------------------------------
+void CHANNEL_Out_Reset(uint8_t index)
+{
+    if(index < io_out->size)
+    {
+        output_t* out = &io_out->list[index];
+        
+        IO_Reset(out);
     }
 }
 //----------------------
@@ -203,8 +202,8 @@ void TIM_INT_Start(void)
     GPIO_INT->BSRR |= GPIO_INT_RESET;
     TIM17->CR1 |= TIM_CR1_CEN;
 }
-//-------------------
-void PWROK_Init(void)
+//-----------------------
+void DEV_PWROK_Init(void)
 {
     IO_Clock_Enable(GPIO_PWROK);
     
@@ -230,13 +229,13 @@ void PWROK_Init(void)
     
     NVIC_EnableIRQ(TIM14_IRQn);
 }
-//-------------------
-void CRASH_Init(void)
+//-----------------------
+void DEV_Crash_Init(void)
 {
     // настройка аварийного выхода
-    out_crash       = io_out->list[2];
-    out_crash.param = EVENT_Create(5000, true, crash, &out_crash, 0xFF);
-    IO_Set(out_crash, true); // включаем аварийный выход - только для теста
+    out_crash        = &io_out->list[2];
+    out_crash->param = EVENT_Create(5000, true, crash, out_crash, 0xFF);
+    IO_Set(out_crash); // включаем аварийный выход - только для теста
 }
 //-----------------------
 uint8_t DEV_Address(void)
@@ -499,7 +498,7 @@ bool DEV_Driver(uint8_t cmd, FS9Packet_t* data, FS9Packet_t* packet)
                             
                             out->state = OUTPUT_STATE_OFF;
                             
-                            IO_Set(*out, false);
+                            IO_Reset(out);
                         break;
                         
                         case OUTPUT_STATE_ON: // включение выхода
@@ -510,11 +509,11 @@ bool DEV_Driver(uint8_t cmd, FS9Packet_t* data, FS9Packet_t* packet)
                             else if(out->state == OUTPUT_STATE_FREQ_2HZ || out->state == OUTPUT_STATE_RESERVE)
                             {
                                 EVENT_Kill(out->param);
-                                IO_Set(*out, false);
+                                IO_Reset(out);
                             }
                             
                             out->state = OUTPUT_STATE_ON;
-                            IO_Set(*out, true);
+                            IO_Set(out);
                         break;
                         
                         case OUTPUT_STATE_FREQ_2HZ: // включение выхода с альтернативной функцией
@@ -525,7 +524,7 @@ bool DEV_Driver(uint8_t cmd, FS9Packet_t* data, FS9Packet_t* packet)
                             }
                             else if(out->state == OUTPUT_STATE_ON)
                             {
-                                IO_Set(*out, false);
+                                IO_Reset(out);
                             }
                             
                             out->state = OUTPUT_STATE_FREQ_2HZ;
@@ -538,67 +537,67 @@ bool DEV_Driver(uint8_t cmd, FS9Packet_t* data, FS9Packet_t* packet)
         break;
         
         case 0x06: // установка значения 0 на выходе канала 0
-            CHANNEL_Out_Set(0, false);
+            CHANNEL_Out_Reset(0);
         break;
             
         case 0x07: // установка значения 0 на выходе канала 1
-            CHANNEL_Out_Set(1, false);
+            CHANNEL_Out_Reset(1);
         break;
             
         case 0x08: // установка значения 0 на выходе канала 2
-            CHANNEL_Out_Set(2, false);
+            CHANNEL_Out_Reset(2);
         break;
             
         case 0x09: // установка значения 0 на выходе канала 3
-            CHANNEL_Out_Set(3, false);
+            CHANNEL_Out_Reset(3);
         break;
             
         case 0x0A: // установка значения 0 на выходе канала 4
-            CHANNEL_Out_Set(4, false);
+            CHANNEL_Out_Reset(4);
         break;
             
         case 0x0B: // установка значения 0 на выходе канала 5
-            CHANNEL_Out_Set(5, false);
+            CHANNEL_Out_Reset(5);
         break;
             
         case 0x0C: // установка значения 0 на выходе канала 6
-            CHANNEL_Out_Set(6, false);
+            CHANNEL_Out_Reset(6);
         break;
             
         case 0x0D: // установка значения 0 на выходе канала 7
-            CHANNEL_Out_Set(7, false);
+            CHANNEL_Out_Reset(7);
         break;
             
         case 0x0E: // установка значения 1 на выходе канала 0
-            CHANNEL_Out_Set(0, true);
+            CHANNEL_Out_Set(0);
         break;
             
         case 0x0F: // установка значения 1 на выходе канала 1
-            CHANNEL_Out_Set(1, true);
+            CHANNEL_Out_Set(1);
         break;
             
         case 0x10: // установка значения 1 на выходе канала 2
-            CHANNEL_Out_Set(2, true);
+            CHANNEL_Out_Set(2);
         break;
             
         case 0x11: // установка значения 1 на выходе канала 3
-            CHANNEL_Out_Set(3, true);
+            CHANNEL_Out_Set(3);
         break;
             
         case 0x12: // установка значения 1 на выходе канала 4
-            CHANNEL_Out_Set(4, true);
+            CHANNEL_Out_Set(4);
         break;
             
         case 0x13: // установка значения 1 на выходе канала 5
-            CHANNEL_Out_Set(5, true);
+            CHANNEL_Out_Set(5);
         break;
             
         case 0x14: // установка значения 1 на выходе канала 6
-            CHANNEL_Out_Set(6, true);
+            CHANNEL_Out_Set(6);
         break;
             
         case 0x15: // установка значения 1 на выходе канала 7
-            CHANNEL_Out_Set(7, true);
+            CHANNEL_Out_Set(7);
         break;
             
         case 0x1F: // чтение времени срабатывания выделенного входного дискретного канала
@@ -1015,28 +1014,28 @@ void TIM14_IRQHandler(void)
 //-------------------------
 void blink2Hz(void* output)
 {    
-    output_t out = *((output_t*)output);
+    output_t* out = ((output_t*)output);
     
-    if(out.pin.gpio->ODR & out.pin.pin)
+    if(out->pin.gpio->ODR & out->pin.pin)
     {
-        IO_Set(out, false);
+        IO_Reset(out);
     }
     else
     {
-        IO_Set(out, true);
+        IO_Set(out);
     }
 }
 //----------------------
 void crash(void* output)
 {
+    output_t* out = ((output_t*)output);
+    
     if(is_crash == true) // запрос пришел
     {
         is_crash = false;
     }
     else // запроса нет - отключаем выход
-    {
-        output_t out = *((output_t*)output);
-        
-        IO_Set(out, false);
+    {        
+        IO_Reset(out);
     }
 }

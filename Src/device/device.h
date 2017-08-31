@@ -138,4 +138,6 @@
     void    DEV_Input_Set_Default(void);
     void    DEV_Input_Filter(uint8_t index);
     bool    DEV_Input_Changed_Channel(void);
+    void    DEV_Crash_Init(void);
+    void    DEV_PWROK_Init(void);
 #endif
