@@ -167,7 +167,14 @@ void DEV_Out_Toggle(output_t* out)
 //----------------------------
 bool DEV_Is_Out(output_t* out)
 {
-    return (out->pin.gpio->ODR & out->pin.io);
+    bool state = (out->pin.gpio->ODR & out->pin.io);
+    
+    if(out->level == true) // выход управляется лог "1" (прямой)
+    {
+        return state;
+    }
+    
+    return !state; // иначе управление инверсное, т.е. лог "0"
 }
 //---------------------------------
 void CHANNEL_Out_Set(uint8_t index)

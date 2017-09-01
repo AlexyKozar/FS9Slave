@@ -104,7 +104,7 @@ int main(void)
     
     EVENT_Init();
     DEV_Init(&input, &output);
-
+    
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
