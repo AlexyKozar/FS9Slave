@@ -227,24 +227,24 @@ void IODevice_Init(uint8_t addr, PORT_Input_Type* in, PORT_Output_Type* out)
     in->list[8].pin.gpio = GPIOA;
     in->list[9].pin.gpio = GPIOA;
     
-    in->list[0].pin.pin = GPIO_PIN_0; // input channel 1
-    in->list[1].pin.pin = GPIO_PIN_1; // input channel 2
-    in->list[2].pin.pin = GPIO_PIN_2; // input channel 3
-    in->list[3].pin.pin = GPIO_PIN_3; // input channel 4
-    in->list[4].pin.pin = GPIO_PIN_4; // input channel 5
-    in->list[5].pin.pin = GPIO_PIN_5; // input channel 6
-    in->list[6].pin.pin = GPIO_PIN_6; // input channel 7
-    in->list[7].pin.pin = GPIO_PIN_7; // input channel 8
-    in->list[8].pin.pin = GPIO_PIN_8; // input channel 9
-    in->list[9].pin.pin = GPIO_PIN_9; // input channel 10
+    in->list[0].pin.io = GPIO_PIN_0; // input channel 1
+    in->list[1].pin.io = GPIO_PIN_1; // input channel 2
+    in->list[2].pin.io = GPIO_PIN_2; // input channel 3
+    in->list[3].pin.io = GPIO_PIN_3; // input channel 4
+    in->list[4].pin.io = GPIO_PIN_4; // input channel 5
+    in->list[5].pin.io = GPIO_PIN_5; // input channel 6
+    in->list[6].pin.io = GPIO_PIN_6; // input channel 7
+    in->list[7].pin.io = GPIO_PIN_7; // input channel 8
+    in->list[8].pin.io = GPIO_PIN_8; // input channel 9
+    in->list[9].pin.io = GPIO_PIN_9; // input channel 10
     
     if(addr == 0x00) // МДВВ-01
     {
         in->list[10].pin.gpio = GPIOA;
         in->list[11].pin.gpio = GPIOA;
         
-        in->list[10].pin.pin = GPIO_PIN_10; // input channel 11
-        in->list[11].pin.pin = GPIO_PIN_11; // input channel 12
+        in->list[10].pin.io = GPIO_PIN_10; // input channel 11
+        in->list[11].pin.io = GPIO_PIN_11; // input channel 12
         
         out->list[0].pin.gpio = GPIOB;
         out->list[1].pin.gpio = GPIOB;
@@ -253,12 +253,12 @@ void IODevice_Init(uint8_t addr, PORT_Input_Type* in, PORT_Output_Type* out)
         out->list[4].pin.gpio = GPIOB;
         out->list[5].pin.gpio = GPIOB;
         
-        out->list[0].pin.pin = GPIO_PIN_10; // output chanel 1
-        out->list[1].pin.pin = GPIO_PIN_15; // output chanel 2
-        out->list[2].pin.pin = GPIO_PIN_14; // output chanel 3
-        out->list[3].pin.pin = GPIO_PIN_13; // output chanel 4
-        out->list[4].pin.pin = GPIO_PIN_12; // output chanel 5
-        out->list[5].pin.pin = GPIO_PIN_11; // output chanel 6
+        out->list[0].pin.io = GPIO_PIN_10; // output chanel 1
+        out->list[1].pin.io = GPIO_PIN_15; // output chanel 2
+        out->list[2].pin.io = GPIO_PIN_14; // output chanel 3
+        out->list[3].pin.io = GPIO_PIN_13; // output chanel 4
+        out->list[4].pin.io = GPIO_PIN_12; // output chanel 5
+        out->list[5].pin.io = GPIO_PIN_11; // output chanel 6
         
         out->list[0].level = true;
         out->list[1].level = true;
@@ -280,13 +280,13 @@ void IODevice_Init(uint8_t addr, PORT_Input_Type* in, PORT_Output_Type* out)
         out->list[5].pin.gpio = GPIOB;
         out->list[6].pin.gpio = GPIOB;
         
-        out->list[0].pin.pin = GPIO_PIN_11; // output chanel 1
-        out->list[1].pin.pin = GPIO_PIN_12; // output chanel 2
-        out->list[2].pin.pin = GPIO_PIN_13; // output chanel 3
-        out->list[3].pin.pin = GPIO_PIN_14; // output chanel 4
-        out->list[4].pin.pin = GPIO_PIN_15; // output chanel 5
-        out->list[5].pin.pin = GPIO_PIN_10; // output chanel 6
-        out->list[6].pin.pin = GPIO_PIN_2; // output chanel 7
+        out->list[0].pin.io = GPIO_PIN_11; // output chanel 1
+        out->list[1].pin.io = GPIO_PIN_12; // output chanel 2
+        out->list[2].pin.io = GPIO_PIN_13; // output chanel 3
+        out->list[3].pin.io = GPIO_PIN_14; // output chanel 4
+        out->list[4].pin.io = GPIO_PIN_15; // output chanel 5
+        out->list[5].pin.io = GPIO_PIN_10; // output chanel 6
+        out->list[6].pin.io = GPIO_PIN_2; // output chanel 7
         
         out->list[0].level = true;
         out->list[1].level = true;
@@ -303,8 +303,8 @@ void IODevice_Init(uint8_t addr, PORT_Input_Type* in, PORT_Output_Type* out)
         in->list[10].pin.gpio = GPIOA;
         in->list[11].pin.gpio = GPIOA;
         
-        in->list[10].pin.pin = GPIO_PIN_10; // input channel 11 (scan1)
-        in->list[11].pin.pin = GPIO_PIN_11; // input channel 12 (scan2)
+        in->list[10].pin.io = GPIO_PIN_10; // input channel 11 (scan1)
+        in->list[11].pin.io = GPIO_PIN_11; // input channel 12 (scan2)
         
         out->list[0].pin.gpio  = GPIOB;
         out->list[1].pin.gpio  = GPIOB;
@@ -319,18 +319,18 @@ void IODevice_Init(uint8_t addr, PORT_Input_Type* in, PORT_Output_Type* out)
         out->list[10].pin.gpio = GPIOF;
         out->list[11].pin.gpio = GPIOB;
         
-        out->list[0].pin.pin  = GPIO_PIN_14;
-        out->list[1].pin.pin  = GPIO_PIN_13;
-        out->list[2].pin.pin  = GPIO_PIN_12;
-        out->list[3].pin.pin  = GPIO_PIN_11;
-        out->list[4].pin.pin  = GPIO_PIN_10;
-        out->list[5].pin.pin  = GPIO_PIN_2;
-        out->list[6].pin.pin  = GPIO_PIN_1;
-        out->list[7].pin.pin  = GPIO_PIN_0;
-        out->list[8].pin.pin  = GPIO_PIN_15;
-        out->list[9].pin.pin  = GPIO_PIN_6;
-        out->list[10].pin.pin = GPIO_PIN_7;
-        out->list[11].pin.pin = GPIO_PIN_4;
+        out->list[0].pin.io  = GPIO_PIN_14;
+        out->list[1].pin.io  = GPIO_PIN_13;
+        out->list[2].pin.io  = GPIO_PIN_12;
+        out->list[3].pin.io  = GPIO_PIN_11;
+        out->list[4].pin.io  = GPIO_PIN_10;
+        out->list[5].pin.io  = GPIO_PIN_2;
+        out->list[6].pin.io  = GPIO_PIN_1;
+        out->list[7].pin.io  = GPIO_PIN_0;
+        out->list[8].pin.io  = GPIO_PIN_15;
+        out->list[9].pin.io  = GPIO_PIN_6;
+        out->list[10].pin.io = GPIO_PIN_7;
+        out->list[11].pin.io = GPIO_PIN_4;
         
         out->list[0].level  = false;
         out->list[1].level  = false;

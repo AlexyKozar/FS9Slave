@@ -2,8 +2,8 @@
 //---------------------------------------
 void IO_Clock_Enable(GPIO_TypeDef* gpio);
 void IO_Init(io_t io, uint8_t io_dir);
-void IO_Set(output_t output, bool state);
-void CHANNEL_Out_Set(uint8_t index, bool state);
+void CHANNEL_Out_Set(uint8_t index);
+void CHANNEL_Out_Reset(uint8_t index);
 void TIM_Scan_Init(void);
 void TIM_Scan_Update(void);
 void TIM_INT_Init(void);
@@ -24,7 +24,7 @@ uint8_t devAddr = 0xFF;
 bool Input_Changed = false;
 //--------------------
 bool is_crash = false; // авария - отключение выхода (происходит в случае отсутствия запросов от ЦП 5 сек)
-output_t out_crash; // выход аварийной сигнализации
+output_t* out_crash = NULL; // выход аварийной сигнализации
 //--------------------------
 error_t error = { 0, 0, 0 };
 //---------------------------------------
@@ -77,7 +77,7 @@ void DEV_Init(PORT_Input_Type* inputs, PORT_Output_Type* outputs)
         io_out->list[i].pin.num = i;
         io_out->list[i].state   = OUTPUT_STATE_OFF;
         
-        IO_Set(io_out->list[i], false); // выключить выход - состояние по умолчанию
+        DEV_Out_Reset(&io_out->list[i]); // выключить выход - состояние по умолчанию
     }
     
     io_t pin_int = { GPIO_INT, GPIO_INT_PIN };
@@ -88,16 +88,18 @@ void DEV_Init(PORT_Input_Type* inputs, PORT_Output_Type* outputs)
     if(devAddr == 0x00)
     {
         PWROK_Init();
+        CRASH_Init();
+        AIN_Init();
+    }
+    else if(devAddr == 0x01)
+    {
+        AIN_Init();
     }
     
     DEV_Input_Set_Default();
     
     TIM_Scan_Init();
     TIM_INT_Init();
-    
-    AIN_Init();
-    
-    CRASH_Init();
 }
 //--------------------------------------
 void IO_Clock_Enable(GPIO_TypeDef* gpio)
@@ -108,6 +110,10 @@ void IO_Clock_Enable(GPIO_TypeDef* gpio)
         RCC->AHBENR |= RCC_AHBENR_GPIOBEN;
     else if(gpio == GPIOC)
         RCC->AHBENR |= RCC_AHBENR_GPIOCEN;
+    else if(gpio == GPIOD)
+        RCC->AHBENR |= RCC_AHBENR_GPIODEN;
+    else if(gpio == GPIOF)
+        RCC->AHBENR |= RCC_AHBENR_GPIOFEN;
 }
 //------------------------------------
 void IO_Init(io_t pin, uint8_t io_dir)
@@ -117,45 +123,70 @@ void IO_Init(io_t pin, uint8_t io_dir)
     IO_Clock_Enable(pin.gpio);
     
     /*Configure GPIO pins*/
-    GPIO_InitStruct.Pin  = pin.pin;
+    GPIO_InitStruct.Pin  = pin.io;
     GPIO_InitStruct.Mode = (io_dir == 0x01)?GPIO_MODE_OUTPUT_PP:GPIO_MODE_INPUT;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     HAL_GPIO_Init(pin.gpio, &GPIO_InitStruct);
 }
-//--------------------------------------
-void IO_Set(output_t output, bool state)
+//-----------------------------
+void DEV_Out_Set(output_t* out)
 {
-    if(output.level == true)
+    uint32_t io = ((uint32_t)out->pin.io);
+    
+    if(out->level == false) // включение выхода по лог "0"
     {
-        if(state == true)
-        {
-            output.pin.gpio->ODR |= output.pin.pin;
-        }
-        else
-        {
-            output.pin.gpio->ODR &= ~output.pin.pin;
-        }
+        io <<= 16; // смещаем влево на 2 байта для получения RESET (GPIO_BSRR_BRx)
     }
-    else if(output.level == false)
+    
+    out->pin.gpio->BSRR |= io;
+}
+//-------------------------------
+void DEV_Out_Reset(output_t* out)
+{
+    uint32_t io = ((uint32_t)out->pin.io);
+    
+    if(out->level == true) // включение выхода по лог "1"
     {
-        if(state == true)
-        {
-            output.pin.gpio->ODR &= ~output.pin.pin;
-        }
-        else
-        {
-            output.pin.gpio->ODR |= output.pin.pin;
-        }
+        io <<= 16; // смещаем влево на 2 байта для получения RESET (GPIO_BSRR_BRx)
+    }
+    
+    out->pin.gpio->BSRR |= io;
+}
+//--------------------------------
+void DEV_Out_Toggle(output_t* out)
+{
+    if(DEV_Is_Out(out))
+    {
+        DEV_Out_Reset(out);
+    }
+    else
+    {
+        DEV_Out_Set(out);
     }
 }
-//---------------------------------------------
-void CHANNEL_Out_Set(uint8_t index, bool state)
+//----------------------------
+bool DEV_Is_Out(output_t* out)
+{
+    return (out->pin.gpio->ODR & out->pin.io);
+}
+//---------------------------------
+void CHANNEL_Out_Set(uint8_t index)
 {
     if(index < io_out->size)
     {
-        output_t out = io_out->list[index];
+        output_t* out = &io_out->list[index];
         
-        IO_Set(out, state);
+        DEV_Out_Set(out);
+    }
+}
+//-----------------------------------
+void CHANNEL_Out_Reset(uint8_t index)
+{
+    if(index < io_out->size)
+    {
+        output_t* out = &io_out->list[index];
+        
+        DEV_Out_Reset(out);
     }
 }
 //----------------------
@@ -230,9 +261,9 @@ void PWROK_Init(void)
 void CRASH_Init(void)
 {
     // настройка аварийного выхода
-    out_crash       = io_out->list[2];
-    out_crash.param = EVENT_Create(5000, true, crash, &out_crash, 0xFF);
-    IO_Set(out_crash, true); // включаем аварийный выход - только для теста
+    out_crash        = &io_out->list[2];
+    out_crash->param = EVENT_Create(5000, true, crash, out_crash, 0xFF);
+    DEV_Out_Set(out_crash); // включаем аварийный выход - только для теста
 }
 //-----------------------
 uint8_t DEV_Address(void)
@@ -314,6 +345,14 @@ bool DEV_Driver(uint8_t cmd, FS9Packet_t* data, FS9Packet_t* packet)
     uint8_t   n_out;
     output_t* out = NULL;
     
+    union
+    {
+        uint16_t count;
+        uint8_t  byte[2];
+    } utemp;
+    
+    utemp.count = 0x0000;
+    
     switch(cmd)
     {
         case 0x00: // чтение дискретных каналов входов
@@ -352,7 +391,7 @@ bool DEV_Driver(uint8_t cmd, FS9Packet_t* data, FS9Packet_t* packet)
             {
                 io_t pin = io_out->list[i].pin;
                 
-                if((pin.gpio->ODR & pin.pin) == pin.pin)
+                if((pin.gpio->ODR & pin.io) == pin.io)
                 {
                     packet->buffer[0] |= 0x01 << i;
                 }
@@ -495,7 +534,7 @@ bool DEV_Driver(uint8_t cmd, FS9Packet_t* data, FS9Packet_t* packet)
                             
                             out->state = OUTPUT_STATE_OFF;
                             
-                            IO_Set(*out, false);
+                            DEV_Out_Reset(out);
                         break;
                         
                         case OUTPUT_STATE_ON: // включение выхода
@@ -506,11 +545,11 @@ bool DEV_Driver(uint8_t cmd, FS9Packet_t* data, FS9Packet_t* packet)
                             else if(out->state == OUTPUT_STATE_FREQ_2HZ || out->state == OUTPUT_STATE_RESERVE)
                             {
                                 EVENT_Kill(out->param);
-                                IO_Set(*out, false);
+                                DEV_Out_Reset(out);
                             }
                             
                             out->state = OUTPUT_STATE_ON;
-                            IO_Set(*out, true);
+                            DEV_Out_Set(out);
                         break;
                         
                         case OUTPUT_STATE_FREQ_2HZ: // включение выхода с альтернативной функцией
@@ -521,7 +560,7 @@ bool DEV_Driver(uint8_t cmd, FS9Packet_t* data, FS9Packet_t* packet)
                             }
                             else if(out->state == OUTPUT_STATE_ON)
                             {
-                                IO_Set(*out, false);
+                                DEV_Out_Reset(out);
                             }
                             
                             out->state = OUTPUT_STATE_FREQ_2HZ;
@@ -534,67 +573,67 @@ bool DEV_Driver(uint8_t cmd, FS9Packet_t* data, FS9Packet_t* packet)
         break;
         
         case 0x06: // установка значения 0 на выходе канала 0
-            CHANNEL_Out_Set(0, false);
+            CHANNEL_Out_Reset(0);
         break;
             
         case 0x07: // установка значения 0 на выходе канала 1
-            CHANNEL_Out_Set(1, false);
+            CHANNEL_Out_Reset(1);
         break;
             
         case 0x08: // установка значения 0 на выходе канала 2
-            CHANNEL_Out_Set(2, false);
+            CHANNEL_Out_Reset(2);
         break;
             
         case 0x09: // установка значения 0 на выходе канала 3
-            CHANNEL_Out_Set(3, false);
+            CHANNEL_Out_Reset(3);
         break;
             
         case 0x0A: // установка значения 0 на выходе канала 4
-            CHANNEL_Out_Set(4, false);
+            CHANNEL_Out_Reset(4);
         break;
             
         case 0x0B: // установка значения 0 на выходе канала 5
-            CHANNEL_Out_Set(5, false);
+            CHANNEL_Out_Reset(5);
         break;
             
         case 0x0C: // установка значения 0 на выходе канала 6
-            CHANNEL_Out_Set(6, false);
+            CHANNEL_Out_Reset(6);
         break;
             
         case 0x0D: // установка значения 0 на выходе канала 7
-            CHANNEL_Out_Set(7, false);
+            CHANNEL_Out_Reset(7);
         break;
             
         case 0x0E: // установка значения 1 на выходе канала 0
-            CHANNEL_Out_Set(0, true);
+            CHANNEL_Out_Set(0);
         break;
             
         case 0x0F: // установка значения 1 на выходе канала 1
-            CHANNEL_Out_Set(1, true);
+            CHANNEL_Out_Set(1);
         break;
             
         case 0x10: // установка значения 1 на выходе канала 2
-            CHANNEL_Out_Set(2, true);
+            CHANNEL_Out_Set(2);
         break;
             
         case 0x11: // установка значения 1 на выходе канала 3
-            CHANNEL_Out_Set(3, true);
+            CHANNEL_Out_Set(3);
         break;
             
         case 0x12: // установка значения 1 на выходе канала 4
-            CHANNEL_Out_Set(4, true);
+            CHANNEL_Out_Set(4);
         break;
             
         case 0x13: // установка значения 1 на выходе канала 5
-            CHANNEL_Out_Set(5, true);
+            CHANNEL_Out_Set(5);
         break;
             
         case 0x14: // установка значения 1 на выходе канала 6
-            CHANNEL_Out_Set(6, true);
+            CHANNEL_Out_Set(6);
         break;
             
         case 0x15: // установка значения 1 на выходе канала 7
-            CHANNEL_Out_Set(7, true);
+            CHANNEL_Out_Set(7);
         break;
             
         case 0x1F: // чтение времени срабатывания выделенного входного дискретного канала
@@ -610,20 +649,14 @@ bool DEV_Driver(uint8_t cmd, FS9Packet_t* data, FS9Packet_t* packet)
                 else
                     packet->buffer[0] = DSDIN_TRIGGER_OFF;
                 
-                union
-                {
-                    uint16_t time;
-                    uint8_t  buffer[2];
-                } dsdin_time;
-                
-                dsdin_time.time = pwr_ok.dsdin_time;
+                utemp.count = pwr_ok.dsdin_time;
                 
                 // установка для теста - должно вернуть 0xA13C011E
                 //packet->buffer[0] = DSDIN_TRIGGER_ON_0;
                 //dsdin_time.time = 316;
                 
-                packet->buffer[1] = dsdin_time.buffer[0];
-                packet->buffer[2] = dsdin_time.buffer[1];
+                packet->buffer[1] = utemp.byte[0];
+                packet->buffer[2] = utemp.byte[1];
             }
             else // иначе, если другие модули
             {
@@ -637,26 +670,20 @@ bool DEV_Driver(uint8_t cmd, FS9Packet_t* data, FS9Packet_t* packet)
             
         case 0x3D: // чтение счетчиков ошибок
         {
-            union
-            {
-                uint8_t  byte[2];
-                uint16_t count;
-            } err_count;
+            utemp.count = error.address; // чтение счетчика ошибок адресации
             
-            err_count.count = error.address; // чтение счетчика ошибок адресации
+            packet->buffer[0] = utemp.byte[0];
+            packet->buffer[1] = utemp.byte[1];
             
-            packet->buffer[0] = err_count.byte[0];
-            packet->buffer[1] = err_count.byte[1];
+            utemp.count = error.command; // чтение счетчика ошибок команд
             
-            err_count.count = error.command; // чтение счетчика ошибок команд
+            packet->buffer[2] = utemp.byte[0];
+            packet->buffer[3] = utemp.byte[1];
             
-            packet->buffer[2] = err_count.byte[0];
-            packet->buffer[3] = err_count.byte[1];
+            utemp.count = error.command; // чтение счетчика ошибок контрольной суммы
             
-            err_count.count = error.command; // чтение счетчика ошибок контрольной суммы
-            
-            packet->buffer[4] = err_count.byte[0];
-            packet->buffer[5] = err_count.byte[1];
+            packet->buffer[4] = utemp.byte[0];
+            packet->buffer[5] = utemp.byte[1];
             
             packet->size = 6;
         }
@@ -738,7 +765,7 @@ void DEV_Input_Filter(uint8_t index)
 {
     input_t* input = &io_in->list[index];
     
-    bool in_state  = input->pin.gpio->IDR & input->pin.pin;
+    bool in_state  = input->pin.gpio->IDR & input->pin.io;
     bool act_level = !input->state; // ожидаемый уровень (при выключенном входе - лог "1", при включенном лог "0")
     
     // если уровень на входе равен ожидаемому уровню (обратное значение от состояния входа)
@@ -1011,16 +1038,9 @@ void TIM14_IRQHandler(void)
 //-------------------------
 void blink2Hz(void* output)
 {    
-    output_t out = *((output_t*)output);
+    output_t* out = ((output_t*)output);
     
-    if(out.pin.gpio->ODR & out.pin.pin)
-    {
-        IO_Set(out, false);
-    }
-    else
-    {
-        IO_Set(out, true);
-    }
+    DEV_Out_Toggle(out);
 }
 //----------------------
 void crash(void* output)
@@ -1031,8 +1051,8 @@ void crash(void* output)
     }
     else // запроса нет - отключаем выход
     {
-        output_t out = *((output_t*)output);
+        output_t* out = ((output_t*)output);
         
-        IO_Set(out, false);
+        DEV_Out_Reset(out);
     }
 }
