@@ -1,4 +1,8 @@
 #include "ain.h"
+//-----------------------------------
+const uint8_t MAX_NUM_CHANNELS   = 4; // максимальное количество каналов
+const uint8_t MAX_NUM_CONVERSION = 10; // максимальное количество
+                                       // преобразований (усреднение)
 //-----------------------------------------------
 volatile uint16_t AIN_channels[MAX_NUM_CHANNELS];
 volatile uint16_t AIN_buffer[MAX_NUM_CHANNELS];
@@ -6,13 +10,24 @@ volatile uint16_t AIN_result[MAX_NUM_CHANNELS];
 volatile uint8_t  conv_count = 0;
 volatile bool     AIN_is_eoc = false;
 volatile uint16_t VDDA = 0;
-//-----------------
-void AIN_Init(void)
+volatile uint8_t  ADDR = 0xFF; // адрес устройства
+//-------------------------
+void AIN_Init(uint8_t addr)
 {
-    RCC->AHBENR  |= RCC_AHBENR_GPIOBEN | RCC_AHBENR_DMA1EN; // тактирование порта B и DMA
-    RCC->APB2ENR |= RCC_APB2ENR_ADC1EN; // тактирование АЦП
+    ADDR = addr;
     
-    GPIOB->MODER |= GPIO_MODER_MODER0 | GPIO_MODER_MODER1; // вывод 0 и 1 как аналоговые входы
+    RCC->AHBENR |= RCC_AHBENR_DMA1EN; // тактирование порта B и DMA
+    RCC->APB2ENR |= RCC_APB2ENR_ADC1EN; // тактирование АЦП
+ 
+    uint8_t num_channels = MAX_NUM_CHANNELS/2;
+    
+    if(ADDR == 0x00 || ADDR == 0x01)
+    {
+        RCC->AHBENR  |= RCC_AHBENR_GPIOBEN;    
+        GPIOB->MODER |= GPIO_MODER_MODER0 | GPIO_MODER_MODER1; // вывод 0 и 1 как аналоговые входы
+        
+        num_channels = MAX_NUM_CHANNELS;
+    }
     
     if((ADC1->CR & ADC_CR_ADEN) == ADC_CR_ADEN)
         ADC1->CR |= ADC_CR_ADDIS;
@@ -40,7 +55,7 @@ void AIN_Init(void)
     
     DMA1_Channel1->CPAR   = (uint32_t)(&(ADC1->DR));
     DMA1_Channel1->CMAR   = (uint32_t)(AIN_channels);
-    DMA1_Channel1->CNDTR  = MAX_NUM_CHANNELS;
+    DMA1_Channel1->CNDTR  = num_channels;
     DMA1_Channel1->CCR   |= DMA_CCR_MINC | DMA_CCR_MSIZE_0 | DMA_CCR_PSIZE_0 | DMA_CCR_TCIE | DMA_CCR_CIRC;
     DMA1_Channel1->CCR   |= DMA_CCR_EN;
     
@@ -57,7 +72,14 @@ bool AIN_Is_Ready(void)
 //-------------------------------
 int32_t AIN_Get_Temperature(void)
 {
-    int32_t temp = ((uint32_t)*TEMP30_CAL_ADDR - ((uint32_t)AIN_result[2]*VDDA/3300))*1000;
+    uint32_t result = (uint32_t)AIN_result[0];
+    
+    if(ADDR == 0x00 || ADDR == 0x01)
+    {
+        result = (uint32_t)AIN_result[2];
+    }
+    
+    int32_t temp = ((uint32_t)*TEMP30_CAL_ADDR - (result*VDDA/3300))*1000;
     temp = (temp/4300.0f + 30.0f)*1000;
     
     return temp;
@@ -79,10 +101,18 @@ void DMA1_Ch1_IRQHandler(void)
     {
         DMA1_Channel1->CCR &= ~DMA_CCR_TCIE; // отключаем прерывания DMA
         
-        AIN_buffer[0] += AIN_channels[0];
-        AIN_buffer[1] += AIN_channels[1];
-        AIN_buffer[2] += AIN_channels[2];
-        AIN_buffer[3] += AIN_channels[3];
+        if(ADDR == 0x00 || ADDR == 0x01)
+        {
+            AIN_buffer[0] += AIN_channels[0];
+            AIN_buffer[1] += AIN_channels[1];
+            AIN_buffer[2] += AIN_channels[2];
+            AIN_buffer[3] += AIN_channels[3];
+        }
+        else if(ADDR == 0x02)
+        {
+            AIN_buffer[0] += AIN_channels[0];
+            AIN_buffer[1] += AIN_channels[1];
+        }
         
         conv_count++;
         
@@ -90,10 +120,18 @@ void DMA1_Ch1_IRQHandler(void)
         {
             AIN_is_eoc = false; // снимаем флаг готовности данных (на время сохранения новых)
             
-            AIN_result[0] = AIN_buffer[0]/MAX_NUM_CONVERSION;
-            AIN_result[1] = AIN_buffer[1]/MAX_NUM_CONVERSION;
-            AIN_result[2] = AIN_buffer[2]/MAX_NUM_CONVERSION;
-            AIN_result[3] = AIN_buffer[3]/MAX_NUM_CONVERSION;
+            if(ADDR == 0x00 || ADDR == 0x01)
+            {
+                AIN_result[0] = AIN_buffer[0]/MAX_NUM_CONVERSION;
+                AIN_result[1] = AIN_buffer[1]/MAX_NUM_CONVERSION;
+                AIN_result[2] = AIN_buffer[2]/MAX_NUM_CONVERSION;
+                AIN_result[3] = AIN_buffer[3]/MAX_NUM_CONVERSION;
+            }
+            else if(ADDR == 0x02)
+            {
+                AIN_result[0] = AIN_buffer[0]/MAX_NUM_CONVERSION;
+                AIN_result[1] = AIN_buffer[1]/MAX_NUM_CONVERSION;
+            }
             
             AIN_buffer[0] = 0;
             AIN_buffer[1] = 0;
@@ -103,7 +141,17 @@ void DMA1_Ch1_IRQHandler(void)
             AIN_is_eoc = true; // устанавливаем флаг готовности данных
             conv_count = 0;
             
-            VDDA = 3300*(*VREFINT_CAL_ADDR)/AIN_result[3];
+            uint16_t result = AIN_result[1];
+            
+            if(ADDR != 0xFF)
+            {
+                if(ADDR == 0x00 || ADDR == 0x01)
+                {
+                    result = AIN_result[3];
+                }
+                
+                VDDA = 3300*(*VREFINT_CAL_ADDR)/result;
+            }
         }
         
         DMA1->IFCR         |= DMA_IFCR_CTCIF1;

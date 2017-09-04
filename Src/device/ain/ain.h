@@ -4,14 +4,11 @@
     #include <stdint.h>
     #include <stdbool.h>
     #include "stm32f030x6.h"
-    //--------------------------
-    #define MAX_NUM_CHANNELS   4
-    #define MAX_NUM_CONVERSION 10
     //-----------------------------------------------------------
     #define TEMP30_CAL_ADDR  ((uint16_t*) ((uint32_t)0x1FFFF7B8))
     #define VREFINT_CAL_ADDR ((uint16_t*) ((uint32_t)0x1FFFF7BA))
-    //----------------------
-    void     AIN_Init(void);
+    //------------------------------
+    void     AIN_Init(uint8_t addr);
     bool     AIN_Is_Ready(void);
     int32_t  AIN_Get_Temperature(void);
     uint16_t AIN_Get_Channel_1(void);

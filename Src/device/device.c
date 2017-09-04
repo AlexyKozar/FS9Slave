@@ -332,13 +332,11 @@ bool DEV_Driver(uint8_t cmd, FS9Packet_t* data, FS9Packet_t* packet)
 {
     uint8_t bit_count = 0; // счетчик бит (позиция канала в байте)
     
-    int32_t   temp;
-    uint16_t  ain1;
-    uint16_t  ain2;
-    uint8_t   byte;
-    uint8_t   state;
-    uint8_t   n_out;
-    output_t* out = NULL;
+    int32_t   temp  = 0x00;
+    uint8_t   byte  = 0x00;
+    uint8_t   state = 0x00;
+    uint8_t   n_out = 0x00;
+    output_t* out   = NULL;
     
     union
     {
@@ -399,21 +397,23 @@ bool DEV_Driver(uint8_t cmd, FS9Packet_t* data, FS9Packet_t* packet)
             while(AIN_Is_Ready() == false); // ожидание готовности результатов
             
             temp = AIN_Get_Temperature();
-            ain1 = AIN_Get_Channel_1();
-            ain2 = AIN_Get_Channel_2();
             
             union float_t t;
             
-            if(devAddr == 0)
+            if(devAddr == 0x00)
             {
                 uint16_t vdda = AIN_Get_VDDA();
                 
-                t.number = ((float)(ain1/4095.0f*vdda/1000.0f));
+                t.number = ((float)(AIN_Get_Channel_1()/4095.0f*vdda/1000.0f));
             }
-            else if(devAddr == 1)
+            else if(devAddr == 0x01)
             {
-                uint16_t temp = ((float)ain1/4095)*AIN_TEMP[MAX_SIZE_AIN_TEMP - 1][1];
+                uint16_t temp = ((float)AIN_Get_Channel_1()/4095)*AIN_TEMP[MAX_SIZE_AIN_TEMP - 1][1];
                 t.number = Get_Temp(temp, 1);
+            }
+            else if(devAddr == 0x02)
+            {
+                t.number = 0.0f;
             }
             
             packet->buffer[0] = t.byte[0];
@@ -421,16 +421,20 @@ bool DEV_Driver(uint8_t cmd, FS9Packet_t* data, FS9Packet_t* packet)
             packet->buffer[2] = t.byte[2];
             packet->buffer[3] = t.byte[3];
         
-            if(devAddr == 0)
+            if(devAddr == 0x00)
             {
                 uint16_t vdda = AIN_Get_VDDA();
-                t.number = ((float)ain2/4095)*vdda/1000.0f; // шунт 0.1 Ом, усиление ОУ 20, делитель 2
+                t.number = ((float)AIN_Get_Channel_2()/4095)*vdda/1000.0f; // шунт 0.1 Ом, усиление ОУ 20, делитель 2
                 //t.number /= 0.1f;                         // т.е. значение пропорционально току
             }
-            else if(devAddr == 1)
+            else if(devAddr == 0x01)
             {
-                uint16_t temp = ((float)ain2/4095)*AIN_TEMP[MAX_SIZE_AIN_TEMP - 1][2];
+                uint16_t temp = ((float)AIN_Get_Channel_2()/4095)*AIN_TEMP[MAX_SIZE_AIN_TEMP - 1][2];
                 t.number = Get_Temp(temp, 2);
+            }
+            else if(devAddr == 0x02)
+            {
+                t.number = 0.0f;
             }
             
             packet->buffer[4] = t.byte[0];

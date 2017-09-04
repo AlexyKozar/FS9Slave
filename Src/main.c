@@ -106,14 +106,11 @@ int main(void)
 
     if(addr == 0x00)
     {
-        AIN_Init();
         DEV_Crash_Init();
         DEV_PWROK_Init();
     }
-    else if(addr == 0x01)
-    {
-       AIN_Init(); 
-    }
+    
+    AIN_Init(addr);
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
@@ -304,6 +301,7 @@ void IODevice_Init(uint8_t addr, PORT_Input_Type* in, PORT_Output_Type* out)
         out->list[3].level = true;
         out->list[4].level = true;
         out->list[5].level = true;
+        out->list[6].level = true;
         
         in->size  = 10;
         out->size = 7;
