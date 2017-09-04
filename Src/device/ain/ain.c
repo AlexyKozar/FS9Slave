@@ -47,7 +47,14 @@ void AIN_Init(uint8_t addr)
     
     while((ADC1->ISR & ADC_ISR_ADRDY) == 0);
     
-    ADC1->CHSELR |= ADC_CHSELR_CHSEL8 | ADC_CHSELR_CHSEL9 | ADC_CHSELR_CHSEL16 | ADC_CHSELR_CHSEL17;
+    uint32_t channels = ADC_CHSELR_CHSEL16 | ADC_CHSELR_CHSEL17;
+    
+    if(ADDR == 0x00 || ADDR == 0x01)
+    {
+        channels |= ADC_CHSELR_CHSEL8 | ADC_CHSELR_CHSEL9;
+    }
+    
+    ADC1->CHSELR |= channels;
     ADC1->SMPR   |= ADC_SMPR1_SMPR_0 | ADC_SMPR1_SMPR_1 | ADC_SMPR1_SMPR_2; // 239.5 + 12.5 = ~18us
     ADC1->CFGR1  |= ADC_CFGR1_CONT;
     ADC->CCR     |= ADC_CCR_TSEN | ADC_CCR_VREFEN;
