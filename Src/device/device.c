@@ -2,11 +2,6 @@
 //---------------------------------------
 void IO_Clock_Enable(GPIO_TypeDef* gpio);
 void IO_Init(io_t io, uint8_t io_dir);
-<<<<<<< HEAD
-void IO_Set(output_t* out);
-void IO_Reset(output_t* out);
-=======
->>>>>>> edit
 void CHANNEL_Out_Set(uint8_t index);
 void CHANNEL_Out_Reset(uint8_t index);
 void TIM_Scan_Init(void);
@@ -79,12 +74,8 @@ void DEV_Init(PORT_Input_Type* inputs, PORT_Output_Type* outputs)
         IO_Init(io_out->list[i].pin, DEV_IO_OUTPUT);
         io_out->list[i].pin.num = i;
         io_out->list[i].state   = OUTPUT_STATE_OFF;
-        
-<<<<<<< HEAD
-        IO_Reset(&io_out->list[i]); // выключить выход - состояние по умолчанию
-=======
+
         DEV_Out_Reset(&io_out->list[i]); // выключить выход - состояние по умолчанию
->>>>>>> edit
     }
     
     io_t pin_int = { GPIO_INT, GPIO_INT_PIN };
@@ -92,20 +83,6 @@ void DEV_Init(PORT_Input_Type* inputs, PORT_Output_Type* outputs)
     
     GPIO_INT->BSRR |= GPIO_INT_SET; // включить выход INT (default state)
     
-<<<<<<< HEAD
-=======
-    if(devAddr == 0x00)
-    {
-        PWROK_Init();
-        CRASH_Init();
-        AIN_Init();
-    }
-    else if(devAddr == 0x01)
-    {
-        AIN_Init();
-    }
-    
->>>>>>> edit
     DEV_Input_Set_Default();
     
     TIM_Scan_Init();
@@ -138,18 +115,6 @@ void IO_Init(io_t pin, uint8_t io_dir)
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     HAL_GPIO_Init(pin.gpio, &GPIO_InitStruct);
 }
-<<<<<<< HEAD
-//---------------------------
-void IO_Set(output_t* output)
-{
-    if(output->level == true)
-    {
-        output->pin.gpio->ODR |= output->pin.pin;
-    }
-    else if(output->level == false)
-    {
-        output->pin.gpio->ODR &= ~output->pin.pin;
-=======
 //-----------------------------
 void DEV_Out_Set(output_t* out)
 {
@@ -170,25 +135,10 @@ void DEV_Out_Reset(output_t* out)
     if(out->level == true) // включение выхода по лог "1"
     {
         io <<= 16; // смещаем влево на 2 байта для получения RESET (GPIO_BSRR_BRx)
->>>>>>> edit
     }
     
     out->pin.gpio->BSRR |= io;
 }
-<<<<<<< HEAD
-//-----------------------------
-void IO_Reset(output_t* output)
-{
-    if(output->level == true)
-    {
-        output->pin.gpio->ODR &= ~output->pin.pin;
-    }
-    else if(output->level == false)
-    {
-        output->pin.gpio->ODR |= output->pin.pin;
-    }
-}
-=======
 //--------------------------------
 void DEV_Out_Toggle(output_t* out)
 {
@@ -213,19 +163,14 @@ bool DEV_Is_Out(output_t* out)
     
     return !state; // иначе управление инверсное, т.е. лог "0"
 }
->>>>>>> edit
 //---------------------------------
 void CHANNEL_Out_Set(uint8_t index)
 {
     if(index < io_out->size)
     {
         output_t* out = &io_out->list[index];
-        
-<<<<<<< HEAD
-        IO_Set(out);
-=======
+
         DEV_Out_Set(out);
->>>>>>> edit
     }
 }
 //-----------------------------------
@@ -234,12 +179,8 @@ void CHANNEL_Out_Reset(uint8_t index)
     if(index < io_out->size)
     {
         output_t* out = &io_out->list[index];
-        
-<<<<<<< HEAD
-        IO_Reset(out);
-=======
+
         DEV_Out_Reset(out);
->>>>>>> edit
     }
 }
 //----------------------
@@ -316,11 +257,8 @@ void DEV_Crash_Init(void)
     // настройка аварийного выхода
     out_crash        = &io_out->list[2];
     out_crash->param = EVENT_Create(5000, true, crash, out_crash, 0xFF);
-<<<<<<< HEAD
-    IO_Set(out_crash); // включаем аварийный выход - только для теста
-=======
+
     DEV_Out_Set(out_crash); // включаем аварийный выход - только для теста
->>>>>>> edit
 }
 //-----------------------
 uint8_t DEV_Address(void)
@@ -590,12 +528,8 @@ bool DEV_Driver(uint8_t cmd, FS9Packet_t* data, FS9Packet_t* packet)
                             }
                             
                             out->state = OUTPUT_STATE_OFF;
-                            
-<<<<<<< HEAD
-                            IO_Reset(out);
-=======
+
                             DEV_Out_Reset(out);
->>>>>>> edit
                         break;
                         
                         case OUTPUT_STATE_ON: // включение выхода
@@ -606,19 +540,13 @@ bool DEV_Driver(uint8_t cmd, FS9Packet_t* data, FS9Packet_t* packet)
                             else if(out->state == OUTPUT_STATE_FREQ_2HZ || out->state == OUTPUT_STATE_RESERVE)
                             {
                                 EVENT_Kill(out->param);
-<<<<<<< HEAD
-                                IO_Reset(out);
-                            }
-                            
-                            out->state = OUTPUT_STATE_ON;
-                            IO_Set(out);
-=======
+
                                 DEV_Out_Reset(out);
                             }
                             
                             out->state = OUTPUT_STATE_ON;
+                            
                             DEV_Out_Set(out);
->>>>>>> edit
                         break;
                         
                         case OUTPUT_STATE_FREQ_2HZ: // включение выхода с альтернативной функцией
@@ -629,11 +557,7 @@ bool DEV_Driver(uint8_t cmd, FS9Packet_t* data, FS9Packet_t* packet)
                             }
                             else if(out->state == OUTPUT_STATE_ON)
                             {
-<<<<<<< HEAD
-                                IO_Reset(out);
-=======
                                 DEV_Out_Reset(out);
->>>>>>> edit
                             }
                             
                             out->state = OUTPUT_STATE_FREQ_2HZ;
@@ -1113,18 +1037,7 @@ void blink2Hz(void* output)
 {    
     output_t* out = ((output_t*)output);
     
-<<<<<<< HEAD
-    if(out->pin.gpio->ODR & out->pin.pin)
-    {
-        IO_Reset(out);
-    }
-    else
-    {
-        IO_Set(out);
-    }
-=======
     DEV_Out_Toggle(out);
->>>>>>> edit
 }
 //----------------------
 void crash(void* output)
@@ -1136,14 +1049,7 @@ void crash(void* output)
         is_crash = false;
     }
     else // запроса нет - отключаем выход
-<<<<<<< HEAD
-    {        
-        IO_Reset(out);
-=======
     {
-        output_t* out = ((output_t*)output);
-        
         DEV_Out_Reset(out);
->>>>>>> edit
     }
 }

@@ -138,13 +138,10 @@
     void    DEV_Input_Set_Default(void);
     void    DEV_Input_Filter(uint8_t index);
     bool    DEV_Input_Changed_Channel(void);
-<<<<<<< HEAD
     void    DEV_Crash_Init(void);
     void    DEV_PWROK_Init(void);
-=======
     void    DEV_Out_Set(output_t* out);
     void    DEV_Out_Reset(output_t* out);
     void    DEV_Out_Toggle(output_t* out);
     bool    DEV_Is_Out(output_t* out);
->>>>>>> edit
 #endif

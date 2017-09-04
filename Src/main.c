@@ -103,7 +103,6 @@ int main(void)
     EVENT_Init();
     IODevice_Init(addr, &input, &output);
     DEV_Init(&input, &output);
-<<<<<<< HEAD
 
     if(addr == 0x00)
     {
@@ -111,15 +110,11 @@ int main(void)
         DEV_Crash_Init();
         DEV_PWROK_Init();
     }
-
-    if(addr == 0x01)
+    else if(addr == 0x01)
     {
        AIN_Init(); 
     }
 
-=======
-    
->>>>>>> edit
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
