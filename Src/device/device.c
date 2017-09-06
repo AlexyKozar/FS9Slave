@@ -23,6 +23,8 @@ bool Input_Changed = false;
 //--------------------
 bool is_crash = false; // авария - отключение выхода (происходит в случае отсутствия запросов от ЦП 5 сек)
 output_t* out_crash = NULL; // выход аварийной сигнализации
+//-------------------------------------------------------------------------
+key_t keys = { 0x00000000, KEY_EMPTY_MASK, KEY_EMPTY_MASK, KEY_MODE_NONE };
 //--------------------------
 error_t error = { 0, 0, 0 };
 //---------------------------------------
@@ -56,6 +58,8 @@ void DEV_Create(GPIO_TypeDef* gpio, uint16_t addr_pins)
     IO_Init(pin, DEV_IO_INPUT);
     
     devAddr = (uint8_t)((gpio->IDR & addr_pins) >> 14); // set the address device
+    
+    //devAddr = 0x02; // для теста МИК
 }
 //---------------------------------------------------------------
 void DEV_Init(PORT_Input_Type* inputs, PORT_Output_Type* outputs)
@@ -65,7 +69,19 @@ void DEV_Init(PORT_Input_Type* inputs, PORT_Output_Type* outputs)
     
     for(uint8_t i = 0; i < io_in->size; ++i)
     {
-        IO_Init(io_in->list[i].pin, DEV_IO_INPUT);
+        if((devAddr == 0x02 && i == 10) || (devAddr == 0x02 && i == 11))
+        {
+            // устройство МИК-01 и это 10 или 11 канал
+            IO_Init(io_in->list[i].pin, DEV_IO_OUTPUT); // настраиваем как выход (сканирование)
+            
+            // устанавливаем на выходе лог "1"
+            io_in->list[i].pin.gpio->ODR |= io_in->list[i].pin.io;
+        }
+        else // это не МИК-01 или все остальные входы
+        {
+            IO_Init(io_in->list[i].pin, DEV_IO_INPUT); // настраиваем как вход
+        }
+        
         io_in->list[i].pin.num = i;
     }
     
@@ -85,7 +101,15 @@ void DEV_Init(PORT_Input_Type* inputs, PORT_Output_Type* outputs)
     
     DEV_Input_Set_Default();
     
-    TIM_Scan_Init();
+    if(devAddr != 0x02) // только для МДВВ
+    {
+        TIM_Scan_Init();
+    }
+    else // для МИК запуск задачи на 5мс
+    {
+        EVENT_Create(5, false, DEV_Keyboard_Scan, NULL, 0xFF);
+    }
+    
     TIM_INT_Init();
 }
 //--------------------------------------
@@ -458,7 +482,7 @@ bool DEV_Driver(uint8_t cmd, FS9Packet_t* data, FS9Packet_t* packet)
         break;
             
         case 0x03: // чтение регистра расширения дискретных каналов входов
-            for(uint8_t i = 0; i < io_in->size; ++i)
+            /*for(uint8_t i = 0; i < io_in->size; ++i)
             {
                 if(bit_count == 8)
                 {
@@ -469,7 +493,11 @@ bool DEV_Driver(uint8_t cmd, FS9Packet_t* data, FS9Packet_t* packet)
                 uint8_t channel_state = (io_in->list[i].state == true)?0x01:0x00;
                 
                 packet->buffer[packet->size] |= channel_state << bit_count++;
-            }
+            }*/
+        
+            packet->buffer[0] = keys.last_state&0x000000FF;
+            packet->buffer[1] = (keys.last_state >> 8)&0x000000FF;
+            packet->buffer[2] = (keys.last_state >> 16)&0x0000000F;
             
             packet->size = 3;
         break;
@@ -743,7 +771,7 @@ uint8_t DEV_Checksum(FS9Packet_t* packet, uint8_t size)
 }
 //-----------------------
 void DEV_Input_Scan(void)
-{
+{    
     if(pwr_ok.is_dsdin == false)
     {
         for(uint8_t i = 0; i < io_in->size; ++i)
@@ -873,7 +901,7 @@ void DEV_Input_Filter(uint8_t index)
                 input->state  = act_level;
                 Input_Changed = true;
                 
-                if(pwr_ok.is_dsdin == true)
+                if(pwr_ok.is_dsdin == true) 
                 {
                     pwr_ok.dsdin_level       = input->state;
                     pwr_ok.dsdin_lev_changed = true;
@@ -893,6 +921,66 @@ void DEV_Input_Filter(uint8_t index)
             input->filter.c_state    = 0;
             input->filter.is_capture = false;
         }
+    }
+}
+//--------------------------------
+void DEV_Keyboard_Scan(void* data)
+{
+    io_t scan;
+    
+    switch(keys.mode)
+    {
+        case KEY_MODE_NONE:
+            scan = io_in->list[10].pin; // первая сканлиния
+            scan.gpio->BSRR |= scan.io << 16; // прижимаем первую сканлинию
+        
+            keys.mode = KEY_MODE_SCAN_1;
+        
+            EVENT_Create(5, false, DEV_Keyboard_Scan, NULL, 0xFF);
+        break;
+        
+        case KEY_MODE_SCAN_1:
+            scan  = io_in->list[10].pin;
+            keys.temp = scan.gpio->IDR;
+            keys.temp &= 0x000003FF; // считываем состояние кнопок
+            
+            scan.gpio->BSRR |= scan.io; // подымаем первую сканлинию
+        
+            scan = io_in->list[11].pin; // вторая сканлиния
+            scan.gpio->BSRR |= scan.io << 16; // прижимаем вторую сканлинию
+        
+            keys.mode = KEY_MODE_SCAN_2;
+        
+            EVENT_Create(5, false, DEV_Keyboard_Scan, NULL, 0xFF);
+        break;
+        
+        case KEY_MODE_SCAN_2:
+            scan = io_in->list[11].pin;
+            keys.temp |= (scan.gpio->IDR&0x000003FF) << 10; // считываем состояние кнопок
+            scan.gpio->BSRR |= scan.io; // поднимаем вторую сканлинию
+        
+            if(keys.cur_state == KEY_EMPTY_MASK) // первый проход сканирования линий
+            {
+                keys.cur_state = keys.temp; // сохраняем текущее состояние линий
+            }
+            else if(keys.temp != KEY_EMPTY_MASK) // второй проход - проверка
+            {
+                if(keys.cur_state == keys.temp) // состояния совподают
+                {
+                    keys.temp ^= KEY_EMPTY_MASK;
+                    keys.last_state = keys.temp&KEY_EMPTY_MASK; // сохраняем кобинацию кнопок
+                    
+                    Input_Changed = true;
+                }
+                
+                keys.cur_state = KEY_EMPTY_MASK; // обнуление текущего состояния
+            }
+            
+            keys.temp = KEY_EMPTY_MASK;
+            keys.mode = KEY_MODE_NONE;
+            
+            EVENT_Create(5, false, DEV_Keyboard_Scan, NULL, 0xFF);
+        break;
     }
 }
 //------------------------------

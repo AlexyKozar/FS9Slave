@@ -42,7 +42,13 @@
     #define DSDIN_TRIGGER_OFF          0xB8 // срабатывание не зафиксировано
     #define DSDIN_FUNCTION_NOT_SUPPORT 0xEA // функция не поддерживается
     //--------------------------
+    #define KEY_MODE_NONE   0x01
+    #define KEY_MODE_SCAN_1 0x02
+    #define KEY_MODE_SCAN_2 0x04
+    //--------------------------
     #define MAX_SIZE_AIN_TEMP 19 // максимальный размер массива для калибровочной таблицы температуры
+    //-------------------------------------------
+    #define KEY_EMPTY_MASK ((uint32_t)0x000FFFFF) // маска клавиатуры - неактивное состояние
     //--------------------------------------
     typedef struct _FS9Packet_t FS9Packet_t;
     //-------------------------
@@ -121,6 +127,14 @@
         uint16_t command; // ошибка команды
         uint16_t checksum; // ошибка контрольной суммы
     } error_t;
+    //-------------------
+    typedef struct _key_t
+    {
+        uint32_t last_state;
+        uint32_t cur_state;
+        uint32_t temp;
+        uint8_t  mode;
+    } key_t;
     //-----------
     union float_t
     {
@@ -137,6 +151,7 @@
     void    DEV_Input_Scan(void);
     void    DEV_Input_Set_Default(void);
     void    DEV_Input_Filter(uint8_t index);
+    void    DEV_Keyboard_Scan(void* data);
     bool    DEV_Input_Changed_Channel(void);
     void    DEV_Crash_Init(void);
     void    DEV_PWROK_Init(void);
