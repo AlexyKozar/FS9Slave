@@ -967,7 +967,7 @@ void DEV_Keyboard_Scan(void* data)
             {
                 if(keys.cur_state == keys.temp) // состояния совподают
                 {
-                    keys.temp ^= KEY_EMPTY_MASK;
+                    keys.temp ^= KEY_EMPTY_MASK; // инвертируем значение
                     keys.last_state = keys.temp&KEY_EMPTY_MASK; // сохраняем кобинацию кнопок
                     
                     Input_Changed = true;
