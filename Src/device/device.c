@@ -982,6 +982,11 @@ void DEV_Keyboard_Scan(void* data)
             EVENT_Create(5, false, DEV_Keyboard_Scan, NULL, 0xFF);
         break;
     }
+    
+    if(Input_Changed == true)
+    {
+        TIM_INT_Start();
+    }
 }
 //------------------------------
 void DEV_Input_Set_Default(void)
