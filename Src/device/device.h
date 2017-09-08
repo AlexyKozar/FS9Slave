@@ -131,7 +131,6 @@
     typedef struct _key_t
     {
         uint32_t last_state;
-        uint32_t cur_state;
         uint32_t temp;
         uint8_t  mode;
     } key_t;

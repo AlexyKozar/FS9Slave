@@ -23,8 +23,8 @@ bool Input_Changed = false;
 //--------------------
 bool is_crash = false; // авария - отключение выхода (происходит в случае отсутствия запросов от ЦП 5 сек)
 output_t* out_crash = NULL; // выход аварийной сигнализации
-//-------------------------------------------------------------------------
-key_t keys = { 0x00000000, KEY_EMPTY_MASK, KEY_EMPTY_MASK, KEY_MODE_NONE };
+//---------------------------------------------------------
+key_t keys = { 0x00000000, KEY_EMPTY_MASK, KEY_MODE_NONE };
 //--------------------------
 error_t error = { 0, 0, 0 };
 //---------------------------------------
@@ -382,15 +382,21 @@ bool DEV_Driver(uint8_t cmd, FS9Packet_t* data, FS9Packet_t* packet)
                     packet->buffer[packet->size] = 0x00;
                 }
                 
-                uint8_t channel_state = 0x00;
+                uint8_t  channel_state = 0x00;
+                input_t* channel        = &io_in->list[i];
                 
-                if(io_in->list[i].state == true && io_in->list[i].error == false)
+                if(channel->state == true && channel->error == false)
                 {
-                    channel_state = 0x01;
+                    // состояние канала входа активно и ошибок в канале нет
+                    channel_state = 0x01; // сигнал на входе присутствует
                 }
-                else if(io_in->list[i].error == true)
+                else if(channel->error == true)
                 {
+                    // зафиксирована ошибка канала входа
                     channel_state = 0x02;
+                    
+                    // сбрасываем ошибку канала входа при чтении
+                    channel->error = false;
                 }
                 
                 packet->buffer[packet->size] |= channel_state << bit_count;
@@ -482,19 +488,6 @@ bool DEV_Driver(uint8_t cmd, FS9Packet_t* data, FS9Packet_t* packet)
         break;
             
         case 0x03: // чтение регистра расширения дискретных каналов входов
-            /*for(uint8_t i = 0; i < io_in->size; ++i)
-            {
-                if(bit_count == 8)
-                {
-                    bit_count = 0;
-                    packet->buffer[++packet->size] = 0x00;
-                }
-                
-                uint8_t channel_state = (io_in->list[i].state == true)?0x01:0x00;
-                
-                packet->buffer[packet->size] |= channel_state << bit_count++;
-            }*/
-        
             packet->buffer[0] = keys.last_state&0x000000FF;
             packet->buffer[1] = (keys.last_state >> 8)&0x000000FF;
             packet->buffer[2] = (keys.last_state >> 16)&0x0000000F;
@@ -911,7 +904,11 @@ void DEV_Input_Filter(uint8_t index)
                 }
             }
             else if(input->filter.c_error >= io_in->set.Nperiod)
+            {
                 input->error = true;
+                
+                Input_Changed = true;
+            }
             
             input->filter.c_clock    = 0;
             input->filter.c_error    = 0;
@@ -959,21 +956,16 @@ void DEV_Keyboard_Scan(void* data)
             keys.temp |= (scan.gpio->IDR&0x000003FF) << 10; // считываем состояние кнопок
             scan.gpio->BSRR |= scan.io; // поднимаем вторую сканлинию
         
-            if(keys.cur_state == KEY_EMPTY_MASK) // первый проход сканирования линий
+            keys.temp ^= KEY_EMPTY_MASK; // инвертируем значение
+            keys.temp &= KEY_EMPTY_MASK; // обрезаем по маске (до 20-ти значащих бит)
+            
+            if(keys.temp != keys.last_state) // предыдущее состояние не равно текущему (произошли изменения)
             {
-                keys.cur_state = keys.temp; // сохраняем текущее состояние линий
-            }
-            else if(keys.temp != KEY_EMPTY_MASK) // второй проход - проверка
-            {
-                if(keys.cur_state == keys.temp) // состояния совподают
-                {
-                    keys.temp ^= KEY_EMPTY_MASK; // инвертируем значение
-                    keys.last_state = keys.temp&KEY_EMPTY_MASK; // сохраняем кобинацию кнопок
-                    
-                    Input_Changed = true;
-                }
+                keys.last_state = keys.temp; // сохраняем текущее состояние входов
                 
-                keys.cur_state = KEY_EMPTY_MASK; // обнуление текущего состояния
+                Input_Changed = true; // устанавливаем сигнал INT для оповещении ЦП об изменении состояния входов
+                
+                TIM_INT_Start();
             }
             
             keys.temp = KEY_EMPTY_MASK;
@@ -981,11 +973,6 @@ void DEV_Keyboard_Scan(void* data)
             
             EVENT_Create(5, false, DEV_Keyboard_Scan, NULL, 0xFF);
         break;
-    }
-    
-    if(Input_Changed == true)
-    {
-        TIM_INT_Start();
     }
 }
 //------------------------------
