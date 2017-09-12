@@ -12,6 +12,9 @@ float Get_Temp(uint16_t val, uint8_t in_num);
 float UAIN_to_TResistance(uint16_t val, uint8_t in_num); // преобразование напряжения в сопротивление температуры
 void  blink2Hz(void* output); // мигание с частотой 2Гц (для МИК-01)
 void  crash(void* output); // для обработки аварийной ситуации (нет запросов от ЦП 5 сек)
+void  queue_init(void);
+void  insert_task(uint8_t id); // вставка задачи в очередь для мигания (МИК-01)
+void  kill_task(uint8_t id); // убить задачу в очереди для мигания (МИК-01)
 //----------------------
 PORT_Input_Type*  io_in;
 PORT_Output_Type* io_out;
@@ -27,6 +30,8 @@ output_t* out_crash = NULL; // выход аварийной сигнализа�
 key_t keys = { 0x00000000, KEY_EMPTY_MASK, KEY_EMPTY_MASK, KEY_MODE_NONE, false };
 //--------------------------
 error_t error = { 0, 0, 0 };
+//----------------------------
+Blink_queue_t out_queue_blink;
 //---------------------------------------
 uint16_t AIN_TEMP[MAX_SIZE_AIN_TEMP][3] = 
 {
@@ -105,9 +110,13 @@ void DEV_Init(PORT_Input_Type* inputs, PORT_Output_Type* outputs)
     {
         TIM_Scan_Init();
     }
-    else // для МИК запуск задачи на 5мс
+    else
     {
-        EVENT_Create(5, false, DEV_Keyboard_Scan, NULL, 0xFF);
+        EVENT_Create(5, false, DEV_Keyboard_Scan, NULL, 0xFF); // опрос клавиатуры
+        
+        queue_init(); // инициализация очереди входов для работы в режиме мигания
+        
+        EVENT_Create(1000, true, blink2Hz, NULL, 0xFF); // создание задачи мигания
     }
     
     TIM_INT_Init();
@@ -549,7 +558,7 @@ bool DEV_Driver(uint8_t cmd, FS9Packet_t* data, FS9Packet_t* packet)
                             }
                             else if(out->state == OUTPUT_STATE_FREQ_2HZ || out->state == OUTPUT_STATE_RESERVE)
                             {
-                                EVENT_Kill(out->param);
+                                kill_task(n_out);
                             }
                             
                             out->state = OUTPUT_STATE_OFF;
@@ -564,7 +573,7 @@ bool DEV_Driver(uint8_t cmd, FS9Packet_t* data, FS9Packet_t* packet)
                             }
                             else if(out->state == OUTPUT_STATE_FREQ_2HZ || out->state == OUTPUT_STATE_RESERVE)
                             {
-                                EVENT_Kill(out->param);
+                                kill_task(n_out);
 
                                 DEV_Out_Reset(out);
                             }
@@ -586,8 +595,7 @@ bool DEV_Driver(uint8_t cmd, FS9Packet_t* data, FS9Packet_t* packet)
                             }
                             
                             out->state = OUTPUT_STATE_FREQ_2HZ;
-                            
-                            out->param = EVENT_Create(1000, true, blink2Hz, out, 0xFF);
+                            insert_task(n_out);
                         break;
                     }
                 }
@@ -1136,9 +1144,27 @@ void TIM14_IRQHandler(void)
 //-------------------------
 void blink2Hz(void* output)
 {    
-    output_t* out = ((output_t*)output);
+    if(out_queue_blink.count == 0)
+        return;
     
-    DEV_Out_Toggle(out);
+    for(uint8_t i = 0; i < MAX_SIZE_QUEUE_OUT; ++i)
+    {
+        if(out_queue_blink.queue[i] != 0xFF)
+        {
+            output_t* out = &io_out->list[out_queue_blink.queue[i]];
+            
+            if(out_queue_blink.state == true)
+            {
+                DEV_Out_Set(out);
+            }
+            else
+            {
+                DEV_Out_Reset(out);
+            }
+        }
+    }
+    
+    out_queue_blink.state = !out_queue_blink.state;
 }
 //----------------------
 void crash(void* output)
@@ -1152,5 +1178,34 @@ void crash(void* output)
     else // запроса нет - отключаем выход
     {
         DEV_Out_Reset(out);
+    }
+}
+//--------------------
+void  queue_init(void)
+{
+    for(uint8_t i = 0; i < MAX_SIZE_QUEUE_OUT; ++i)
+    {
+        out_queue_blink.queue[i] = 0xFF;
+    }
+
+    out_queue_blink.state = false;
+    out_queue_blink.count = 0;
+}
+//--------------------------
+void insert_task(uint8_t id)
+{
+    if(out_queue_blink.count < MAX_SIZE_QUEUE_OUT)
+    {
+        out_queue_blink.queue[id] = id;
+        out_queue_blink.count++;
+    }
+}
+//------------------------
+void kill_task(uint8_t id)
+{
+    if(out_queue_blink.count < MAX_SIZE_QUEUE_OUT)
+    {
+        out_queue_blink.queue[id] = 0xFF;
+        out_queue_blink.count--;
     }
 }

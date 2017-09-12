@@ -47,6 +47,8 @@
     #define KEY_MODE_SCAN_2 0x04
     //--------------------------
     #define MAX_SIZE_AIN_TEMP 19 // максимальный размер массива для калибровочной таблицы температуры
+    //---------------------------
+    #define MAX_SIZE_QUEUE_OUT 12 // максимальный размер массива очереди входов в режиме blink (для МИК-01)
     //-------------------------------------------
     #define KEY_EMPTY_MASK ((uint32_t)0x000FFFFF) // маска клавиатуры - неактивное состояние
     //--------------------------------------
@@ -136,6 +138,13 @@
         uint8_t  mode;
         bool     is_bounce;
     } key_t;
+    //---------------------------
+    typedef struct _Blink_queue_t
+    {
+        uint8_t queue[MAX_SIZE_QUEUE_OUT];
+        bool    state;
+        uint8_t count;
+    } Blink_queue_t;
     //-----------
     union float_t
     {
