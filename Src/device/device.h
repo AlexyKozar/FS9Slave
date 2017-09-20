@@ -9,6 +9,7 @@
     #include "math.h"
     #include "ain/ain.h"
     #include "event/event.h"
+    #include "ds18b20/ds18b20.h"
     //----------------------
     #define F_CPU 48000000UL
     //---------------------------
