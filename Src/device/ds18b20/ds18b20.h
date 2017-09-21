@@ -16,4 +16,5 @@
     //----------------------
     void DS18B20_Init(void);
     void DS18B20_Convert(void);
+    void DS18B20_Loop(void);
 #endif

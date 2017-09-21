@@ -5,13 +5,14 @@
 #define STATE_SKIP 0x02
 #define STATE_CONV 0x04
 #define STATE_READ 0x08
-//------------------------
-#define MODE_NONE     0x00
-#define MODE_RESET    0x01
-#define MODE_PRESENCE 0x02
-#define MODE_CMD      0x04
-#define MODE_CMD_ZERO 0x08
-#define MODE_CMD_ONE  0x10
+//-------------------------
+#define MODE_NONE      0x00
+#define MODE_RESET     0x01
+#define MODE_PRESENCE  0x02
+#define MODE_CMD       0x04
+#define MODE_CMD_ZERO  0x08
+#define MODE_CMD_ONE   0x10
+#define MODE_TIME_SLOT 0x20
 //-------------------
 #define CMD_CONV 0x44
 #define CMD_READ 0xBE
@@ -42,6 +43,7 @@ void DQ_write_one(void);
 void TIM_set_capture(void);
 void TIM_set_opm(uint16_t length);
 void reset(void);
+void temp_read(void* param);
 //--------------------------------------------
 ds18b20_cmd_t cmd        = { 0xFF, 0, false };
 state_t       state      = { STATE_NONE, false };
@@ -51,6 +53,7 @@ uint16_t      capture_2  = 0x0000;
 uint16_t      period     = 0x0000;
 uint16_t      pause      = 0x0000;
 uint8_t       mode       = MODE_NONE;
+bool          is_convert = false; // this flag is set when send the command CONVERT
 //---------------------
 void DS18B20_Init(void)
 {
@@ -87,6 +90,66 @@ void DS18B20_Convert(void)
 {    
     reset();
 }
+//---------------------
+void DS18B20_Loop(void)
+{
+    switch(state.state)
+    {
+        case STATE_NONE:
+            if(state.is_ok == false)
+            {
+                state.state = STATE_INIT;
+                state.is_ok = false;
+                reset();
+            }
+        break;
+        
+        case STATE_INIT:
+            if(state.is_ok == true)
+            {
+                state.state = STATE_SKIP;
+                state.is_ok = false;
+                DQ_write_cmd(CMD_SKIP);
+            }
+        break;
+        
+        case STATE_SKIP:
+            if(state.is_ok == true)
+            {
+                if(is_convert == false)
+                {
+                    state.state = STATE_CONV;
+                    state.is_ok = false;
+                    DQ_write_cmd(CMD_CONV);
+                }
+                else
+                {
+                    state.state = STATE_READ;
+                    state.is_ok = false;
+                    DQ_write_cmd(CMD_READ);
+                }
+            }
+        break;
+            
+        case STATE_CONV:
+            if(state.is_ok == true)
+            {
+                state.state = STATE_NONE;
+                is_convert  = true; 
+                
+                EVENT_Create(750, false, temp_read, NULL, 0xFF);
+            }
+        break;
+            
+        case STATE_READ:
+            if(state.is_ok == true)
+            {
+                state.state = STATE_NONE;
+                is_convert  = false;
+            }
+        break;
+    }
+}
 //--------------------------
 void DS18B20_INTERRUPT(void)
 {
@@ -100,7 +163,7 @@ void DS18B20_INTERRUPT(void)
         }
         else if(mode == MODE_PRESENCE)
         {
-            DQ_write_cmd(CMD_SKIP);
+            state.is_ok = true;
         }
         else if((mode & MODE_CMD) == MODE_CMD)
         {   
@@ -110,7 +173,7 @@ void DS18B20_INTERRUPT(void)
                 {
                     cmd.is_bit = true;
                     DQ_out_set();
-                    TIM_set_opm(5);
+                    TIM_set_opm(2);
                 }
                 else
                 {
@@ -124,7 +187,7 @@ void DS18B20_INTERRUPT(void)
                 {
                     cmd.is_bit = true;
                     DQ_out_set();
-                    TIM_set_opm(45);
+                    TIM_set_opm(90);
                 }
                 else
                 {
@@ -259,6 +322,8 @@ void DQ_write_cmd(uint8_t byte)
         cmd.cmd       = 0xFF;
         cmd.bit_count = 0;
         
+        state.is_ok = true;
+        
         return;
     }
     
@@ -285,7 +350,7 @@ void DQ_write_zero(void)
     mode |= MODE_CMD_ZERO;
     
     DQ_out_reset();
-    TIM_set_opm(80);
+    TIM_set_opm(90);
 }
 //---------------------
 void DQ_write_one(void)
@@ -293,7 +358,7 @@ void DQ_write_one(void)
     mode |= MODE_CMD_ONE;
     
     DQ_out_reset();
-    TIM_set_opm(5);
+    TIM_set_opm(2);
 }
 //------------------------
 void TIM_set_capture(void)
@@ -328,4 +393,9 @@ void reset(void)
     DQ_out_reset();
     
     TIM_set_opm(500);
+}
+//-------------------------
+void temp_read(void* param)
+{
+    state.is_ok = false;
 }
