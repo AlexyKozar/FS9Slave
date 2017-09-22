@@ -9,6 +9,7 @@ void     DQ_output(void);
 void     DQ_set(void);
 void     DQ_reset(void);
 uint16_t DQ_read(void);
+bool     DQ_read_bit(void);
 bool     DQ_state(void);
 void     DQ_send(uint8_t cmd);
 void     DQ_send_zero(void);
@@ -17,7 +18,7 @@ bool     init(void); // reset and presence (true - if is valid)
 void     delay_us(uint32_t time);
 //--------------------------
 bool     is_process = false;
-uint16_t temp       = 0xFF;
+uint16_t temp       = 0xFFFF;
 //---------------------
 void DS18B20_Init(void)
 {
@@ -46,6 +47,7 @@ void DS18B20_Init(void)
 //-------------------------------
 void DS18B20_Convert(void* param)
 {
+    
     if(init()) // receive the impulse presence
     {
         DQ_send(CMD_SKIP);
@@ -65,14 +67,41 @@ void DS18B20_Convert(void* param)
             DQ_send(CMD_READ);
             temp = DQ_read();
             
-            //EVENT_Create(5000, false, DS18B20_Convert, NULL, 0xFF);
+            EVENT_Create(5000, false, DS18B20_Convert, NULL, 0xFF);
+            
+            //init(); // reset (we read two bytes of nine bytes)
         }
     }
 }
 //-----------------------------
 float DS18B20_Temperature(void)
 {
-    return 0.0f;
+    float t = 0.0f;
+    
+    if(temp == 0xFFFF) // read error
+    {
+        return 126.0f;
+    }
+    else if(temp == 0x5005) // sensor error
+    {
+        return 127.0f;
+    }
+    else
+    {
+        bool    sign    = temp&0xF800; // temperature sign (true - minus)
+        uint8_t fract   = temp&0x000F; // fractional part
+        uint8_t integer = (temp&0x07F0) >> 4; // integer part
+        
+        if(sign) // negative value temperature
+        {
+            fract   = 0 - fract;
+            integer = 0 - integer;
+        }
+        
+        t = integer + ((float)(fract >> 4));
+    }
+    
+    return t;
 }
 //-----------------
 void DQ_input(void)
@@ -110,23 +139,37 @@ void DQ_reset(void)
 //--------------------
 uint16_t DQ_read(void)
 {
-    uint16_t result = 0x0000;
+    uint16_t data = 0x0000;
     
     for(uint8_t i = 0; i < 16; ++i)
     {
-        DQ_output();
-        DQ_reset();
-        delay_us(1);
-        DQ_set();
-        DQ_input();
-        delay_us(15);
-        
-        result |= (DQ_state())?1 << i:0 << i;
-        
-        delay_us(45);
+        if(DQ_read_bit() == true)
+        {
+            data |= 1 << i;
+        }
+        else
+        {
+            data |= 0 << i;
+        }
     }
     
-    return result;
+    return data;
+}
+//--------------------
+bool DQ_read_bit(void)
+{
+    DQ_output();
+    DQ_reset();
+    delay_us(1);
+    DQ_set();
+    DQ_input();
+    delay_us(7);
+    
+    bool state = DQ_state();
+    
+    delay_us(45);
+    
+    return state;
 }
 //-----------------
 bool DQ_state(void)
@@ -156,9 +199,9 @@ void DQ_send(uint8_t cmd)
 void DQ_send_zero(void)
 {
     DQ_reset();   
-    delay_us(60);
+    delay_us(80);
     DQ_set();
-    delay_us(2);
+    delay_us(5);
 }
 //--------------------
 void DQ_send_one(void)
@@ -166,7 +209,7 @@ void DQ_send_one(void)
     DQ_reset();    
     delay_us(15);
     DQ_set();
-    delay_us(45);
+    delay_us(75);
 }
 //-------------
 bool init(void)
