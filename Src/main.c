@@ -109,9 +109,8 @@ int main(void)
         DS18B20_Init();
         DEV_Crash_Init();
         DEV_PWROK_Init();
-        //EVENT_Create(500, true, DS18B20_Convert, NULL, 0xFF);
         
-        //DS18B20_Convert();
+        EVENT_Create(500, false, DS18B20_Convert, NULL, 0xFF);
     }
     
     AIN_Init(addr);
@@ -140,8 +139,6 @@ int main(void)
     // обработка события
     EVENT_Execute();
     // конец обработки события
-    
-    DS18B20_Loop();
   }
   /* USER CODE END 3 */
 

@@ -12,9 +12,8 @@
     #define DS18B20_TIM       TIM3
     #define DS18B20_TIM_BUS   RCC_APB1ENR_TIM3EN
     #define DS18B20_IRQ       TIM3_IRQn
-    #define DS18B20_INTERRUPT TIM3_IRQHandler
-    //----------------------
-    void DS18B20_Init(void);
-    void DS18B20_Convert(void);
-    void DS18B20_Loop(void);
+    //-----------------------
+    void  DS18B20_Init(void);
+    void  DS18B20_Convert(void* param);
+    float DS18B20_Temperature(void);
 #endif
