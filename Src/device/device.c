@@ -487,11 +487,20 @@ bool DEV_Driver(uint8_t cmd, FS9Packet_t* data, FS9Packet_t* packet)
             packet->buffer[9]  = t.byte[1];
             packet->buffer[10] = t.byte[2];
             packet->buffer[11] = t.byte[3];
-        
-            packet->buffer[12] = 0x00;
-            packet->buffer[13] = 0x00;
-            packet->buffer[14] = 0x00;
-            packet->buffer[15] = 0x00;
+
+            if(devAddr == 0x00)
+            {
+                t.number = DS18B20_Temperature();
+            }
+            else
+            {
+                t.number = 0.0f;
+            }
+            
+            packet->buffer[12] = t.byte[0];
+            packet->buffer[13] = t.byte[1];
+            packet->buffer[14] = t.byte[2];
+            packet->buffer[15] = t.byte[3];
         
             packet->size = 16;
         break;

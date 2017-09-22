@@ -47,7 +47,6 @@ void DS18B20_Init(void)
 //-------------------------------
 void DS18B20_Convert(void* param)
 {
-    
     if(init()) // receive the impulse presence
     {
         DQ_send(CMD_SKIP);
@@ -88,7 +87,7 @@ float DS18B20_Temperature(void)
     }
     else
     {
-        bool    sign    = temp&0xF800; // temperature sign (true - minus)
+        bool    sign    = ((temp & 0xF800) == 0xF800); // temperature sign (true - minus)
         uint8_t fract   = temp&0x000F; // fractional part
         uint8_t integer = (temp&0x07F0) >> 4; // integer part
         
@@ -98,7 +97,7 @@ float DS18B20_Temperature(void)
             integer = 0 - integer;
         }
         
-        t = integer + ((float)(fract >> 4));
+        t = (float)integer + (float)fract*0.0625f;
     }
     
     return t;
@@ -199,7 +198,7 @@ void DQ_send(uint8_t cmd)
 void DQ_send_zero(void)
 {
     DQ_reset();   
-    delay_us(80);
+    delay_us(65);
     DQ_set();
     delay_us(5);
 }
@@ -207,9 +206,9 @@ void DQ_send_zero(void)
 void DQ_send_one(void)
 {
     DQ_reset();    
-    delay_us(15);
+    delay_us(2);
     DQ_set();
-    delay_us(75);
+    delay_us(65);
 }
 //-------------
 bool init(void)

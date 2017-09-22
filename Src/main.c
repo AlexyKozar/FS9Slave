@@ -61,7 +61,6 @@ static void MX_USART1_UART_Init(void);
 /* USER CODE BEGIN 0 */
 //---------------------------------------------------------------------------
 void IODevice_Init(uint8_t addr, PORT_Input_Type* in, PORT_Output_Type* out);
-void temp2(void* param);
 /* USER CODE END 0 */
 
 int main(void)
@@ -111,8 +110,7 @@ int main(void)
         DEV_Crash_Init();
         DEV_PWROK_Init();
         
-        EVENT_Create(5000, false, DS18B20_Convert, NULL, 0xFF);
-        EVENT_Create(10000, false, temp2, NULL, 0xFF);
+        EVENT_Create(2000, false, DS18B20_Convert, NULL, 0xFF);
     }
     
     AIN_Init(addr);
@@ -360,13 +358,6 @@ void IODevice_Init(uint8_t addr, PORT_Input_Type* in, PORT_Output_Type* out)
         in->size  = 12;
         out->size = 12;
     }
-}
-
-void temp2(void* param)
-{
-    float t = DS18B20_Temperature();
-    
-    t += t;
 }
 /* USER CODE END 4 */
 
