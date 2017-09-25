@@ -21,6 +21,7 @@ PORT_Output_Type* io_out;
 PWROK_Type        pwr_ok = { false, false, 0, false, false };
 //---------------------
 uint8_t devAddr = 0xFF;
+uint8_t devID   = 0xFF;
 //-------------------------
 bool Input_Changed = false;
 //--------------------
@@ -63,6 +64,19 @@ void DEV_Create(GPIO_TypeDef* gpio, uint16_t addr_pins)
     IO_Init(pin, DEV_IO_INPUT);
     
     devAddr = (uint8_t)((gpio->IDR & addr_pins) >> 14); // set the address device
+    
+    if(devAddr == 0x00) // a device is MDVV-01
+    {
+        devID = 0x48;
+    }
+    else if(devAddr == 0x01) // a device is MDVV-02
+    {
+        devID = 0x49;
+    }
+    else if(devAddr == 0x02) // a device is MIK-01
+    {
+        devID = 0x50;
+    }
     
     //devAddr = 0x02; // для теста МИК
 }
@@ -673,6 +687,19 @@ bool DEV_Driver(uint8_t cmd, FS9Packet_t* data, FS9Packet_t* packet)
             
         case 0x15: // установка значения 1 на выходе канала 7
             CHANNEL_Out_Set(7);
+        break;
+        
+        case 0x1E:
+            packet->buffer[0] = devID;
+            packet->buffer[1] = DEVICE_NUMBER&0x00FF;
+            packet->buffer[2] = DEVICE_NUMBER&0xFF00;
+            packet->buffer[3] = DEVICE_LOT;
+            packet->buffer[4] = DEVICE_FIRMWARE_VARIANT;
+            packet->buffer[5] = (DEVICE_FIRMWARE_DATE&0x00FF0000) >> 16; // year
+            packet->buffer[6] = (DEVICE_FIRMWARE_DATE&0x0000FF00) >> 8; // month
+            packet->buffer[7] = DEVICE_FIRMWARE_DATE&0x000000FF; // day
+        
+            packet->size = 8;
         break;
             
         case 0x1F: // чтение времени срабатывания выделенного входного дискретного канала

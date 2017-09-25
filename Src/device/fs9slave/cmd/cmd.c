@@ -32,7 +32,7 @@ cmd_t cmd_list[MAX_CMD_NUM] =
     { 0, 0, false },
     { 0, 0, false },
     { 0, 0, false },
-    { 2, 5, false },
+    { 2, 9, false }, // a device data (id, number, lot, firmware variant and firmware date - 3 bytes)
     { 2, 4, false },
     { 0, 0, false },
     { 0, 0, false },

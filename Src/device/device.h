@@ -52,6 +52,12 @@
     #define MAX_SIZE_QUEUE_OUT 12 // максимальный размер массива очереди входов в режиме blink (для МИК-01)
     //-------------------------------------------
     #define KEY_EMPTY_MASK ((uint32_t)0x000FFFFF) // маска клавиатуры - неактивное состояние
+    //--------------
+    // a device data
+    #define DEVICE_NUMBER           (uint16_t)0x01
+    #define DEVICE_LOT              (uint8_t)0x01
+    #define DEVICE_FIRMWARE_VARIANT (uint8_t)0x00
+    #define DEVICE_FIRMWARE_DATE    (uint32_t)0x00110919 // decimal -> 170925 -> 2017/09/25
     //--------------------------------------
     typedef struct _FS9Packet_t FS9Packet_t;
     //-------------------------
