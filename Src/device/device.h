@@ -10,6 +10,7 @@
     #include "ain/ain.h"
     #include "event/event.h"
     #include "ds18b20/ds18b20.h"
+    #include "i2c/i2c.h"
     //----------------------
     #define F_CPU 48000000UL
     //---------------------------

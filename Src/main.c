@@ -111,6 +111,7 @@ int main(void)
         DEV_PWROK_Init();
         
         EVENT_Create(2000, false, DS18B20_Convert, NULL, 0xFF);
+        I2C_EE_Init();
     }
     
     AIN_Init(addr);

@@ -385,6 +385,8 @@ bool DEV_Driver(uint8_t cmd, FS9Packet_t* data, FS9Packet_t* packet)
     uint8_t   n_out = 0x00;
     output_t* out   = NULL;
     
+    uint8_t eeprom[5] = { 0x01, 0x02, 0x03, 0x04, 0x05 }; // data write to eeprom - test
+    
     union
     {
         uint16_t count;
@@ -732,6 +734,10 @@ bool DEV_Driver(uint8_t cmd, FS9Packet_t* data, FS9Packet_t* packet)
             }
             
             packet->size = 3;
+        break;
+            
+        case 0x3C: // запись в память (тест eeprom)
+            I2C_EE_WriteBytes(0xA0, eeprom, 5);
         break;
             
         case 0x3D: // чтение счетчиков ошибок
