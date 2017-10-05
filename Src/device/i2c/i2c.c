@@ -20,6 +20,7 @@ void I2C_EE_Init(void)
     
     while((I2C_BUS->CR1 & I2C_CR1_PE) == I2C_CR1_PE); // wait disabled peripheral
     
+    I2C_BUS->CR2     &= ~I2C_CR2_ADD10; // 7 bit mode
     I2C_BUS->TIMINGR  = 0x10805E89; // set timing i2c (100kHz - standard mode)
     I2C_BUS->CR1     |= I2C_CR1_PE; // enabling the peripheral
     
@@ -30,8 +31,7 @@ bool I2C_EE_WriteBytes(uint8_t dev_addr, uint8_t reg_addr, uint8_t* data, uint8_
 {
     uint8_t bytes = 0;
     
-    I2C_BUS->CR2 &= ~I2C_CR2_ADD10; // 7 bit mode
-    I2C_BUS->CR2 |= 1 << I2C_CR2_NBYTES_Pos | (dev_addr & 0xFE);
+    I2C_BUS->CR2  = 1 << I2C_CR2_NBYTES_Pos | (dev_addr & 0xFE);
     I2C_BUS->CR2 |= I2C_CR2_START;
     
     while((I2C_BUS->ISR & I2C_ISR_BUSY) != I2C_ISR_BUSY);
@@ -46,7 +46,7 @@ bool I2C_EE_WriteBytes(uint8_t dev_addr, uint8_t reg_addr, uint8_t* data, uint8_
         }
     }
     
-    I2C_BUS->CR2 |= (uint32_t)size << I2C_CR2_NBYTES_Pos | (dev_addr & 0xFE);
+    I2C_BUS->CR2  = (uint32_t)size << I2C_CR2_NBYTES_Pos | (dev_addr & 0xFE);
     I2C_BUS->CR2 |= I2C_CR2_START;
     
     while((I2C_BUS->ISR & I2C_ISR_BUSY) != I2C_ISR_BUSY);
@@ -76,8 +76,7 @@ bool I2C_EE_ReadBytes(uint8_t dev_addr, uint8_t reg_addr, uint8_t* data, uint8_t
 {
     uint8_t bytes = 0;
     
-    I2C_BUS->CR2 &= ~I2C_CR2_ADD10; // 7 bit mode
-    I2C_BUS->CR2 |= 1 << I2C_CR2_NBYTES_Pos | (dev_addr & 0xFE);
+    I2C_BUS->CR2  = 1 << I2C_CR2_NBYTES_Pos | (dev_addr & 0xFE);
     I2C_BUS->CR2 |= I2C_CR2_START;
     
     while((I2C_BUS->ISR & I2C_ISR_BUSY) != I2C_ISR_BUSY);
@@ -92,7 +91,7 @@ bool I2C_EE_ReadBytes(uint8_t dev_addr, uint8_t reg_addr, uint8_t* data, uint8_t
         }
     }
     
-    I2C_BUS->CR2 |= I2C_CR2_RD_WRN | (uint32_t)size << I2C_CR2_NBYTES_Pos | 
+    I2C_BUS->CR2  = I2C_CR2_RD_WRN | (uint32_t)size << I2C_CR2_NBYTES_Pos | 
                     (dev_addr & 0xFE);
     I2C_BUS->CR2 |= I2C_CR2_START;
     
