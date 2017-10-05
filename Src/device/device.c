@@ -385,7 +385,8 @@ bool DEV_Driver(uint8_t cmd, FS9Packet_t* data, FS9Packet_t* packet)
     uint8_t   n_out = 0x00;
     output_t* out   = NULL;
     
-    uint8_t eeprom[5] = { 0x01, 0x02, 0x03, 0x04, 0x05 }; // data write to eeprom - test
+    uint8_t eeprom[5] = { 0x10, 0x20, 0x30, 0x40, 0x5F }; // data write to eeprom - test
+    uint8_t eeprom2[5] = { 0x00, 0x00, 0x00, 0x00, 0x00 }; // buffer for read data from eeprom - test
     
     union
     {
@@ -570,7 +571,7 @@ bool DEV_Driver(uint8_t cmd, FS9Packet_t* data, FS9Packet_t* packet)
                 
                 for(uint8_t j = 0; j < 8; j += 2) // 8 бит по 2 на описание каждого канала
                 {
-                    state = (byte >> j)&0x03; // состояние текущего канал
+                    state = (byte >> j)&0x03; // состояние текущего канала
                     n_out = i*4 + j/2; // порядковый номер канала
                     out   = &io_out->list[n_out];
                     
@@ -735,10 +736,12 @@ bool DEV_Driver(uint8_t cmd, FS9Packet_t* data, FS9Packet_t* packet)
             
             packet->size = 3;
         break;
-            
+
+        case 0x3B: // запись в память (тест eeprom)
+            return I2C_EE_ReadBytes(0xA0, 0x00, eeprom2, 5);
+        
         case 0x3C: // запись в память (тест eeprom)
-            I2C_EE_WriteBytes(0xA0, eeprom, 5);
-        break;
+            return I2C_EE_WriteBytes(0xA0, 0x00, eeprom, 5);
             
         case 0x3D: // чтение счетчиков ошибок
         {

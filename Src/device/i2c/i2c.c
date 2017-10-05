@@ -1,7 +1,6 @@
 #include "i2c.h"
-//--------------------
-uint8_t* _data = NULL;
-uint8_t  bytes = 0;
+//---------------------
+void I2C_EE_Stop(void);
 //--------------------
 void I2C_EE_Init(void)
 {
@@ -17,44 +16,120 @@ void I2C_EE_Init(void)
     GPIOB->AFR[1]  |= ((0x01 << GPIO_AFRH_AFSEL8_Pos) | (0x01 << GPIO_AFRH_AFSEL9_Pos));
     
     // set i2c
-    I2C1->CR1     &= ~I2C_CR1_PE; // disabling the peripheral
-    I2C1->CR1     &= ~I2C_CR1_ANFOFF; // analog noise filter disabled
-    I2C1->CR1     &= ~I2C_CR1_DNF; // digital filter disabled
-    I2C1->TIMINGR  = 0x00B0DBFF; // set timing i2c (100kHz - standard mode)
-    I2C1->CR1     |= I2C_CR1_NOSTRETCH; // clock stretching disabled
-    I2C1->CR1     |= I2C_CR1_ADDRIE | I2C_CR1_TXIE;
-    I2C1->CR1     |= I2C_CR1_PE; // enabling the peripheral
+    I2C_BUS->CR1 &= ~I2C_CR1_PE; // disabling the peripheral
     
-    NVIC_EnableIRQ(I2C1_IRQn);
+    while((I2C_BUS->CR1 & I2C_CR1_PE) == I2C_CR1_PE); // wait disabled peripheral
+    
+    I2C_BUS->TIMINGR  = 0x10805E89; // set timing i2c (100kHz - standard mode)
+    I2C_BUS->CR1     |= I2C_CR1_PE; // enabling the peripheral
+    
+    while((I2C_BUS->CR1 & I2C_CR1_PE) != I2C_CR1_PE); // wait enabled peripheral
 }
-//---------------------------------------------------------------
-void I2C_EE_WriteBytes(uint8_t addr, uint8_t* data, uint8_t size)
+//-------------------------------------------------------------------------------------
+bool I2C_EE_WriteBytes(uint8_t dev_addr, uint8_t reg_addr, uint8_t* data, uint8_t size)
 {
-    if(size == 0 || data == NULL)
+    uint8_t bytes = 0;
+    
+    I2C_BUS->CR2 &= ~I2C_CR2_ADD10; // 7 bit mode
+    I2C_BUS->CR2 |= 1 << I2C_CR2_NBYTES_Pos | (dev_addr & 0xFE);
+    I2C_BUS->CR2 |= I2C_CR2_START;
+    
+    while((I2C_BUS->ISR & I2C_ISR_BUSY) != I2C_ISR_BUSY);
+    
+    while(((I2C_BUS->ISR & I2C_ISR_TC) != I2C_ISR_TC) && 
+          ((I2C_BUS->ISR & I2C_ISR_NACKF) != I2C_ISR_NACKF) &&
+          ((I2C_BUS->ISR & I2C_ISR_BUSY) == I2C_ISR_BUSY))    
     {
-        return;
-    }
-    
-    _data = data;
-    bytes = 0;
-    
-    I2C1->CR2 &= ~I2C_CR2_ADD10; // 7 bit mode
-    I2C1->CR2 &= I2C_CR2_RD_WRN; // write mode
-    I2C1->CR2 |= addr; // set slave address
-    I2C1->CR2 |= size << I2C_CR2_NBYTES_Pos; // size array data
-    I2C1->CR2 |= I2C_CR2_AUTOEND; // automatic end mode
-    I2C1->CR2 |= I2C_CR2_START; // start enable
-}
-//------------------------
-void I2C1_IRQHandler(void)
-{
-    uint32_t state = I2C1->ISR;
-    
-    if((state & I2C_ISR_TXIS) == I2C_ISR_TXIS)
-    {
-        if((I2C1->CR2 & I2C_CR2_RD_WRN) == false)
+        if(I2C_BUS->ISR & I2C_ISR_TXIS)
         {
-            I2C1->TXDR = _data[bytes++];
+            I2C_BUS->TXDR = reg_addr;    // send register address
         }
     }
+    
+    I2C_BUS->CR2 |= (uint32_t)size << I2C_CR2_NBYTES_Pos | (dev_addr & 0xFE);
+    I2C_BUS->CR2 |= I2C_CR2_START;
+    
+    while((I2C_BUS->ISR & I2C_ISR_BUSY) != I2C_ISR_BUSY);
+    
+    while(((I2C_BUS->ISR & I2C_ISR_TC) != I2C_ISR_TC) && 
+          ((I2C_BUS->ISR & I2C_ISR_NACKF) != I2C_ISR_NACKF) &&
+          ((I2C_BUS->ISR & I2C_ISR_BUSY) == I2C_ISR_BUSY))
+    {
+        if((I2C_BUS->ISR & I2C_ISR_TXIS) == I2C_ISR_TXIS)
+        {
+            I2C_BUS->TXDR = *data++;
+            bytes++;
+        }
+    }
+    
+    I2C_EE_Stop();
+    
+    if(bytes == size)
+    {
+        return I2C_SUCCESS;
+    }
+    
+    return I2C_ERROR;
+}
+//------------------------------------------------------------------------------------
+bool I2C_EE_ReadBytes(uint8_t dev_addr, uint8_t reg_addr, uint8_t* data, uint8_t size)
+{
+    uint8_t bytes = 0;
+    
+    I2C_BUS->CR2 &= ~I2C_CR2_ADD10; // 7 bit mode
+    I2C_BUS->CR2 |= 1 << I2C_CR2_NBYTES_Pos | (dev_addr & 0xFE);
+    I2C_BUS->CR2 |= I2C_CR2_START;
+    
+    while((I2C_BUS->ISR & I2C_ISR_BUSY) != I2C_ISR_BUSY);
+    
+    while(((I2C_BUS->ISR & I2C_ISR_TC) != I2C_ISR_TC) && 
+          ((I2C_BUS->ISR & I2C_ISR_NACKF) != I2C_ISR_NACKF) &&
+          ((I2C_BUS->ISR & I2C_ISR_BUSY) == I2C_ISR_BUSY))    
+    {
+        if(I2C_BUS->ISR & I2C_ISR_TXIS)
+        {
+            I2C_BUS->TXDR = reg_addr; // send register address
+        }
+    }
+    
+    I2C_BUS->CR2 |= I2C_CR2_RD_WRN | (uint32_t)size << I2C_CR2_NBYTES_Pos | 
+                    (dev_addr & 0xFE);
+    I2C_BUS->CR2 |= I2C_CR2_START;
+    
+    while((I2C_BUS->ISR & I2C_ISR_BUSY) != I2C_ISR_BUSY);
+    
+    while(((I2C_BUS->ISR & I2C_ISR_TC) != I2C_ISR_TC) && 
+          ((I2C_BUS->ISR & I2C_ISR_NACKF) != I2C_ISR_NACKF) &&
+          ((I2C_BUS->ISR & I2C_ISR_BUSY) == I2C_ISR_BUSY))
+    {
+        if((I2C_BUS->ISR & I2C_ISR_RXNE) == I2C_ISR_RXNE)
+        {
+            *data++ = I2C_BUS->RXDR;
+            bytes++;
+        }
+    }
+    
+    I2C_EE_Stop();
+    
+    if(bytes == size)
+    {
+        return I2C_SUCCESS;
+    }
+    
+    return I2C_ERROR;
+}
+//--------------------
+void I2C_EE_Stop(void)
+{
+    I2C_BUS->CR2 |= I2C_CR2_STOP;				// Выдать стоп на шину
+	while(I2C_BUS->ISR & I2C_ISR_BUSY) {};		// Ожидать выдачу стопа
+	// Очищаю флаги - необходимо для дальнейшей работы шины
+	I2C_BUS->ICR |= I2C_ICR_STOPCF;		// STOP флаг
+	I2C_BUS->ICR |= I2C_ICR_NACKCF;		// NACK флаг
+	// Если есть ошибки на шине - очищаю флаги
+	if(I2C_BUS->ISR & (I2C_ISR_ARLO | I2C_ISR_BERR))
+	{
+		I2C_BUS->ICR |= I2C_ICR_ARLOCF;
+		I2C_BUS->ICR |= I2C_ICR_BERRCF;
+	}
 }
