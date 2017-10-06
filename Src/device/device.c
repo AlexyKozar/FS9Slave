@@ -65,15 +65,15 @@ void DEV_Create(GPIO_TypeDef* gpio, uint16_t addr_pins)
     
     devAddr = (uint8_t)((gpio->IDR & addr_pins) >> 14); // set the address device
     
-    if(devAddr == 0x00) // a device is MDVV-01
+    if(devAddr == DEVICE_MDVV_01) // a device is MDVV-01
     {
         devID = 0x48;
     }
-    else if(devAddr == 0x01) // a device is MDVV-02
+    else if(devAddr == DEVICE_MDVV_02) // a device is MDVV-02
     {
         devID = 0x49;
     }
-    else if(devAddr == 0x02) // a device is MIK-01
+    else if(devAddr == DEVICE_MIK_01) // a device is MIK-01
     {
         devID = 0x50;
     }
@@ -120,7 +120,7 @@ void DEV_Init(PORT_Input_Type* inputs, PORT_Output_Type* outputs)
     
     DEV_Input_Set_Default();
     
-    if(devAddr != 0x02) // только для МДВВ
+    if(devAddr != DEVICE_MIK_01) // только для МДВВ
     {
         TIM_Scan_Init();
     }
@@ -1098,11 +1098,7 @@ void TIM17_IRQHandler(void)
 //------------------------------------------
 float Get_Temp(uint16_t val, uint8_t in_num)
 {
-    float Rt = UAIN_to_TResistance(val, in_num);
-    
-    if(Rt == -100.0f)
-        return Rt;
-    
+    float Rt    = UAIN_to_TResistance(val, in_num);
     float Pt100 = 3383.8098f - 8658.0088f*sqrtf(0.1758481f - 0.000231f*Rt);
     
     return Pt100;
@@ -1132,8 +1128,10 @@ float UAIN_to_TResistance(uint16_t val, uint8_t in_num)
         }
     }
     
-    if(res_beg == 0 && res_end == 0)
-        return -100.0f;
+    if(res_beg == 0 && res_end == 0) // not equals value
+    {
+        return AIN_TEMP[MAX_SIZE_AIN_TEMP - 1][0]; // return max value
+    }
     
     float Rt = res_beg + ((val - ain_beg)/(ain_end - ain_beg))*(res_end - res_beg);
     
@@ -1179,6 +1177,8 @@ void TIM14_IRQHandler(void)
             TIM14->EGR  |= TIM_EGR_UG;
             TIM14->SR   &= ~TIM_SR_UIF;
             TIM14->DIER |= TIM_DIER_UIE;
+            
+            TIM_INT_Start(); // generate impulse INT for mode pwrok is disable
         }
         else
         {

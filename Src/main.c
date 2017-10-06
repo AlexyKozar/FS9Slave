@@ -104,7 +104,7 @@ int main(void)
     IODevice_Init(addr, &input, &output);
     DEV_Init(&input, &output);
 
-    if(addr == 0x00)
+    if(addr == DEVICE_MDVV_01)
     {
         DS18B20_Init();
         DEV_Crash_Init();
@@ -248,7 +248,7 @@ void IODevice_Init(uint8_t addr, PORT_Input_Type* in, PORT_Output_Type* out)
     in->list[8].pin.io = GPIO_PIN_8; // input channel 9
     in->list[9].pin.io = GPIO_PIN_9; // input channel 10
     
-    if(addr == 0x00) // МДВВ-01
+    if(addr == DEVICE_MDVV_01) // МДВВ-01
     {
         in->list[10].pin.gpio = GPIOA;
         in->list[11].pin.gpio = GPIOA;
@@ -280,7 +280,7 @@ void IODevice_Init(uint8_t addr, PORT_Input_Type* in, PORT_Output_Type* out)
         in->size  = 12;
         out->size = 6;
     }
-    else if(addr == 0x01) // МДВВ-02
+    else if(addr == DEVICE_MDVV_02) // МДВВ-02
     {
         out->list[0].pin.gpio = GPIOB;
         out->list[1].pin.gpio = GPIOB;
@@ -309,7 +309,7 @@ void IODevice_Init(uint8_t addr, PORT_Input_Type* in, PORT_Output_Type* out)
         in->size  = 10;
         out->size = 7;
     }
-    else if(addr == 0x02) // МИК-01V1
+    else if(addr == DEVICE_MIK_01) // МИК-01V1
     {
         in->list[10].pin.gpio = GPIOA;
         in->list[11].pin.gpio = GPIOA;
