@@ -384,10 +384,9 @@ bool DEV_Driver(uint8_t cmd, FS9Packet_t* data, FS9Packet_t* packet)
     uint8_t   state = 0x00;
     uint8_t   n_out = 0x00;
     output_t* out   = NULL;
-    uint32_t  mdata = 0x00000000; // for test flash
-    uint32_t addr = 0x08007C00; // for test flash
     
-//    uint8_t eeprom[5] = { 0x10, 0x20, 0x30, 0x40, 0x5F }; // data write to eeprom - test
+    uint8_t eeprom[15] = { 0x10, 0x20, 0x30, 0x40, 0x5F, 0x07, 0x32, 0x14, 0x02, 0x0A,
+                           0x11, 0x21, 0x31, 0x41, 0x60}; // data write to eeprom - test
 //    uint8_t eeprom2[5] = { 0x00, 0x00, 0x00, 0x00, 0x00 }; // buffer for read data from eeprom - test
     
     union
@@ -741,44 +740,14 @@ bool DEV_Driver(uint8_t cmd, FS9Packet_t* data, FS9Packet_t* packet)
 
         case 0x3B: // чтение из памяти (тест eeprom и flash)
             //return I2C_EE_ReadBytes(0xA0, 0x00, eeprom2, 5);
-            addr = 0x08007C00;
-
-            for(uint8_t i = 0; i < 20; i += 4)
-            {
-                mdata = FLASH_Read(addr + i);
-            }
+            FLASH_Unlock();
+            FLASH_Erase(FLASH_BASE_ADDRESS);
+            FLASH_Lock();
         break;
             
         case 0x3C: // запись в память (тест eeprom и flash)
             //return I2C_EE_WriteBytes(0xA0, 0x00, eeprom, 5);
-            
-            if(FLASH_Unlock() == false)
-            {
-                FLASH_Lock();
-                
-                return false;
-            }
-            
-            addr = 0x08007C00;
-            
-            if(FLASH_Erase(addr) == false)
-            {
-                FLASH_Lock();
-                
-                return false;
-            }
-            
-            for(uint8_t i = 0; i < 20; i += 4)
-            {
-                uint32_t temp = 0x10101010;
-                
-                if(FLASH_Write(addr + i, temp + i) == false)
-                {
-                    return false;
-                }
-            }
-            
-            FLASH_Lock();
+            FLASH_WriteBlock(eeprom, 15);
         break;
         
         case 0x3D: // чтение счетчиков ошибок

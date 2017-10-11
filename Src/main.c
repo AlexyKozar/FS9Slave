@@ -115,6 +115,7 @@ int main(void)
     }
     
     AIN_Init(addr);
+    FLASH_Init();
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
