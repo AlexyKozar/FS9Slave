@@ -15,10 +15,10 @@ void  crash(void* output); // для обработки аварийной си�
 void  queue_init(void);
 void  insert_task(uint8_t id); // вставка задачи в очередь для мигания (МИК-01)
 void  kill_task(uint8_t id); // убить задачу в очереди для мигания (МИК-01)
+void  pwrok(void* param); // function for proccessed disabled power mode
 //----------------------
 PORT_Input_Type*  io_in;
 PORT_Output_Type* io_out;
-PWROK_Type        pwr_ok = { false, false, 0, false, false };
 //---------------------
 uint8_t devAddr = 0xFF;
 uint8_t devID   = 0xFF;
@@ -33,6 +33,8 @@ key_t keys = { 0x00000000, KEY_EMPTY_MASK, KEY_EMPTY_MASK, KEY_MODE_NONE, false 
 error_t error = { 0, 0, 0 };
 //----------------------------
 Blink_queue_t out_queue_blink;
+//-------------------------------------------------------------------------
+pwrok_t _pwr_ok = { false, false, 0xFF, PWROK_SCAN, false, 0xFFFF, false };
 //---------------------------------------
 uint16_t AIN_TEMP[MAX_SIZE_AIN_TEMP][3] = 
 {
@@ -274,29 +276,24 @@ void TIM_INT_Start(void)
 //-----------------------
 void DEV_PWROK_Init(void)
 {
-    IO_Clock_Enable(GPIO_PWROK);
+    RCC->AHBENR  |= RCC_AHBENR_GPIOAEN;
+    RCC->APB2ENR |= RCC_APB2ENR_SYSCFGEN;
     
-    RCC->APB1ENR |= RCC_APB1ENR_TIM14EN;
+    GPIOA->MODER &= ~GPIO_MODER_MODER12;
+    GPIOA->PUPDR &= ~GPIO_PUPDR_PUPDR12;
+    GPIOA->PUPDR |= GPIO_PUPDR_PUPDR12_1; // pull down
     
-    DBGMCU->APB1FZ |= DBGMCU_APB1_FZ_DBG_TIM14_STOP;
-
-    SYSCFG->EXTICR[3] &= ~SYSCFG_EXTICR1_EXTI2;
+    SYSCFG->EXTICR[3] &= ~SYSCFG_EXTICR4_EXTI12_PA;
     
-    EXTI->IMR  |= GPIO_PWROK_PIN;
-    EXTI->RTSR |= GPIO_PWROK_PIN;
+    EXTI->IMR  |= EXTI_IMR_MR12;
+    EXTI->RTSR |= EXTI_RTSR_TR12;
+    
+    EXTI->PR |= EXTI_PR_PR12; // clear flag
     
     NVIC_EnableIRQ(EXTI4_15_IRQn);
+    NVIC_SetPriority(EXTI4_15_IRQn, 0);
     
-    TIM14->PSC = F_CPU/1000L - 1;
-    TIM14->ARR = 11 - 1;
-    
-    TIM14->CR1  |= TIM_CR1_ARPE;
-    TIM14->EGR  |= TIM_EGR_UG;
-    TIM14->SR   &= ~TIM_SR_UIF;
-    TIM14->DIER |= TIM_DIER_UIE;
-    TIM14->CR1  |= TIM_CR1_CEN;
-    
-    NVIC_EnableIRQ(TIM14_IRQn);
+    _pwr_ok.event = EVENT_Create(10, false, pwrok, NULL, 0xFF);
 }
 //-----------------------
 void DEV_Crash_Init(void)
@@ -709,24 +706,31 @@ bool DEV_Driver(uint8_t cmd, FS9Packet_t* data, FS9Packet_t* packet)
         case 0x1F: // чтение времени срабатывания выделенного входного дискретного канала
             if(devAddr == 0x00) // если модуль МДВВ-01
             {
-                if(pwr_ok.dsdin_lev_changed)
+                if(_pwr_ok.DSDIN_change == true)
                 {
-                    if(pwr_ok.dsdin_level)
+                    if(_pwr_ok.DSDIN_state == true)
+                    {
                         packet->buffer[0] = DSDIN_TRIGGER_ON_1;
+                    }
                     else
+                    {
                         packet->buffer[0] = DSDIN_TRIGGER_ON_0;
+                    }
                 }
                 else
+                {
                     packet->buffer[0] = DSDIN_TRIGGER_OFF;
+                }
                 
-                utemp.count = pwr_ok.dsdin_time;
+                uint16_t time = 0x0000;
                 
-                // установка для теста - должно вернуть 0xA13C011E
-                //packet->buffer[0] = DSDIN_TRIGGER_ON_0;
-                //dsdin_time.time = 316;
+                if(_pwr_ok.DSDIN_time != 0xFFFF)
+                {
+                    time = _pwr_ok.DSDIN_time;
+                }
                 
-                packet->buffer[1] = utemp.byte[0];
-                packet->buffer[2] = utemp.byte[1];
+                packet->buffer[1] = (uint8_t)(time&0x00FF);
+                packet->buffer[2] = (uint8_t)((time&0xFF00) >> 8);
             }
             else // иначе, если другие модули
             {
@@ -825,7 +829,7 @@ uint8_t DEV_Checksum(FS9Packet_t* packet, uint8_t size)
 //-----------------------
 void DEV_Input_Scan(void)
 {    
-    if(pwr_ok.is_dsdin == false)
+    if(_pwr_ok.state == false)
     {
         for(uint8_t i = 0; i < io_in->size; ++i)
         {
@@ -954,13 +958,15 @@ void DEV_Input_Filter(uint8_t index)
                 input->state  = act_level;
                 Input_Changed = true;
                 
-                if(pwr_ok.is_dsdin == true) 
+                if(_pwr_ok.state == true && index == 4)
                 {
-                    pwr_ok.dsdin_level       = input->state;
-                    pwr_ok.dsdin_lev_changed = true;
-                    pwr_ok.dsdin_time        = TIM14->CNT;
+                    if(_pwr_ok.event != 0xFF)
+                    {
+                        _pwr_ok.DSDIN_time = 500 - EVENT_Tick(_pwr_ok.event);
+                    }
                     
-                    TIM14->CR1 &= ~TIM_CR1_CEN;
+                    _pwr_ok.DSDIN_state  = input->state;
+                    _pwr_ok.DSDIN_change = true;
                 }
             }
             else if(input->filter.c_error >= io_in->set.Nperiod)
@@ -1080,6 +1086,27 @@ bool DEV_Input_Changed_Channel(void)
 {
     return Input_Changed;
 }
+//----------------------------
+void EXTI4_15_IRQHandler(void)
+{
+    if((EXTI->PR & EXTI_PR_PR12) == EXTI_PR_PR12)
+    {
+        _pwr_ok.is_ok = true;
+        
+        if(_pwr_ok.state == true)
+        {
+            _pwr_ok.mode  = PWROK_SCAN;
+            _pwr_ok.state = false;
+            
+            if(_pwr_ok.event == 0xFF)
+            {
+                _pwr_ok.event = EVENT_Create(10, false, pwrok, NULL, 0xFF);
+            }
+        }
+        
+        EXTI->PR |= EXTI_PR_PR12; // clear flag
+    }
+}
 //-------------------------
 void TIM16_IRQHandler(void)
 {
@@ -1143,55 +1170,6 @@ float UAIN_to_TResistance(uint16_t val, uint8_t in_num)
     float Rt = res_beg + ((val - ain_beg)/(ain_end - ain_beg))*(res_end - res_beg);
     
     return Rt;
-}
-//----------------------------
-void EXTI4_15_IRQHandler(void)
-{
-    if(EXTI->PR & GPIO_PWROK_PIN)
-    {
-        EXTI->PR |= GPIO_PWROK_PIN;
-        
-        pwr_ok.is_pwrok = true;
-        
-        if(pwr_ok.is_dsdin == true)
-        {
-            pwr_ok.is_dsdin          = false;
-            pwr_ok.dsdin_level       = false;
-            pwr_ok.dsdin_lev_changed = false;
-            pwr_ok.dsdin_time        = 0;
-            
-            TIM14->ARR  = 11 - 1;
-            TIM14->CR1 &= ~TIM_CR1_OPM;
-        }
-        
-        TIM14->EGR |= TIM_EGR_UG;
-    }
-}
-//-------------------------
-void TIM14_IRQHandler(void)
-{
-    if(TIM14->SR & TIM_SR_UIF)
-    {
-        TIM14->SR &= ~TIM_SR_UIF;
-        
-        if(pwr_ok.is_pwrok == false && pwr_ok.is_dsdin == false) // активация алгоритма обработки
-        {                                                        // отключения внешнего питания
-            pwr_ok.is_dsdin = true;
-            
-            TIM14->ARR   = 500 - 1; // запуск таймера на 500мс
-            TIM14->CR1  |= TIM_CR1_OPM; // в режиме одного импульса
-            TIM14->DIER &= TIM_DIER_UIE;
-            TIM14->EGR  |= TIM_EGR_UG;
-            TIM14->SR   &= ~TIM_SR_UIF;
-            TIM14->DIER |= TIM_DIER_UIE;
-            
-            TIM_INT_Start(); // generate impulse INT for mode pwrok is disable
-        }
-        else
-        {
-            pwr_ok.is_pwrok = false;
-        }
-    }
 }
 //-------------------------
 void blink2Hz(void* output)
@@ -1259,5 +1237,32 @@ void kill_task(uint8_t id)
     {
         out_queue_blink.queue[id] = 0xFF;
         out_queue_blink.count--;
+    }
+}
+//---------------------
+void pwrok(void* param)
+{
+    if(_pwr_ok.is_ok == true)
+    {
+        _pwr_ok.is_ok = false;
+        
+        _pwr_ok.event = EVENT_Create(10, false, pwrok, NULL, 0xFF);
+        
+        return;
+    }
+    
+    if(_pwr_ok.mode == PWROK_SCAN)
+    {
+        _pwr_ok.state = true;
+        _pwr_ok.mode  = PWROK_WAIT;
+        
+        TIM_INT_Start(); // impulse INT for CPU - disavled power mode
+        
+        _pwr_ok.event = EVENT_Create(500, false, pwrok, NULL, 0xFF);
+    }
+    else if(_pwr_ok.mode == PWROK_WAIT)
+    {
+        _pwr_ok.mode  = PWROK_END;
+        _pwr_ok.event = 0xFF;
     }
 }

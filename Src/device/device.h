@@ -40,9 +40,6 @@
     #define GPIO_INT_PIN   GPIO_PIN_5
     #define GPIO_INT_SET   GPIO_BSRR_BS_5
     #define GPIO_INT_RESET GPIO_BSRR_BR_5
-    //--------------------------
-    #define GPIO_PWROK     GPIOA
-    #define GPIO_PWROK_PIN GPIO_PIN_12
     //-------------------------------------
     #define DSDIN_TRIGGER_ON_0         0xA1 // срабатывание зафиксировано, установлен уровень «0»
     #define DSDIN_TRIGGER_ON_1         0xF5 // срабатывание зафиксировано, установлен уровень «1»
@@ -64,6 +61,10 @@
     #define DEVICE_LOT              (uint8_t)0x01
     #define DEVICE_FIRMWARE_VARIANT (uint8_t)0x00
     #define DEVICE_FIRMWARE_DATE    (uint32_t)0x00110A06 // decimal -> 171006 -> 2017/10/06
+    //---------------------
+    #define PWROK_SCAN 0x00
+    #define PWROK_WAIT 0x01
+    #define PWROK_END  0x02
     //--------------------------------------
     typedef struct _FS9Packet_t FS9Packet_t;
     //-------------------------
@@ -126,15 +127,17 @@
         output_t list[MAX_SIZE_DS_OUTPUT];
         uint8_t  size;
     } PORT_Output_Type;
-    //------------------------
-    typedef struct _PWROK_Type
+    //---------------------
+    typedef struct _pwrok_t
     {
-        bool     is_pwrok; // присутствие/отсутствие сигнала PWR_OK
-        bool     is_dsdin; // режим "отключение питания" при отсутствии сигнала PWR_OK
-        uint16_t dsdin_time; // время от включения режима "отключения питания" до изменения уровня на входе DSDIN
-        bool     dsdin_level; // уровень сигнала на входе DSDIN
-        bool     dsdin_lev_changed; // уровень сигнала изменился
-    } PWROK_Type;
+        bool     is_ok; // true - impulse pwr_ok is presence
+        bool     state; // true - active algorithm a power off
+        uint8_t  event; // event id in events queue
+        uint8_t  mode; // power mode
+        bool     DSDIN_state; // input state in disabled power mode
+        uint16_t DSDIN_time;
+        bool     DSDIN_change; // change state input
+    } pwrok_t;
     //---------------------
     typedef struct _error_t // структура ошибкок приема данных по протоколу
     {

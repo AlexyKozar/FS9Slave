@@ -115,6 +115,11 @@ void EVENT_Kill(uint8_t id)
 {
     timer[id].timer = TIMER_IDLE;
 }
+//-----------------------------
+uint16_t EVENT_Tick(uint8_t id)
+{
+    return timer[id].timer;
+}
 //------------------------
 void SysTick_Handler(void)
 {
