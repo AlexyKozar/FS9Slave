@@ -90,7 +90,8 @@ void DEV_Init(PORT_Input_Type* inputs, PORT_Output_Type* outputs)
     
     for(uint8_t i = 0; i < io_in->size; ++i)
     {
-        if((devAddr == 0x02 && i == 10) || (devAddr == 0x02 && i == 11))
+        if((devAddr == DEVICE_MIK_01 && i == 10) || 
+           (devAddr == DEVICE_MIK_01 && i == 11))
         {
             // устройство МИК-01 и это 10 или 11 канал
             IO_Init(io_in->list[i].pin, DEV_IO_OUTPUT); // настраиваем как выход (сканирование)
@@ -98,7 +99,7 @@ void DEV_Init(PORT_Input_Type* inputs, PORT_Output_Type* outputs)
             // устанавливаем на выходе лог "1"
             io_in->list[i].pin.gpio->ODR |= io_in->list[i].pin.io;
         }
-        else // это не МИК-01 или все остальные входы
+        else
         {
             IO_Init(io_in->list[i].pin, DEV_IO_INPUT); // настраиваем как вход
         }
@@ -962,7 +963,7 @@ void DEV_Input_Filter(uint8_t index)
                 {
                     if(_pwr_ok.event != 0xFF)
                     {
-                        _pwr_ok.DSDIN_time = 500 - EVENT_Tick(_pwr_ok.event);
+                        _pwr_ok.DSDIN_time = PWROK_TIME - EVENT_Tick(_pwr_ok.event);
                     }
                     
                     _pwr_ok.DSDIN_state  = input->state;
@@ -1258,7 +1259,7 @@ void pwrok(void* param)
         
         TIM_INT_Start(); // impulse INT for CPU - disavled power mode
         
-        _pwr_ok.event = EVENT_Create(500, false, pwrok, NULL, 0xFF);
+        _pwr_ok.event = EVENT_Create(PWROK_TIME, false, pwrok, NULL, 0xFF);
     }
     else if(_pwr_ok.mode == PWROK_WAIT)
     {

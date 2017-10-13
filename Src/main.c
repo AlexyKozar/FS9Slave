@@ -318,6 +318,26 @@ void IODevice_Init(uint8_t addr, PORT_Input_Type* in, PORT_Output_Type* out)
         in->list[10].pin.gpio = GPIOA;
         in->list[11].pin.gpio = GPIOA;
         
+        // замена местами клавиш (попутано на блоке)
+        io_t pin;
+        
+        // меняем местами клавишу 1 с клавишей 7
+        pin = in->list[0].pin; 
+        in->list[0].pin = in->list[6].pin;
+        in->list[6].pin = pin;
+        
+        // меняем местами клавишу 2 с клавишей 8
+        pin = in->list[1].pin; 
+        in->list[1].pin = in->list[7].pin;
+        in->list[7].pin = pin;
+        
+        // меняем местами клавишу 3 с клавишей 9
+        pin = in->list[2].pin; 
+        in->list[2].pin = in->list[8].pin;
+        in->list[8].pin = pin;
+        
+        // конец замены клавиш
+        
         in->list[10].pin.io = GPIO_PIN_10; // input channel 11 (scan1)
         in->list[11].pin.io = GPIO_PIN_11; // input channel 12 (scan2)
         

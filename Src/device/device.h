@@ -65,6 +65,7 @@
     #define PWROK_SCAN 0x00
     #define PWROK_WAIT 0x01
     #define PWROK_END  0x02
+    #define PWROK_TIME 2000 // scan time for pwrok
     //--------------------------------------
     typedef struct _FS9Packet_t FS9Packet_t;
     //-------------------------
