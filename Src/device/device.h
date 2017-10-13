@@ -60,7 +60,7 @@
     #define DEVICE_NUMBER           (uint16_t)0x01
     #define DEVICE_LOT              (uint8_t)0x01
     #define DEVICE_FIRMWARE_VARIANT (uint8_t)0x00
-    #define DEVICE_FIRMWARE_DATE    (uint32_t)0x00110A0C // decimal -> 171012 -> 2017.10.12
+    #define DEVICE_FIRMWARE_DATE    (uint32_t)0x00110A0D // decimal -> 171012 -> 2017.10.13
     //---------------------
     #define PWROK_SCAN 0x00
     #define PWROK_WAIT 0x01

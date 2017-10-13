@@ -108,14 +108,17 @@ int main(void)
     {
         DS18B20_Init();
         DEV_Crash_Init();
-        DEV_PWROK_Init();
+        I2C_EE_Init();
         
         EVENT_Create(2000, false, DS18B20_Convert, NULL, 0xFF);
-        I2C_EE_Init();
+    }
+    else
+    {
+        FLASH_Init();
     }
     
+    DEV_PWROK_Init();
     AIN_Init(addr);
-    FLASH_Init();
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
