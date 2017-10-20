@@ -60,12 +60,10 @@
     #define DEVICE_NUMBER           (uint16_t)0x01
     #define DEVICE_LOT              (uint8_t)0x01
     #define DEVICE_FIRMWARE_VARIANT (uint8_t)0x00
-    #define DEVICE_FIRMWARE_DATE    (uint32_t)0x00110A0D // decimal -> 171012 -> 2017.10.13
-    //---------------------
-    #define PWROK_SCAN 0x00
-    #define PWROK_WAIT 0x01
-    #define PWROK_END  0x02
-    #define PWROK_TIME 2000 // scan time for pwrok
+    #define DEVICE_FIRMWARE_DATE    (uint32_t)0x00110A14 // decimal -> 171020 -> 2017.10.20
+    //----------------------
+    #define PWROK_INPUT 0x04
+    #define PWROK_TIME  2000 // scan time for pwrok
     //--------------------------------------
     typedef struct _FS9Packet_t FS9Packet_t;
     //-------------------------
@@ -131,13 +129,12 @@
     //---------------------
     typedef struct _pwrok_t
     {
-        bool     is_ok; // true - impulse pwr_ok is presence
-        bool     state; // true - active algorithm a power off
-        uint8_t  event; // event id in events queue
-        uint8_t  mode; // power mode
-        bool     DSDIN_state; // input state in disabled power mode
-        uint16_t DSDIN_time;
-        bool     DSDIN_change; // change state input
+        bool     is_ok; // сторожевой флаг (сброс на каждый восходящий фронт
+		bool     state; // состояние аварийной ситуации (true - пропадание питания)
+		bool     is_crash; // была зафиксирована авария - отключение питания
+		bool     IN_state; // состояние входа во время аварии
+		bool     IN_change; // состояние входа во время аварии изменилось
+		uint16_t IN_time; // время через которое поменялось состояние входа во время аварии
     } pwrok_t;
     //---------------------
     typedef struct _error_t // структура ошибкок приема данных по протоколу
