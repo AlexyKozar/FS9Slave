@@ -5,3 +5,5 @@
 *.scvd
 MDK-ARM/FS9Slave/
 *.*.*
+*.uvprojx
+*.lst

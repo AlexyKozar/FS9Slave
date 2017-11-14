@@ -360,10 +360,9 @@ ARM Macro Assembler    Page 6
 Command Line: --debug --xref --diag_suppress=9931 --cpu=Cortex-M0 --apcs=interw
 ork --depend=fs9slave\startup_stm32f030x6.d -ofs9slave\startup_stm32f030x6.o -I
 .\RTE\_FS9Slave -IC:\Keil_v5\ARM\PACK\ARM\CMSIS\5.1.1\CMSIS\Include -IC:\Keil_v
-5\ARM\PACK\Keil\STM32F0xx_DFP\1.5.0\Device\Include --predefine="__EVAL SETA 1" 
---predefine="__MICROLIB SETA 1" --predefine="__UVISION_VERSION SETA 524" --pred
-efine="_RTE_ SETA 1" --predefine="STM32F030x6 SETA 1" --list=startup_stm32f030x
-6.lst startup_stm32f030x6.s
+5\ARM\PACK\Keil\STM32F0xx_DFP\1.5.0\Device\Include --predefine="__MICROLIB SETA
+ 1" --predefine="__UVISION_VERSION SETA 524" --predefine="_RTE_ SETA 1" --prede
+fine="STM32F030x6 SETA 1" --list=startup_stm32f030x6.lst startup_stm32f030x6.s
 
 
 
@@ -803,4 +802,4 @@ Symbol: __main
       At line 135 in file startup_stm32f030x6.s
 Comment: __main used once
 2 symbols
-380 symbols in table
+379 symbols in table
