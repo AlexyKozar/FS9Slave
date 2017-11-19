@@ -57,9 +57,9 @@
     #define KEY_EMPTY_MASK ((uint32_t)0x000FFFFF) // маска клавиатуры - неактивное состояние
     //--------------
     // a device data
-    #define DEVICE_NUMBER           (uint16_t)0x01
-    #define DEVICE_LOT              (uint8_t)0x01
-    #define DEVICE_FIRMWARE_VARIANT (uint8_t)0x00
+    #define DEVICE_NUMBER           (uint16_t)0x01 // номер устройства
+    #define DEVICE_LOT              (uint8_t)0x01 // номер партии
+    #define DEVICE_FIRMWARE_VARIANT (uint8_t)0x00 // вариант прошивки
     #define DEVICE_FIRMWARE_DATE    (uint32_t)0x00110A14 // decimal -> 171020 -> 2017.10.20
     //----------------------
     #define PWROK_INPUT 0x04
