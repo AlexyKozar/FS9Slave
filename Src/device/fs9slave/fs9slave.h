@@ -18,7 +18,8 @@
     //--------------------------
     #define MAX_SIZE_PACK_BUF 20
     //--------------
-    #define ACK 0x06
+    #define ACK 0x06 // подтверждение
+    #define NAK 0x15 // отказ
     //-------------------------
     typedef struct _FS9Packet_t
     {

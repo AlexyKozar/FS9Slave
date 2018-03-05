@@ -49,6 +49,13 @@
     #define KEY_MODE_NONE   0x01
     #define KEY_MODE_SCAN_1 0x02
     #define KEY_MODE_SCAN_2 0x04
+    /*!
+     *   Описание режимов настройки искробезопасных входов DI01-DI04
+     */
+    #define SPARK_SECURITY_MODE_NONE (uint8_t)0x00 // искробезопасных входов нет
+    #define SPARK_SECURITY_MODE_1    (uint8_t)0x01 // искробезопасные входы настроены на режим 1
+    #define SPARK_SECURITY_MODE_2    (uint8_t)0x02 // искробезопасные входы настроены на режим 2
+    #define SPARK_SECURITY_MODE_3    (uint8_t)0x03 // искробезопасные входы настроены на режим 3
     //--------------------------
     #define MAX_SIZE_AIN_TEMP 19 // максимальный размер массива для калибровочной таблицы температуры
     //---------------------------
@@ -60,7 +67,7 @@
     #define DEVICE_NUMBER           (uint16_t)0x01 // номер устройства
     #define DEVICE_LOT              (uint8_t)0x01 // номер партии
     #define DEVICE_FIRMWARE_VARIANT (uint8_t)0x00 // вариант прошивки
-    #define DEVICE_FIRMWARE_DATE    (uint32_t)0x00110A14 // decimal -> 171020 -> 2017.10.20
+    #define DEVICE_FIRMWARE_DATE    (uint32_t)0x00110B1D // decimal -> 171020 -> 2017.11.29
     //----------------------
     #define PWROK_INPUT 0x04
     #define PWROK_TIME  2000 // scan time for pwrok
@@ -104,6 +111,7 @@
         uint8_t        mode;   // режим входа (AC/DC)
         uint8_t        dir;    // направление (прямой/инверсный)
         uint16_t       duration; // длительность периода
+        uint8_t        spark_security; // настройка искробезопасных входов (только для МДВВ-01, входы DI01-DI04)
     } input_t;
     //----------------------
     typedef struct _output_t

@@ -278,7 +278,7 @@ void DEV_PWROK_Init(void)
 {
     RCC->AHBENR  |= RCC_AHBENR_GPIOAEN;
     RCC->APB2ENR |= RCC_APB2ENR_SYSCFGEN;
-	RCC->APB1ENR |= RCC_APB1ENR_TIM14EN;
+		RCC->APB1ENR |= RCC_APB1ENR_TIM14EN;
     
     GPIOA->MODER &= ~GPIO_MODER_MODER12;
     GPIOA->PUPDR &= ~GPIO_PUPDR_PUPDR12;
@@ -291,21 +291,21 @@ void DEV_PWROK_Init(void)
     
     EXTI->PR = EXTI_PR_PR12; // clear flag
 	
-	TIM14->PSC   = 48000 - 1; // 1ms
-	TIM14->ARR   = 12 - 1;
-	TIM14->CR1  |= TIM_CR1_ARPE | TIM_CR1_OPM;
-	TIM14->DIER &= ~TIM_DIER_UIE;
-	TIM14->EGR  |= TIM_EGR_UG;
-	TIM14->SR   &= ~TIM_SR_UIF;
-	TIM14->DIER |= TIM_DIER_UIE;
+		TIM14->PSC   = 48000 - 1; // 1ms
+		TIM14->ARR   = 12 - 1;
+		TIM14->CR1  |= TIM_CR1_ARPE | TIM_CR1_OPM;
+		TIM14->DIER &= ~TIM_DIER_UIE;
+		TIM14->EGR  |= TIM_EGR_UG;
+		TIM14->SR   &= ~TIM_SR_UIF;
+		TIM14->DIER |= TIM_DIER_UIE;
     
     NVIC_EnableIRQ(EXTI4_15_IRQn);
     NVIC_SetPriority(EXTI4_15_IRQn, 0);
 	
-	NVIC_EnableIRQ(TIM14_IRQn);
-	NVIC_SetPriority(TIM14_IRQn, 0);
-	
-	TIM14->CR1 |= TIM_CR1_CEN;
+		NVIC_EnableIRQ(TIM14_IRQn);
+		NVIC_SetPriority(TIM14_IRQn, 0);
+		
+		TIM14->CR1 |= TIM_CR1_CEN;
 }
 //-----------------------
 void DEV_Crash_Init(void)
@@ -364,14 +364,19 @@ bool DEV_Request(FS9Packet_t* source, FS9Packet_t* dest)
         packet.buffer[i] = source->buffer[i + 1];
     }
     
-    if(!DEV_Driver(cmd, &packet, dest))
-        return false;
+    bool answer = DEV_Driver(cmd, &packet, dest);
+    
+    if(!answer && cmd != 0x19) // если получили ложь и код команды не равен 0x19 (искробезопасные входы_
+        return false; // ответа нет
     
     if(tcmd.n > 0 && tcmd.m > 0)
     {
         if(tcmd.is_ack)
         {
-            dest->buffer[dest->size++] = ACK;
+            if(cmd == 0x19 && !answer) // если команда (запись искробезопасных входов) и ответ ложь
+                dest->buffer[dest->size++] = NAK; // отправляем отказ
+            else
+                dest->buffer[dest->size++] = ACK; // в другом любом случае отправляем подтверждение
         }
         
         // append checksum for packet
@@ -703,6 +708,36 @@ bool DEV_Driver(uint8_t cmd, FS9Packet_t* data, FS9Packet_t* packet)
             CHANNEL_Out_Set(7);
         break;
         
+        case 0x18: // чтение байта конфигурации искробезопасных входов
+            if(devAddr != DEVICE_MDVV_01) // если устройство не МДВВ-01,
+            {
+                packet->buffer[0] = SPARK_SECURITY_MODE_NONE; // то возвращаем ответ - нет искробезопасных входов
+            }
+            else
+            {
+                packet->buffer[0] = io_in->list[0].spark_security; // то возвращаем текущую настройку первого входа
+                                                                   // остальные настроены однотипно (блок)
+            }
+            
+            packet->size = 1;
+        break;
+        
+        case 0x19: // запись байта конфигурации искробезопасных входов
+            if(devAddr == DEVICE_MDVV_01 && packet->size == 1) // настройка искробезопасных входов только для МДВВ-01
+            {
+                if(packet->buffer[0] >= SPARK_SECURITY_MODE_1 && packet->buffer[0] <= SPARK_SECURITY_MODE_3)
+                {
+                    // присваиваем новое значение режима для четырех искробезопасных входов
+                    io_in->list[0].spark_security = io_in->list[1].spark_security = io_in->list[2].spark_security =
+                    io_in->list[3].spark_security = packet->buffer[0];
+                }
+                else
+                    return false;
+            }
+            else
+                return false;
+        break;
+        
         case 0x1E:
             packet->buffer[0] = devID;
             packet->buffer[1] = DEVICE_NUMBER&0x00FF;
@@ -774,7 +809,7 @@ bool DEV_Driver(uint8_t cmd, FS9Packet_t* data, FS9Packet_t* packet)
             packet->buffer[2] = utemp.byte[0];
             packet->buffer[3] = utemp.byte[1];
             
-            utemp.count = error.command; // чтение счетчика ошибок контрольной суммы
+            utemp.count = error.checksum; // чтение счетчика ошибок контрольной суммы
             
             packet->buffer[4] = utemp.byte[0];
             packet->buffer[5] = utemp.byte[1];
@@ -936,12 +971,12 @@ void DEV_Input_Filter(uint8_t index)
                 uint16_t trange_beg = input->duration - tfault;
                 uint16_t trange_end = input->duration + tfault;
                 
-                if(tdur >= trange_beg && tdur <= trange_end)
+                if(tdur >= trange_beg && tdur <= trange_end) // если длительность сигнала в пределах погрешности
                 {
-                    input->filter.c_state++;
+                    input->filter.c_state++; // увеличиваем счетчик состояний
                 }
                 else
-                    input->filter.c_error++;
+                    input->filter.c_error++; // иначе увеличиваем счетчик ошибок
             }
             else if(input->mode == IN_MODE_DC) // режим входа DC
             {

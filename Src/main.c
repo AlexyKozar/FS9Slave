@@ -252,6 +252,18 @@ void IODevice_Init(uint8_t addr, PORT_Input_Type* in, PORT_Output_Type* out)
     in->list[8].pin.io = GPIO_PIN_8; // input channel 9
     in->list[9].pin.io = GPIO_PIN_9; // input channel 10
     
+    // настройка искробезопасного режима по умолчанию - не используется
+    in->list[0].spark_security = SPARK_SECURITY_MODE_NONE;
+    in->list[1].spark_security = SPARK_SECURITY_MODE_NONE;
+    in->list[2].spark_security = SPARK_SECURITY_MODE_NONE;
+    in->list[3].spark_security = SPARK_SECURITY_MODE_NONE;
+    in->list[4].spark_security = SPARK_SECURITY_MODE_NONE;
+    in->list[5].spark_security = SPARK_SECURITY_MODE_NONE;
+    in->list[6].spark_security = SPARK_SECURITY_MODE_NONE;
+    in->list[7].spark_security = SPARK_SECURITY_MODE_NONE;
+    in->list[8].spark_security = SPARK_SECURITY_MODE_NONE;
+    in->list[9].spark_security = SPARK_SECURITY_MODE_NONE;
+    
     if(addr == DEVICE_MDVV_01) // МДВВ-01
     {
         in->list[10].pin.gpio = GPIOA;
@@ -259,6 +271,14 @@ void IODevice_Init(uint8_t addr, PORT_Input_Type* in, PORT_Output_Type* out)
         
         in->list[10].pin.io = GPIO_PIN_10; // input channel 11
         in->list[11].pin.io = GPIO_PIN_11; // input channel 12
+        
+        // настройка первых четырех входов МДВВ-01 как искробезопасные в режиме 1 (default settings)
+        in->list[0].spark_security  = SPARK_SECURITY_MODE_1;
+        in->list[1].spark_security  = SPARK_SECURITY_MODE_1;
+        in->list[2].spark_security  = SPARK_SECURITY_MODE_1;
+        in->list[3].spark_security  = SPARK_SECURITY_MODE_1;
+        in->list[10].spark_security = SPARK_SECURITY_MODE_NONE;
+        in->list[11].spark_security = SPARK_SECURITY_MODE_NONE;
         
         out->list[0].pin.gpio = GPIOB;
         out->list[1].pin.gpio = GPIOB;
@@ -317,6 +337,10 @@ void IODevice_Init(uint8_t addr, PORT_Input_Type* in, PORT_Output_Type* out)
     {
         in->list[10].pin.gpio = GPIOA;
         in->list[11].pin.gpio = GPIOA;
+        
+        // режим искробезопасных цепей для входов 11 и 12 (не используются)
+        in->list[10].spark_security = SPARK_SECURITY_MODE_NONE;
+        in->list[11].spark_security = SPARK_SECURITY_MODE_NONE;
         
         // замена местами клавиш (попутано на блоке)
         io_t pin;
