@@ -737,6 +737,28 @@ bool DEV_Driver(uint8_t cmd, FS9Packet_t* data, FS9Packet_t* packet)
             else
                 return false;
         break;
+            
+        case 0x1D: // чтение отладочной информации (счетчиков ошибок)
+            utemp.count = error.address; // чтение счетчика ошибок адресации
+            
+            packet->buffer[0] = utemp.byte[0];
+            packet->buffer[1] = utemp.byte[1];
+            
+            utemp.count = error.command; // чтение счетчика ошибок команд
+            
+            packet->buffer[2] = utemp.byte[0];
+            packet->buffer[3] = utemp.byte[1];
+            
+            utemp.count = error.checksum; // чтение счетчика ошибок контрольной суммы
+            
+            packet->buffer[4] = utemp.byte[0];
+            packet->buffer[5] = utemp.byte[1];
+        
+            for(uint8_t i = 6; i < 16; i++) // забиваем нулями резервные ячейки
+                packet->buffer[i] = 0x00;
+            
+            packet->size = 16;
+        break;
         
         case 0x1E:
             packet->buffer[0] = devID;
@@ -797,27 +819,6 @@ bool DEV_Driver(uint8_t cmd, FS9Packet_t* data, FS9Packet_t* packet)
             FLASH_WriteBlock(eeprom, 15);
         break;
         
-        case 0x3D: // чтение счетчиков ошибок
-        {
-            utemp.count = error.address; // чтение счетчика ошибок адресации
-            
-            packet->buffer[0] = utemp.byte[0];
-            packet->buffer[1] = utemp.byte[1];
-            
-            utemp.count = error.command; // чтение счетчика ошибок команд
-            
-            packet->buffer[2] = utemp.byte[0];
-            packet->buffer[3] = utemp.byte[1];
-            
-            utemp.count = error.checksum; // чтение счетчика ошибок контрольной суммы
-            
-            packet->buffer[4] = utemp.byte[0];
-            packet->buffer[5] = utemp.byte[1];
-            
-            packet->size = 6;
-        }
-        break;
-            
         case 0x3E: // изменение параметров фильтрации
             if(data->size == 3)
             {
