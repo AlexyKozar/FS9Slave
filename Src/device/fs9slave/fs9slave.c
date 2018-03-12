@@ -108,7 +108,7 @@ bool tx_is_empty(void)
 }
 //--------------------------------
 bool FS9_read(FS9Packet_t* packet)
-{   
+{
     if(!rx_is_empty())
     {
         packet->size = rx_size();

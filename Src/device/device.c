@@ -979,7 +979,6 @@ void DEV_Input_Filter(uint8_t index)
                 uint16_t frequency = tick_count/tdur; // н-р: единиц и нулей по 5, тогда 1000/10 = 100 Гц
                 uint16_t fault     = (tick_count/io_in->set.Ndiscret)*input->fault/100; // погрешность частоты, н-р: частота 100 Гц, 
                                                                                         // погрешность 10% - 100*10/100 = 10 Гц
-                
                 if(frequency >= (frequency - fault) && frequency <= (frequency + fault)) // если длительность сигнала в пределах погрешности
                 {
                     input->filter.c_state++; // увеличиваем счетчик состояний
