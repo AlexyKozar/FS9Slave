@@ -971,11 +971,16 @@ void DEV_Input_Filter(uint8_t index)
                 uint16_t tdur = (act_level == true)?(input->filter.c_lev_0 + input->filter.c_lev_1):
                                                      input->filter.c_lev_0;
                 
-                uint16_t tfault     = input->duration*input->fault/100;
-                uint16_t trange_beg = input->duration - tfault;
-                uint16_t trange_end = input->duration + tfault;
+                // определяем количество тиков до перезагрузки таймера сканирования, т.е. чему равно одно прерывание
+                // процессор настроен на 48 МГц, т.е. таймер сканирования считает 1 тик = 1 мкс
+                uint16_t tick_count = 10000/io_in->set.Ndiscret; // количество мкс до перезагрузки таймера, н-р: дискретность равна 10, тогда 1000 = 1мс
                 
-                if(tdur >= trange_beg && tdur <= trange_end) // если длительность сигнала в пределах погрешности
+                // расчет частоты входного сигнала исходя из счетчиков нулей и единиц (длительность сигнала tdur)
+                uint16_t frequency = tick_count/tdur; // н-р: единиц и нулей по 5, тогда 1000/10 = 100 Гц
+                uint16_t fault     = (tick_count/io_in->set.Ndiscret)*input->fault/100; // погрешность частоты, н-р: частота 100 Гц, 
+                                                                                        // погрешность 10% - 100*10/100 = 10 Гц
+                
+                if(frequency >= (frequency - fault) && frequency <= (frequency + fault)) // если длительность сигнала в пределах погрешности
                 {
                     input->filter.c_state++; // увеличиваем счетчик состояний
                 }

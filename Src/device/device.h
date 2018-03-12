@@ -67,7 +67,7 @@
     #define DEVICE_NUMBER           (uint16_t)0x01 // номер устройства
     #define DEVICE_LOT              (uint8_t)0x01 // номер партии
     #define DEVICE_FIRMWARE_VARIANT (uint8_t)0x00 // вариант прошивки
-    #define DEVICE_FIRMWARE_DATE    (uint32_t)0x0012030С // decimal -> 180312 -> 2018.03.12
+    #define DEVICE_FIRMWARE_DATE    (uint32_t)0x0012030C // decimal -> 180312 -> 2018.03.12
     //----------------------
     #define PWROK_INPUT 0x04
     #define PWROK_TIME  2000 // scan time for pwrok
