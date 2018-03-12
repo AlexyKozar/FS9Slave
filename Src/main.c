@@ -66,30 +66,30 @@ void IODevice_Init(uint8_t addr, PORT_Input_Type* in, PORT_Output_Type* out);
 int main(void)
 {
 
-  /* USER CODE BEGIN 1 */
+    /* USER CODE BEGIN 1 */
 
-  /* USER CODE END 1 */
+    /* USER CODE END 1 */
 
-  /* MCU Configuration----------------------------------------------------------*/
+    /* MCU Configuration----------------------------------------------------------*/
 
-  /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
-  HAL_Init();
+    /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
+    HAL_Init();
 
-  /* USER CODE BEGIN Init */
-    
-  /* USER CODE END Init */
+    /* USER CODE BEGIN Init */
 
-  /* Configure the system clock */
-  SystemClock_Config();
+    /* USER CODE END Init */
 
-  /* USER CODE BEGIN SysInit */
+    /* Configure the system clock */
+    SystemClock_Config();
 
-  /* USER CODE END SysInit */
+    /* USER CODE BEGIN SysInit */
 
-  /* Initialize all configured peripherals */
-  MX_USART1_UART_Init();
+    /* USER CODE END SysInit */
 
-  /* USER CODE BEGIN 2 */
+    /* Initialize all configured peripherals */
+    MX_USART1_UART_Init();
+
+    /* USER CODE BEGIN 2 */
     
     // Create device
     DEV_Create(GPIOC, GPIO_PIN_14 | GPIO_PIN_15);

@@ -28,8 +28,8 @@ bool is_crash = false; // авария - отключение выхода (пр
 output_t* out_crash = NULL; // выход аварийной сигнализации
 //--------------------------------------------------------------------------------
 key_t keys = { 0x00000000, KEY_EMPTY_MASK, KEY_EMPTY_MASK, KEY_MODE_NONE, false };
-//--------------------------
-error_t error = { 0, 0, 0 };
+//-----------------------------
+error_t error = { 0, 0, 0, 0 };
 //----------------------------
 Blink_queue_t out_queue_blink;
 //-----------------------------------------------------------------------
@@ -323,17 +323,17 @@ uint8_t DEV_Address(void)
 }
 //------------------------------------------------------
 bool DEV_Request(FS9Packet_t* source, FS9Packet_t* dest)
-{
+{   
     is_crash = true; // получили запрос от ЦП - сброс аварийной ситуации
     
     uint8_t addr = ((source->buffer[0]&CMD_ADDR_MASK) >> 6);
     
     if(addr != devAddr) // ошибка адресации
     {
-        error.address++; // увеличиваем счетчик ошибок адресации
-        
         return false;
     }
+    
+    error.request++; // увеличиваем счетчик запросов, если адрес устройства верный
     
     uint8_t cmd = source->buffer[0]&CMD_CODE_MASK; // get the command for device
     
@@ -366,25 +366,20 @@ bool DEV_Request(FS9Packet_t* source, FS9Packet_t* dest)
     
     bool answer = DEV_Driver(cmd, &packet, dest);
     
-    if(!answer && cmd != 0x19) // если получили ложь и код команды не равен 0x19 (искробезопасные входы_
+    if(!answer && cmd != 0x19) // если получили ложь и код команды не равен 0x19 (искробезопасные входы)
         return false; // ответа нет
     
-    if(tcmd.n > 0 && tcmd.m > 0)
+    if(tcmd.is_ack)
     {
-        if(tcmd.is_ack)
-        {
-            if(cmd == 0x19 && !answer) // если команда (запись искробезопасных входов) и ответ ложь
-                dest->buffer[dest->size++] = NAK; // отправляем отказ
-            else
-                dest->buffer[dest->size++] = ACK; // в другом любом случае отправляем подтверждение
-        }
-        
-        // append checksum for packet
-        checksum = DEV_Checksum(dest, dest->size);
-        dest->buffer[dest->size++] = checksum;
+        if(cmd == 0x19 && !answer) // если команда (запись искробезопасных входов) и ответ ложь
+            dest->buffer[dest->size++] = NAK; // отправляем отказ
+        else
+            dest->buffer[dest->size++] = ACK; // в другом любом случае отправляем подтверждение
     }
-    else
-        return false;
+    
+    // append checksum for packet
+    checksum = DEV_Checksum(dest, dest->size);
+    dest->buffer[dest->size++] = checksum;
     
     return true;
 }
@@ -739,7 +734,7 @@ bool DEV_Driver(uint8_t cmd, FS9Packet_t* data, FS9Packet_t* packet)
         break;
             
         case 0x1D: // чтение отладочной информации (счетчиков ошибок)
-            utemp.count = error.address; // чтение счетчика ошибок адресации
+            utemp.count = error.request; // чтение счетчика количества запросов
             
             packet->buffer[0] = utemp.byte[0];
             packet->buffer[1] = utemp.byte[1];
@@ -754,7 +749,12 @@ bool DEV_Driver(uint8_t cmd, FS9Packet_t* data, FS9Packet_t* packet)
             packet->buffer[4] = utemp.byte[0];
             packet->buffer[5] = utemp.byte[1];
         
-            for(uint8_t i = 6; i < 16; i++) // забиваем нулями резервные ячейки
+            utemp.count = error.no_process; // чтение счетчика ошибок отсутствия обработчика команды
+            
+            packet->buffer[6] = utemp.byte[0];
+            packet->buffer[7] = utemp.byte[1];
+        
+            for(uint8_t i = 8; i < 16; i++) // забиваем нулями резервные ячейки
                 packet->buffer[i] = 0x00;
             
             packet->size = 16;
@@ -849,8 +849,11 @@ bool DEV_Driver(uint8_t cmd, FS9Packet_t* data, FS9Packet_t* packet)
             }
         break;
         
-        default: 
+        default:
+        {
+            error.no_process++; // увеличиваем счетчик - нет обработчика команды
             return false;
+        }
     };
     
     return true;
