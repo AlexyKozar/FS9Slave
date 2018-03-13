@@ -8,10 +8,6 @@
     //---------------------------
     #define FS9_UART       USART1
     #define FS9_IRQHandler USART1_IRQHandler
-    //------------------------------------
-    #define CMD_MASK      (uint16_t)0x0100
-    #define CMD_ADDR_MASK (uint8_t)0xC0
-    #define CMD_CODE_MASK (uint8_t)0x3F
     //------------------------
     #define MAX_SIZE_BUF_RX 20
     #define MAX_SIZE_BUF_TX 20

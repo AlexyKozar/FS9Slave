@@ -18,6 +18,8 @@
     #define DEVICE_MDVV_01 0x00
     #define DEVICE_MDVV_02 0x01
     #define DEVICE_MIK_01  0x02
+    //---------------------------------
+    #define DEV_ADDR_MASK (uint8_t)0xC0
     //---------------------------
     #define MAX_SIZE_DS_INPUT  12
     #define MAX_SIZE_DS_OUTPUT 12

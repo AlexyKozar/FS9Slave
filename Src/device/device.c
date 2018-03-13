@@ -326,7 +326,7 @@ bool DEV_Request(FS9Packet_t* source, FS9Packet_t* dest)
 {   
     is_crash = true; // получили запрос от ЦП - сброс аварийной ситуации
     
-    uint8_t addr = ((source->buffer[0]&CMD_ADDR_MASK) >> 6);
+    uint8_t addr = ((source->buffer[0]&DEV_ADDR_MASK) >> 6);
     
     if(addr != devAddr) // ошибка адресации
     {

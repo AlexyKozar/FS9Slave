@@ -37,6 +37,9 @@
     #define READ_ID                  (uint8_t)0x18 // the command read a device ID
     #define READ_SET_DSDIn           (uint8_t)0x19 // the command read the changed set input discret chanel
     #define RESERVE                  (uint8_t)0x1A // the command reserve
+    //------------------------------------
+    #define CMD_MASK      (uint16_t)0x0100
+    #define CMD_CODE_MASK (uint8_t)0x3F
     //-------------------------------
     #define MAX_CMD_NUM (uint8_t)0x40
     //--------------------------------------
