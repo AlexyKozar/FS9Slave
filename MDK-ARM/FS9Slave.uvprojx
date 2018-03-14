@@ -311,7 +311,7 @@
           </ArmAdsMisc>
           <Cads>
             <interw>1</interw>
-            <Optim>4</Optim>
+            <Optim>1</Optim>
             <oTime>1</oTime>
             <SplitLS>0</SplitLS>
             <OneElfS>1</OneElfS>
@@ -336,7 +336,7 @@
               <MiscControls>--C99</MiscControls>
               <Define>USE_HAL_DRIVER,STM32F030x6</Define>
               <Undefine></Undefine>
-              <IncludePath>../Inc;../Drivers/STM32F0xx_HAL_Driver/Inc;../Drivers/STM32F0xx_HAL_Driver/Inc/Legacy;../Drivers/CMSIS/Device/ST/STM32F0xx/Include;../Drivers/CMSIS/Include;..\Src\device;..\Src\device\ain;..\Src\device\event;..\Src\device\fs9slave;..\Src\device\fs9slave\cmd</IncludePath>
+              <IncludePath>../Inc;../Drivers/STM32F0xx_HAL_Driver/Inc;../Drivers/STM32F0xx_HAL_Driver/Inc/Legacy;../Drivers/CMSIS/Device/ST/STM32F0xx/Include;../Drivers/CMSIS/Include;..\Src\device;..\Src\device\ain;..\Src\device\event;..\Src\device\fs9slave;..\Src\device\fs9slave\cmd;..\Src\device\error</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -529,6 +529,16 @@
               <FileName>flash.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\src\device\flash\flash.c</FilePath>
+            </File>
+            <File>
+              <FileName>error.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Src\device\error\error.h</FilePath>
+            </File>
+            <File>
+              <FileName>error.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Src\device\error\error.c</FilePath>
             </File>
           </Files>
         </Group>

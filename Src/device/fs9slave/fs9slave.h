@@ -3,27 +3,44 @@
     //-----------------
     #include <stdint.h>
     #include <stdbool.h>
+    #include <string.h>
     #include "stm32f0xx.h"
     #include "cmd/cmd.h"
-    //---------------------------
-    #define FS9_UART       USART1
-    #define FS9_IRQHandler USART1_IRQHandler
     //------------------------
-    #define MAX_SIZE_BUF_RX 20
-    #define MAX_SIZE_BUF_TX 20
-    //--------------------------
-    #define MAX_SIZE_PACK_BUF 20
-    //--------------
-    #define ACK 0x06 // подтверждение
-    #define NAK 0x15 // отказ
-    //-------------------------
-    typedef struct _FS9Packet_t
+    #define BUFFER_MAX_SIZE 20 // max size rx and tx buffer
+    #define ACK             0x06
+    #define NAK             0x15
+    /*!
+     * /brief struct buffer type
+     */
+    typedef struct _FS9Buffer_t
     {
-        uint8_t buffer[MAX_SIZE_PACK_BUF];
-        uint8_t size;
-    } FS9Packet_t;
-    //---------------------------------
-    bool FS9_read(FS9Packet_t* packet);
-    bool FS9_write(FS9Packet_t* packet);
-    bool FS9_Is_Ready(void);
+        uint8_t data[BUFFER_MAX_SIZE];
+        uint8_t cmd_code; // command code
+        cmd_t   cmd; // command data
+        uint8_t size; // data buffer size
+        uint8_t index; // current data index
+    } FS9Buffer_t;    
+    /*!
+     * /brief Protocol initialize
+     * /param address The device address
+     */
+    void FS9Slave_Init(uint8_t address);
+    /*!
+     * /brief Data is ready
+     * /return true if data is ready
+     */
+    bool FS9Slave_IsReady(void);
+    /*!
+     * /brief Read a data from receiver buffer
+     * /param dest Destination buffer
+     * /param source Source buffer
+     * /return true if data is read from receiver buffer
+     */
+    bool FS9Slave_Read(FS9Buffer_t* dest);
+    /*!
+     * /brief Send a data to transmission buffer
+     * /param packet Data packet for transmission
+     */
+     void FS9Slave_Write(FS9Buffer_t* packet);
 #endif

@@ -1,201 +1,131 @@
 #include "fs9slave.h"
-//-------------------
-uint8_t rx_pop(void);
-uint8_t tx_pop(void);
-bool    rx_push(uint8_t byte);
-bool    tx_push(uint8_t byte);
-uint8_t rx_size(void);
-uint8_t tx_size(void);
-bool    rx_is_empty(void);
-bool    tx_is_empty(void);
+//------------------------------------------
+volatile FS9Buffer_t _rx_buffer     = { 0 }; // receive buffer
+volatile FS9Buffer_t _tx_buffer     = { 0 }; // transmission buffer
+volatile bool        _is_cmd        = false; // is command or not
+volatile bool        _is_data_ready = false;
+volatile uint8_t     _address       = 0xFF; // default device address
 //---------------------------------
-uint8_t rx_buffer[MAX_SIZE_BUF_RX];
-uint8_t tx_buffer[MAX_SIZE_BUF_TX];
-//----------------------------
-volatile uint8_t rx_count = 0;
-volatile uint8_t tx_count = 0;
-volatile uint8_t rx_head  = 0;
-volatile uint8_t tx_head  = 0;
-volatile uint8_t rx_tail  = 0;
-volatile uint8_t tx_tail  = 0;
-volatile uint8_t rx_bytes = 0; // how much will be read bytes
-volatile bool    is_cmd   = false;
-//-----------------------------------
-volatile bool FS9_Data_Ready = false;
-//------------------
-uint8_t rx_pop(void)
+void FS9Slave_Init(uint8_t address)
 {
-    uint8_t byte = 0;
-    
-    if(rx_count > 0)
-    {
-        byte = rx_buffer[rx_head++];
-        
-        if(rx_head == MAX_SIZE_BUF_RX)
-            rx_head = 0;
-        
-        rx_count--;
-    }
-    
-    return byte;
+    _address = address;
 }
-//------------------
-uint8_t tx_pop(void)
+//--------------------------
+void USART1_IRQHandler(void)
 {
-    uint8_t byte = 0;
-    
-    if(tx_count > 0)
-    {
-        byte = tx_buffer[tx_head++];
-        
-        if(tx_head == MAX_SIZE_BUF_TX)
-            tx_head = 0;
-        
-        tx_count--;
-    }
-    
-    return byte;
-}
-//------------------------
-bool rx_push(uint8_t byte)
-{
-    if(rx_count == MAX_SIZE_BUF_RX)
-        return false;
-    
-    rx_buffer[rx_tail++] = byte;
-    
-    if(rx_tail == MAX_SIZE_BUF_RX)
-        rx_tail = 0;
-    
-    rx_count++;
-    
-    return true;
-}
-//------------------------
-bool tx_push(uint8_t byte)
-{
-    if(tx_count == MAX_SIZE_BUF_TX)
-        return false;
-    
-    tx_buffer[tx_tail++] = byte;
-    
-    if(tx_tail == MAX_SIZE_BUF_TX)
-        tx_tail = 0;
-    
-    tx_count++;
-    
-    return true;
-}
-//-------------------
-uint8_t rx_size(void)
-{
-    return rx_count;
-}
-//-------------------
-uint8_t tx_size(void)
-{
-    return tx_count;
-}
-//--------------------
-bool rx_is_empty(void)
-{
-    return (rx_count == 0);
-}
-//--------------------
-bool tx_is_empty(void)
-{
-    return (tx_count == 0);
-}
-//--------------------------------
-bool FS9_read(FS9Packet_t* packet)
-{
-    if(!rx_is_empty())
-    {
-        packet->size = rx_size();
-        
-        for(uint8_t i = 0; i < packet->size; ++i)
-        {
-            packet->buffer[i] = rx_pop();
-        }
-    }
-    else
-        return false;
-    
-    FS9_Data_Ready = false;
-    
-    return true;
-}
-//---------------------------------
-bool FS9_write(FS9Packet_t* packet)
-{
-    for(uint8_t i = 0; i < packet->size; ++i)
-    {
-        if(!tx_push(packet->buffer[i]))
-            return false;
-    }
-    
-    FS9_UART->CR1 |= USART_CR1_TE | USART_CR1_TXEIE;
-    
-    return true;
-}
-//---------------------
-bool FS9_Is_Ready(void)
-{
-    return FS9_Data_Ready;
-}
-//-----------------------
-void FS9_IRQHandler(void)
-{
-    uint32_t status = USART1->ISR;
-    
-    if(status & USART_ISR_RXNE)
+    if((USART1->ISR & USART_ISR_RXNE) == USART_ISR_RXNE) // read data
     {
         uint16_t byte = USART1->RDR;
-
-        if(!is_cmd) // is command
+        
+        if(_address != 0xFF) // device address is valid
         {
-            if((byte & CMD_MASK) == CMD_MASK)
+            if(!_is_cmd && (byte&CMD_MASK) == CMD_MASK) // command yet is not finded and byte contains is command bit
             {
-                cmd_t cmd = CMD_get(byte&CMD_CODE_MASK);
+                uint8_t address = (uint8_t)((byte&DEV_ADDR_MASK) >> 6);
                 
-                rx_bytes = cmd.n; // get size packet
+                if(_address == address) // received address is device address
+                {
+                    uint8_t cmd_code = ((uint8_t)(byte&0x00FF))&CMD_CODE_MASK; // get command code from received byte
+                    cmd_t   cmd      = CMD_get(cmd_code); // get command data from list command valid
+                    
+                    if(cmd.n > 0)
+                    {
+                        _is_cmd             = true;
+                        _rx_buffer.cmd_code = cmd_code; // save command code
+                        _rx_buffer.cmd      = cmd; // save command data
+                        _rx_buffer.size     = cmd.n; // save command size
+                        _rx_buffer.index    = 0; // index clear
+                        _rx_buffer.data[_rx_buffer.index++] = ((uint8_t)(byte&0x00FF)); // save first byte in receiver buffer
+                        
+//                        USART1->RTOR = 2;
+//                        USART1->CR2 |= USART_CR2_RTOEN; // enable receive timeout
+//                        USART1->CR1 |= USART_CR1_RTOIE; // enable timeout interrupt
+                    }
+                    else
+                        ERROR_command_inc();
+                }
+            }
+            else if(_is_cmd) // flag command is set
+            {
+                _rx_buffer.data[_rx_buffer.index++] = ((uint8_t)(byte&0x00FF)); // save next byte in receiver buffer
                 
-                if(rx_bytes > 0)
-                {   
-                    is_cmd = true;
-                    rx_push((uint8_t)(byte&0xFF));
+                if(_rx_buffer.size == _rx_buffer.index) // received all data
+                {
+                    _is_cmd        = false;
+                    _is_data_ready = true;
+                    
+//                    USART1->CR2 &= ~USART_CR2_RTOEN; // disable receive timeout
+//                    USART1->CR1 &= ~USART_CR1_RTOIE; // disable timeout interrupt
                 }
             }
         }
-        else
-        {
-            rx_push((uint8_t)(byte&0xFF));
-            
-            if(rx_size() == rx_bytes) // packet receiver
-            {
-                FS9_Data_Ready = true;
-                is_cmd         = false;
-            }
-        }
         
-        USART1->RQR |= USART_RQR_RXFRQ;
+        USART1->RQR |= USART_RQR_RXFRQ; // flag clear
     }
     
-    if(status & USART_ISR_TXE)
+    if((USART1->ISR & USART_ISR_TXE) == USART_ISR_TXE)
     {
-       if(!tx_is_empty())
+        if(_tx_buffer.index < _tx_buffer.size)
         {
-            USART1->TDR = tx_pop();
+            USART1->TDR = _tx_buffer.data[_tx_buffer.index++];
         }
         else
         {
             USART1->CR1 &= ~(USART_CR1_TE | USART_CR1_TXEIE);
-            USART1->ISR &= ~USART_ISR_TXE;
         }
+        
+        USART1->ISR &= !USART_ISR_TXE;
     }
     
-    if(status & USART_ISR_ORE)
+//    if((USART1->ISR & USART_ISR_RTOF) == USART_ISR_RTOF)
+//    {   
+//        _is_cmd = false;
+//        
+//        ERROR_timeout_inc(); // timeout error counter increment
+//        
+//        USART1->ICR |= USART_ICR_RTOCF; // clear flag
+//    }
+    
+    if((USART1->ISR & USART_ISR_ORE) == USART_ISR_ORE)
     {
-        USART1->ICR |= USART_ICR_ORECF;
+        _is_cmd = false;
+        
+        ERROR_overrun_inc(); // overrun error counter increment
+        
+        USART1->ICR |= USART_ICR_ORECF; // clear flag
     }
+}
+//-------------------------
+bool FS9Slave_IsReady(void)
+{
+    return _is_data_ready;
+}
+//-----------------------------------
+bool FS9Slave_Read(FS9Buffer_t* dest)
+{
+    if(_rx_buffer.size > 0)
+    {
+        dest->size     = _rx_buffer.size;
+        dest->cmd_code = _rx_buffer.cmd_code;
+        dest->cmd      = _rx_buffer.cmd;
+        _is_data_ready = false;
+        
+        memcpy(&dest->data[0], (const uint8_t*)&_rx_buffer.data[0], _rx_buffer.size);
+        
+        return true;
+    }
+    
+    return false;
+}
+//--------------------------------------
+void FS9Slave_Write(FS9Buffer_t* packet)
+{
+    _tx_buffer.size  = packet->size;
+    _tx_buffer.index = 0;
+    
+    memcpy((uint8_t*)&_tx_buffer.data[0], (const uint8_t*)&packet->data[0], _tx_buffer.size);
+    
+    USART1->CR1 |= USART_CR1_TE | USART_CR1_TXEIE;
+    
+    USART1->TDR = _tx_buffer.data[_tx_buffer.index++];
 }

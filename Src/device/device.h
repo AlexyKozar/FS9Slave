@@ -12,6 +12,7 @@
     #include "ds18b20/ds18b20.h"
     #include "i2c/i2c.h"
     #include "flash/flash.h"
+    #include "error.h"
     //----------------------
     #define F_CPU 48000000UL
     //-------------------------
@@ -69,12 +70,12 @@
     #define DEVICE_NUMBER           (uint16_t)0x01 // номер устройства
     #define DEVICE_LOT              (uint8_t)0x01 // номер партии
     #define DEVICE_FIRMWARE_VARIANT (uint8_t)0x00 // вариант прошивки
-    #define DEVICE_FIRMWARE_DATE    (uint32_t)0x0012030C // decimal -> 180312 -> 2018.03.12
+    #define DEVICE_FIRMWARE_DATE    (uint32_t)0x0012030E // decimal -> 180312 -> 2018.03.14
     //----------------------
     #define PWROK_INPUT 0x04
     #define PWROK_TIME  2000 // scan time for pwrok
     //--------------------------------------
-    typedef struct _FS9Packet_t FS9Packet_t;
+    typedef struct _FS9Buffer_t FS9Buffer_t;
     //-------------------------
     typedef struct _input_set_t
     {
@@ -146,14 +147,6 @@
 		bool     IN_change; // состояние входа во время аварии изменилось
 		uint16_t IN_time; // время через которое поменялось состояние входа во время аварии
     } pwrok_t;
-    //---------------------
-    typedef struct _error_t // структура ошибкок приема данных по протоколу
-    {
-        uint16_t request; // всего запросов
-        uint16_t command; // ошибка команды
-        uint16_t checksum; // ошибка контрольной суммы
-        uint16_t no_process; // нет обработчика команды
-    } error_t;
     //-------------------
     typedef struct _key_t
     {
@@ -180,9 +173,9 @@
     void    DEV_Create(GPIO_TypeDef* gpio, uint16_t addr_pins);
     void    DEV_Init(PORT_Input_Type* inputs, PORT_Output_Type* outputs);
     uint8_t DEV_Address(void);
-    bool    DEV_Request(FS9Packet_t* source, FS9Packet_t* dest);
-    bool    DEV_Driver(uint8_t cmd, FS9Packet_t* data, FS9Packet_t* packet);
-    uint8_t DEV_Checksum(FS9Packet_t* packet, uint8_t size);
+    bool    DEV_Request(FS9Buffer_t* source, FS9Buffer_t* dest);
+    bool    DEV_Driver(FS9Buffer_t* source, FS9Buffer_t* dest);
+    uint8_t DEV_Checksum(FS9Buffer_t* packet, uint8_t size);
     void    DEV_Input_Scan(void);
     void    DEV_Input_Set_Default(void);
     void    DEV_Input_Filter(uint8_t index);
