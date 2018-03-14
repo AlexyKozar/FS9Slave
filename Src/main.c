@@ -96,6 +96,9 @@ int main(void)
     // Get address device
     uint8_t addr = DEV_Address();
     
+    // Protocol initialize
+    FS9Slave_Init(addr);
+    
     // Declaration struct inputs and outputs
     PORT_Input_Type  input; // the input channels
     PORT_Output_Type output; // the output channels
@@ -128,17 +131,18 @@ int main(void)
 
   /* USER CODE BEGIN 3 */
       
-    if(FS9_Is_Ready())
+    if(FS9Slave_IsReady())
     {
-        FS9Packet_t packet_source = { 0, 0 };
-        FS9Packet_t packet_dest = { 0, 0 };
-        
-        if(FS9_read(&packet_source))
-            DEV_Request(&packet_source, &packet_dest);
-        
-        if(packet_dest.size > 0)
+        FS9Buffer_t source = { 0 };
+        FS9Buffer_t dest   = { 0 };
+
+        if(FS9Slave_Read(&source))
         {
-            FS9_write(&packet_dest);
+            if(DEV_Request(&source, &dest) && dest.size > 0) // request is successful and destination packet size isn't empty
+            {
+                // send answer
+                FS9Slave_Write(&dest);
+            }
         }
     }
     // обработка события
@@ -146,7 +150,6 @@ int main(void)
     // конец обработки события
   }
   /* USER CODE END 3 */
-
 }
 
 /** System Clock Configuration
@@ -214,7 +217,7 @@ static void MX_USART1_UART_Init(void)
   huart1.Init.WordLength = UART_WORDLENGTH_9B;
   huart1.Init.StopBits = UART_STOPBITS_1;
   huart1.Init.Parity = UART_PARITY_NONE;
-  huart1.Init.Mode = UART_MODE_TX_RX;
+  huart1.Init.Mode = UART_MODE_RX;
   huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
   huart1.Init.OverSampling = UART_OVERSAMPLING_16;
   huart1.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
@@ -224,7 +227,8 @@ static void MX_USART1_UART_Init(void)
     _Error_Handler(__FILE__, __LINE__);
   }
     
-    USART1->CR1 |= USART_CR1_RE | USART_CR1_RXNEIE;
+    USART1->CR1 |= USART_CR1_RE | USART_CR1_RXNEIE; // read enable
+    USART1->CR1 &= ~(USART_CR1_TE | USART_CR1_TXEIE); // send disable
 }
 
 /* USER CODE BEGIN 4 */

@@ -291,21 +291,21 @@ void DEV_PWROK_Init(void)
     
     EXTI->PR = EXTI_PR_PR12; // clear flag
 	
-		TIM14->PSC   = 48000 - 1; // 1ms
-		TIM14->ARR   = 12 - 1;
-		TIM14->CR1  |= TIM_CR1_ARPE | TIM_CR1_OPM;
-		TIM14->DIER &= ~TIM_DIER_UIE;
-		TIM14->EGR  |= TIM_EGR_UG;
-		TIM14->SR   &= ~TIM_SR_UIF;
-		TIM14->DIER |= TIM_DIER_UIE;
+    TIM14->PSC   = 48000 - 1; // 1ms
+    TIM14->ARR   = 12 - 1;
+    TIM14->CR1  |= TIM_CR1_ARPE | TIM_CR1_OPM;
+    TIM14->DIER &= ~TIM_DIER_UIE;
+    TIM14->EGR  |= TIM_EGR_UG;
+    TIM14->SR   &= ~TIM_SR_UIF;
+    TIM14->DIER |= TIM_DIER_UIE;
     
     NVIC_EnableIRQ(EXTI4_15_IRQn);
     NVIC_SetPriority(EXTI4_15_IRQn, 0);
 	
-		NVIC_EnableIRQ(TIM14_IRQn);
-		NVIC_SetPriority(TIM14_IRQn, 0);
-		
-		TIM14->CR1 |= TIM_CR1_CEN;
+    NVIC_EnableIRQ(TIM14_IRQn);
+    NVIC_SetPriority(TIM14_IRQn, 0);
+    
+    TIM14->CR1 |= TIM_CR1_CEN;
 }
 //-----------------------
 void DEV_Crash_Init(void)
@@ -322,69 +322,51 @@ uint8_t DEV_Address(void)
     return devAddr;
 }
 //------------------------------------------------------
-bool DEV_Request(FS9Packet_t* source, FS9Packet_t* dest)
+bool DEV_Request(FS9Buffer_t* source, FS9Buffer_t* dest)
 {   
     is_crash = true; // получили запрос от ЦП - сброс аварийной ситуации
-    
-    uint8_t addr = ((source->buffer[0]&DEV_ADDR_MASK) >> 6);
-    
-    if(addr != devAddr) // ошибка адресации
-    {
-        return false;
-    }
-    
-    error.request++; // увеличиваем счетчик запросов, если адрес устройства верный
-    
-    uint8_t cmd = source->buffer[0]&CMD_CODE_MASK; // get the command for device
-    
-    cmd_t tcmd = CMD_get(cmd); // verification command
-    
-    if(tcmd.n == 0 || tcmd.m == 0) // нет такой команды или она зарезервирована
-    {
-        error.command++; // увеличиваем счетчик ошибок команд
-        
-        return false; // command is not valid
-    }
+   
+    ERROR_request_inc(); // увеличиваем счетчик запросов, если адрес устройства верный
     
     uint8_t checksum = DEV_Checksum(source, source->size - 1);
     
-    if(checksum != source->buffer[source->size - 1]) // ошибка контрольной суммы
+    if(checksum != source->data[source->size - 1]) // ошибка контрольной суммы
     {
-        error.checksum++; // увеличиваем счетчик ошибок контрольной суммы
+        ERROR_checksum_inc(); // увеличиваем счетчик ошибок контрольной суммы
         
         return false;
     }
     
-    FS9Packet_t packet; // пакет данных (т.е. чистые данные без контрольной суммы и команды)
+    FS9Buffer_t data = { 0 };
     
-    packet.size = source->size - 2; // размер пакета данных (минус команда и контрольная сумма)
+    data.cmd      = source->cmd;
+    data.cmd_code = source->cmd_code;
+    data.size     = source->size - 2;
     
-    for(uint8_t i = 0; i < packet.size; ++i) // заполнение данными пакета
-    {
-        packet.buffer[i] = source->buffer[i + 1];
-    }
+    if(data.size > 0)
+        memcpy(&source->data[1], &data.data[0], data.size);
     
-    bool answer = DEV_Driver(cmd, &packet, dest);
+    bool answer = DEV_Driver(&data, dest);
     
-    if(!answer && cmd != 0x19) // если получили ложь и код команды не равен 0x19 (искробезопасные входы)
+    if(!answer && dest->cmd_code != 0x19) // если получили ложь и код команды не равен 0x19 (искробезопасные входы)
         return false; // ответа нет
     
-    if(tcmd.is_ack)
+    if(dest->cmd.is_ack)
     {
-        if(cmd == 0x19 && !answer) // если команда (запись искробезопасных входов) и ответ ложь
-            dest->buffer[dest->size++] = NAK; // отправляем отказ
+        if(dest->cmd_code == 0x19 && !answer) // если команда (запись искробезопасных входов) и ответ ложь
+            dest->data[dest->size++] = NAK; // отправляем отказ
         else
-            dest->buffer[dest->size++] = ACK; // в другом любом случае отправляем подтверждение
+            dest->data[dest->size++] = ACK; // в другом любом случае отправляем подтверждение
     }
     
     // append checksum for packet
     checksum = DEV_Checksum(dest, dest->size);
-    dest->buffer[dest->size++] = checksum;
+    dest->data[dest->size++] = checksum;
     
     return true;
 }
-//------------------------------------------------------------------
-bool DEV_Driver(uint8_t cmd, FS9Packet_t* data, FS9Packet_t* packet)
+//-----------------------------------------------------
+bool DEV_Driver(FS9Buffer_t* source, FS9Buffer_t* dest)
 {
     uint8_t bit_count = 0; // счетчик бит (позиция канала в байте)
     
@@ -407,7 +389,7 @@ bool DEV_Driver(uint8_t cmd, FS9Packet_t* data, FS9Packet_t* packet)
     
     utemp.count = 0x0000;
     
-    switch(cmd)
+    switch(source->cmd_code)
     {
         case 0x00: // чтение дискретных каналов входов
             for(uint8_t i = 0; i < io_in->size; ++i)
@@ -415,8 +397,8 @@ bool DEV_Driver(uint8_t cmd, FS9Packet_t* data, FS9Packet_t* packet)
                 if(bit_count == 8)
                 {
                     bit_count = 0;
-                    packet->size++;
-                    packet->buffer[packet->size] = 0x00;
+                    dest->index++;
+                    dest->data[dest->index] = 0x00;
                 }
                 
                 uint8_t  channel_state = 0x00;
@@ -436,16 +418,16 @@ bool DEV_Driver(uint8_t cmd, FS9Packet_t* data, FS9Packet_t* packet)
                     channel->error = false;
                 }
                 
-                packet->buffer[packet->size] |= channel_state << bit_count;
+                dest->data[dest->index] |= channel_state << bit_count;
                 
                 bit_count += 2;
             }
             
-            packet->size = 3;
+            dest->size = 3;
         break;
             
         case 0x01: // чтение дискретных каналов выходов
-            packet->buffer[0] = 0x00;
+            dest->data[0] = 0x00;
         
             for(uint8_t i = 0; i < io_out->size; ++i)
             {
@@ -453,11 +435,11 @@ bool DEV_Driver(uint8_t cmd, FS9Packet_t* data, FS9Packet_t* packet)
                 
                 if((pin.gpio->ODR & pin.io) == pin.io)
                 {
-                    packet->buffer[0] |= 0x01 << i;
+                    dest->data[0] |= 0x01 << i;
                 }
             }
             
-            packet->size = 1;
+            dest->size = 1;
         break;
             
         case 0x02: // чтение аналоговых величин 1..4
@@ -483,10 +465,10 @@ bool DEV_Driver(uint8_t cmd, FS9Packet_t* data, FS9Packet_t* packet)
                 t.number = 0.0f;
             }
             
-            packet->buffer[0] = t.byte[0];
-            packet->buffer[1] = t.byte[1];
-            packet->buffer[2] = t.byte[2];
-            packet->buffer[3] = t.byte[3];
+            dest->data[0] = t.byte[0];
+            dest->data[1] = t.byte[1];
+            dest->data[2] = t.byte[2];
+            dest->data[3] = t.byte[3];
         
             if(devAddr == 0x00)
             {
@@ -504,17 +486,17 @@ bool DEV_Driver(uint8_t cmd, FS9Packet_t* data, FS9Packet_t* packet)
                 t.number = 0.0f;
             }
             
-            packet->buffer[4] = t.byte[0];
-            packet->buffer[5] = t.byte[1];
-            packet->buffer[6] = t.byte[2];
-            packet->buffer[7] = t.byte[3];
+            dest->data[4] = t.byte[0];
+            dest->data[5] = t.byte[1];
+            dest->data[6] = t.byte[2];
+            dest->data[7] = t.byte[3];
         
             t.number = temp/1000.0f;
         
-            packet->buffer[8]  = t.byte[0];
-            packet->buffer[9]  = t.byte[1];
-            packet->buffer[10] = t.byte[2];
-            packet->buffer[11] = t.byte[3];
+            dest->data[8]  = t.byte[0];
+            dest->data[9]  = t.byte[1];
+            dest->data[10] = t.byte[2];
+            dest->data[11] = t.byte[3];
 
             if(devAddr == 0x00)
             {
@@ -525,20 +507,20 @@ bool DEV_Driver(uint8_t cmd, FS9Packet_t* data, FS9Packet_t* packet)
                 t.number = 0.0f;
             }
             
-            packet->buffer[12] = t.byte[0];
-            packet->buffer[13] = t.byte[1];
-            packet->buffer[14] = t.byte[2];
-            packet->buffer[15] = t.byte[3];
+            dest->data[12] = t.byte[0];
+            dest->data[13] = t.byte[1];
+            dest->data[14] = t.byte[2];
+            dest->data[15] = t.byte[3];
         
-            packet->size = 16;
+            dest->size = 16;
         break;
             
         case 0x03: // чтение регистра расширения дискретных каналов входов
-            packet->buffer[0] = keys.last_state&0x000000FF;
-            packet->buffer[1] = (keys.last_state >> 8)&0x000000FF;
-            packet->buffer[2] = (keys.last_state >> 16)&0x0000000F;
+            dest->data[0] = keys.last_state&0x000000FF;
+            dest->data[1] = (keys.last_state >> 8)&0x000000FF;
+            dest->data[2] = (keys.last_state >> 16)&0x0000000F;
             
-            packet->size = 3;
+            dest->size = 3;
         break;
             
         case 0x04: // чтение регистра расширения дискретных каналов выходов
@@ -549,7 +531,7 @@ bool DEV_Driver(uint8_t cmd, FS9Packet_t* data, FS9Packet_t* packet)
                 if(bit_count == 8)
                 {
                     bit_count = 0;
-                    packet->buffer[++packet->size] = 0x00;
+                    dest->data[++dest->index] = 0x00;
                 }
                 
                 uint8_t channel_state = 0x00;
@@ -567,18 +549,18 @@ bool DEV_Driver(uint8_t cmd, FS9Packet_t* data, FS9Packet_t* packet)
                     channel_state = 0x03;
                 }
                 
-                packet->buffer[packet->size] |= channel_state << bit_count;
+                dest->data[dest->index] |= channel_state << bit_count;
                 
                 bit_count += 2;
             }
                 
-            packet->size = 3;
+            dest->size = 3;
         break;
             
         case 0x05: // запись регистра расширения дискретных каналов выходов
-            for(uint8_t i = 0; i < data->size; ++i)
+            for(uint8_t i = 0; i < source->size; ++i)
             {
-                byte = data->buffer[i]; // текущий байт
+                byte = source->data[i]; // текущий байт
                 
                 for(uint8_t j = 0; j < 8; j += 2) // 8 бит по 2 на описание каждого канала
                 {
@@ -706,25 +688,25 @@ bool DEV_Driver(uint8_t cmd, FS9Packet_t* data, FS9Packet_t* packet)
         case 0x18: // чтение байта конфигурации искробезопасных входов
             if(devAddr != DEVICE_MDVV_01) // если устройство не МДВВ-01,
             {
-                packet->buffer[0] = SPARK_SECURITY_MODE_NONE; // то возвращаем ответ - нет искробезопасных входов
+                dest->data[0] = SPARK_SECURITY_MODE_NONE; // то возвращаем ответ - нет искробезопасных входов
             }
             else
             {
-                packet->buffer[0] = io_in->list[0].spark_security; // то возвращаем текущую настройку первого входа
+                dest->data[0] = io_in->list[0].spark_security; // то возвращаем текущую настройку первого входа
                                                                    // остальные настроены однотипно (блок)
             }
             
-            packet->size = 1;
+            dest->size = 1;
         break;
         
         case 0x19: // запись байта конфигурации искробезопасных входов
-            if(devAddr == DEVICE_MDVV_01 && packet->size == 1) // настройка искробезопасных входов только для МДВВ-01
+            if(devAddr == DEVICE_MDVV_01 && source->size == 1) // настройка искробезопасных входов только для МДВВ-01
             {
-                if(packet->buffer[0] >= SPARK_SECURITY_MODE_1 && packet->buffer[0] <= SPARK_SECURITY_MODE_3)
+                if(source->data[0] >= SPARK_SECURITY_MODE_1 && source->data[0] <= SPARK_SECURITY_MODE_3)
                 {
                     // присваиваем новое значение режима для четырех искробезопасных входов
                     io_in->list[0].spark_security = io_in->list[1].spark_security = io_in->list[2].spark_security =
-                    io_in->list[3].spark_security = packet->buffer[0];
+                    io_in->list[3].spark_security = source->data[0];
                 }
                 else
                     return false;
@@ -734,43 +716,52 @@ bool DEV_Driver(uint8_t cmd, FS9Packet_t* data, FS9Packet_t* packet)
         break;
             
         case 0x1D: // чтение отладочной информации (счетчиков ошибок)
-            utemp.count = error.request; // чтение счетчика количества запросов
+            utemp.count = ERROR_request();; // чтение счетчика количества запросов
             
-            packet->buffer[0] = utemp.byte[0];
-            packet->buffer[1] = utemp.byte[1];
+            dest->data[0] = utemp.byte[0];
+            dest->data[1] = utemp.byte[1];
             
-            utemp.count = error.command; // чтение счетчика ошибок команд
+            utemp.count = ERROR_command(); // чтение счетчика ошибок команд
             
-            packet->buffer[2] = utemp.byte[0];
-            packet->buffer[3] = utemp.byte[1];
+            dest->data[2] = utemp.byte[0];
+            dest->data[3] = utemp.byte[1];
             
-            utemp.count = error.checksum; // чтение счетчика ошибок контрольной суммы
+            utemp.count = ERROR_checksum(); // чтение счетчика ошибок контрольной суммы
             
-            packet->buffer[4] = utemp.byte[0];
-            packet->buffer[5] = utemp.byte[1];
+            dest->data[4] = utemp.byte[0];
+            dest->data[5] = utemp.byte[1];
         
-            utemp.count = error.no_process; // чтение счетчика ошибок отсутствия обработчика команды
+            utemp.count = ERROR_no_process(); // чтение счетчика ошибок отсутствия обработчика команды
             
-            packet->buffer[6] = utemp.byte[0];
-            packet->buffer[7] = utemp.byte[1];
+            dest->data[6] = utemp.byte[0];
+            dest->data[7] = utemp.byte[1];
         
-            for(uint8_t i = 8; i < 16; i++) // забиваем нулями резервные ячейки
-                packet->buffer[i] = 0x00;
+            utemp.count = ERROR_overrun(); // чтение счетчика ошибок переполнения
             
-            packet->size = 16;
+            dest->data[8] = utemp.byte[0];
+            dest->data[9] = utemp.byte[1];
+            
+            utemp.count = ERROR_timeout(); // чтение счетчика ошибок таймаута
+            
+            dest->data[10] = utemp.byte[0];
+            dest->data[11] = utemp.byte[1];
+        
+            // структура инициализируется при передаче нулями, поэтому нет смысла обнулять резервные ячейки
+            
+            dest->size = 16;
         break;
         
         case 0x1E:
-            packet->buffer[0] = devID;
-            packet->buffer[1] = DEVICE_NUMBER&0x00FF;
-            packet->buffer[2] = DEVICE_NUMBER&0xFF00;
-            packet->buffer[3] = DEVICE_LOT;
-            packet->buffer[4] = DEVICE_FIRMWARE_VARIANT;
-            packet->buffer[5] = (DEVICE_FIRMWARE_DATE&0x00FF0000) >> 16; // year
-            packet->buffer[6] = (DEVICE_FIRMWARE_DATE&0x0000FF00) >> 8; // month
-            packet->buffer[7] = DEVICE_FIRMWARE_DATE&0x000000FF; // day
+            dest->data[0] = devID;
+            dest->data[1] = DEVICE_NUMBER&0x00FF;
+            dest->data[2] = DEVICE_NUMBER&0xFF00;
+            dest->data[3] = DEVICE_LOT;
+            dest->data[4] = DEVICE_FIRMWARE_VARIANT;
+            dest->data[5] = (DEVICE_FIRMWARE_DATE&0x00FF0000) >> 16; // year
+            dest->data[6] = (DEVICE_FIRMWARE_DATE&0x0000FF00) >> 8; // month
+            dest->data[7] = DEVICE_FIRMWARE_DATE&0x000000FF; // day
         
-            packet->size = 8;
+            dest->size = 8;
         break;
             
         case 0x1F: // чтение времени срабатывания выделенного входного дискретного канала                
@@ -794,17 +785,17 @@ bool DEV_Driver(uint8_t cmd, FS9Packet_t* data, FS9Packet_t* packet)
 				_pwr_ok.IN_state  = false;
 				_pwr_ok.IN_time   = 0x0000;
 				
-				packet->buffer[0] = state;
+				dest->data[0] = state;
 			}
 			else
 			{
-				packet->buffer[0] = DSDIN_TRIGGER_OFF;
+				dest->data[0] = DSDIN_TRIGGER_OFF;
 			}
 			
-			packet->buffer[1] = (uint8_t)(time&0x00FF);
-			packet->buffer[2] = (uint8_t)((time&0xFF00) >> 8);
+			dest->data[1] = (uint8_t)(time&0x00FF);
+			dest->data[2] = (uint8_t)((time&0xFF00) >> 8);
             
-            packet->size = 3;
+            dest->size = 3;
         break;
 
         case 0x3B: // чтение из памяти (тест eeprom и flash)
@@ -820,38 +811,38 @@ bool DEV_Driver(uint8_t cmd, FS9Packet_t* data, FS9Packet_t* packet)
         break;
         
         case 0x3E: // изменение параметров фильтрации
-            if(data->size == 3)
+            if(source->size == 3)
             {
-                io_in->set.Nperiod  = data->buffer[0]; // количество периодов фильтрации
-                io_in->set.Ndiscret = data->buffer[1]; // количество выборок на период
-                io_in->set.SGac     = data->buffer[2]; // длительность сигнала считаемая, что сигнал валидный
+                io_in->set.Nperiod  = source->data[0]; // количество периодов фильтрации
+                io_in->set.Ndiscret = source->data[1]; // количество выборок на период
+                io_in->set.SGac     = source->data[2]; // длительность сигнала считаемая, что сигнал валидный
                 
                 TIM_Scan_Update();
             }
         break;
             
         case 0x3F: // изменение входа
-            if(data->size == 4)
+            if(source->size == 4)
             {
-                uint8_t in_num = data->buffer[0]; // номер настраиваемого входа
-                io_in->list[in_num].mode  = data->buffer[1]; // режим работы входа AC или DC
+                uint8_t in_num = source->data[0]; // номер настраиваемого входа
+                io_in->list[in_num].mode  = source->data[1]; // режим работы входа AC или DC
               
-                io_in->list[in_num].duration = data->buffer[2]; // длительность периода
+                io_in->list[in_num].duration = source->data[2]; // длительность периода
                 
                 if(io_in->list[in_num].mode == IN_MODE_AC)
                 {
-                    io_in->list[in_num].fault = data->buffer[3]; // погрешность допускаемая за один период - в процентах
+                    io_in->list[in_num].fault = source->data[3]; // погрешность допускаемая за один период - в процентах
                 }
                 else
                 {
-                    io_in->set.P0dc = io_in->set.P1dc = data->buffer[3];
+                    io_in->set.P0dc = io_in->set.P1dc = source->data[3];
                 }
             }
         break;
         
         default:
         {
-            error.no_process++; // увеличиваем счетчик - нет обработчика команды
+            ERROR_no_process_inc(); // увеличиваем счетчик - нет обработчика команды
             return false;
         }
     };
@@ -859,13 +850,13 @@ bool DEV_Driver(uint8_t cmd, FS9Packet_t* data, FS9Packet_t* packet)
     return true;
 }
 //-----------------------------------------------------
-uint8_t DEV_Checksum(FS9Packet_t* packet, uint8_t size)
+uint8_t DEV_Checksum(FS9Buffer_t* packet, uint8_t size)
 {
     uint8_t checksum = 0;
     
     for(uint8_t i = 0; i < size; ++i)
     {
-        checksum += packet->buffer[i];
+        checksum += packet->data[i];
     }
     
     checksum += size;

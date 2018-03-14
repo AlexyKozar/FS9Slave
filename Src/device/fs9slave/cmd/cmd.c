@@ -74,6 +74,8 @@ cmd_t CMD_get(uint8_t code)
     
     if(code > 0x3F)
         return cmd;
+    
+    cmd = cmd_list[code];
         
-    return cmd_list[code];
+    return cmd;
 }
