@@ -339,8 +339,8 @@ bool DEV_Request(FS9Buffer_t* source, FS9Buffer_t* dest)
     
     FS9Buffer_t data = { 0 };
     
-    data.cmd      = source->cmd;
-    data.cmd_code = source->cmd_code;
+    data.cmd      = dest->cmd = source->cmd;
+    data.cmd_code = dest->cmd_code = source->cmd_code;
     data.size     = source->size - 2;
     
     if(data.size > 0)
