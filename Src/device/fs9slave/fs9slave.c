@@ -74,7 +74,7 @@ void USART1_IRQHandler(void)
             USART1->CR1 &= ~(USART_CR1_TE | USART_CR1_TXEIE);
         }
         
-        USART1->ISR &= !USART_ISR_TXE;
+        USART1->ISR &= ~USART_ISR_TXE;
     }
     
     if((USART1->ISR & USART_ISR_RTOF) == USART_ISR_RTOF)
