@@ -1005,10 +1005,6 @@ void DEV_Input_Filter(uint8_t index)
                     {
                         input->filter.c_error++;
                     }
-                    else if(input == io_inOff && (io_phaseState && !io_offState)) // вход OFF и синал не совпадает с сигнлом на DI_1 - обрыв линии OFF
-                    {
-                        input->filter.c_error++;
-                    }
                     else
                     {
                         if(input == io_inOn)
@@ -1044,18 +1040,27 @@ void DEV_Input_Filter(uint8_t index)
         {
             if(input->filter.c_state >= (io_in->set.Nperiod - 1))
             {
-                input->error  = false;
-                input->state  = act_level;
-                Input_Changed = true;
-                
-                if(_pwr_ok.state == true && index == PWROK_INPUT)
+                if(input == io_inOff && !act_level && io_inPhase->state)
                 {
-                    if(_pwr_ok.IN_change == false)
-					{
-						_pwr_ok.IN_state  = input->state;
-						_pwr_ok.IN_time   = TIM14->CNT;
-						_pwr_ok.IN_change = true;
-					}
+                    input->error  = true;
+                    input->state  = false;
+                    Input_Changed = true;
+                }
+                else
+                {
+                    input->error  = false;
+                    input->state  = act_level;
+                    Input_Changed = true;
+                    
+                    if(_pwr_ok.state == true && index == PWROK_INPUT)
+                    {
+                        if(_pwr_ok.IN_change == false)
+                        {
+                            _pwr_ok.IN_state  = input->state;
+                            _pwr_ok.IN_time   = TIM14->CNT;
+                            _pwr_ok.IN_change = true;
+                        }
+                    }
                 }
             }
             else if(input->filter.c_error >= io_in->set.Nperiod)
