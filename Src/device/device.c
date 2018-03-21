@@ -23,9 +23,12 @@ uint8_t devAddr = 0xFF;
 uint8_t devID   = 0xFF;
 //-------------------------
 bool Input_Changed = false;
-//--------------------
-bool is_crash = false; // авария - отключение выхода (происходит в случае отсутствия запросов от ЦП 5 сек)
-output_t* out_crash = NULL; // выход аварийной сигнализации
+//---------------------------
+bool      is_crash   = false; // авария - отключение выхода (происходит в случае отсутствия запросов от ЦП 5 сек)
+output_t* out_crash  = NULL; // выход аварийной сигнализации
+input_t*  io_inOff   = 0;
+input_t*  io_inOn    = 0;
+input_t*  io_inPhase = NULL;
 //--------------------------------------------------------------------------------
 key_t keys = { 0x00000000, KEY_EMPTY_MASK, KEY_EMPTY_MASK, KEY_MODE_NONE, false };
 //-----------------------------
@@ -101,6 +104,7 @@ void DEV_Init(PORT_Input_Type* inputs, PORT_Output_Type* outputs)
         else
         {
             IO_Init(io_in->list[i].pin, DEV_IO_INPUT); // настраиваем как вход
+            io_in->list[i].frequency = 0; // обнуляем переменную, которая сохраняет предыдущую частоту
         }
         
         io_in->list[i].pin.num = i;
@@ -125,6 +129,13 @@ void DEV_Init(PORT_Input_Type* inputs, PORT_Output_Type* outputs)
     if(devAddr != DEVICE_MIK_01) // только для МДВВ
     {
         TIM_Scan_Init();
+        
+        if(devAddr == DEVICE_MDVV_01) // только для МДВВ-01
+        {
+            io_inPhase = &io_in->list[0]; // искробезопасный вход DI_1 для определения фазы
+            io_inOff   = &io_in->list[1]; // искробезопасный вход DI_2 - кнопка СТОП
+            io_inOn    = &io_in->list[2]; // искробезопасный вход DI_3 - кнопка СТАРТ
+        }
     }
     else
     {
@@ -392,6 +403,8 @@ bool DEV_Driver(FS9Buffer_t* source, FS9Buffer_t* dest)
     switch(source->cmd_code)
     {
         case 0x00: // чтение дискретных каналов входов
+            bit_count = 0;
+        
             for(uint8_t i = 0; i < io_in->size; ++i)
             {
                 if(bit_count == 8)
@@ -402,7 +415,7 @@ bool DEV_Driver(FS9Buffer_t* source, FS9Buffer_t* dest)
                 }
                 
                 uint8_t  channel_state = 0x00;
-                input_t* channel        = &io_in->list[i];
+                input_t* channel       = &io_in->list[i];
                 
                 if(channel->state == true && channel->error == false)
                 {
@@ -946,7 +959,8 @@ void DEV_Input_Filter(uint8_t index)
                 
                 // если ожидаемый уровень лог "0" (снятие сигнала со входа) и длительность лог "1"
                 // больше нуля, то значит это не снятие сигнала и нет смысла дальше анализировать
-                if(act_level == false && input->filter.c_lev_1 > 0)
+                if(act_level == false && input->filter.c_lev_1 > 0 && (input->spark_security != SPARK_SECURITY_MODE_2 || 
+                                                                       input->spark_security != SPARK_SECURITY_MODE_3))
                 {
                     input->filter.c_clock    = 0;
                     input->filter.c_error    = 0;
@@ -967,15 +981,49 @@ void DEV_Input_Filter(uint8_t index)
                 uint16_t tick_count = 10000/io_in->set.Ndiscret; // количество мкс до перезагрузки таймера, н-р: дискретность равна 10, тогда 1000 = 1мс
                 
                 // расчет частоты входного сигнала исходя из счетчиков нулей и единиц (длительность сигнала tdur)
-                uint16_t frequency = tick_count/tdur; // н-р: единиц и нулей по 5, тогда 1000/10 = 100 Гц
-                uint16_t fault     = (tick_count/io_in->set.Ndiscret)*input->fault/100; // погрешность частоты, н-р: частота 100 Гц, 
-                                                                                        // погрешность 10% - 100*10/100 = 10 Гц
-                if(frequency >= (frequency - fault) && frequency <= (frequency + fault)) // если длительность сигнала в пределах погрешности
+                uint16_t frequency = tick_count/tdur; // н-р: единиц и нулей по 5, тогда 1000/10 = 100Гц
+                uint16_t fault     = (tick_count/io_in->set.Ndiscret)*input->fault/100; // погрешность частоты, н-р: частота 100Гц, 
+                                                                                        // погрешность 10% - 100*10/100 = 10Гц
+                
+                input->frequency = frequency; // обновляем переменную предыдущего значения частоты сигнала
+                
+                if(input->spark_security == SPARK_SECURITY_MODE_NONE || input->spark_security == SPARK_SECURITY_MODE_1)
                 {
-                    input->filter.c_state++; // увеличиваем счетчик состояний
+                    // обрабатываются не искробезопасные входы, либо искробезопасные в режиме №1
+                    if(frequency >= (100 - fault) && frequency <= (100 + fault)) // частота в пределах 100Гц
+                        input->filter.c_state++;
+                    else
+                        input->filter.c_error++;
                 }
-                else
-                    input->filter.c_error++; // иначе увеличиваем счетчик ошибок
+                else if(input->spark_security == SPARK_SECURITY_MODE_2) // обработка искробезопасных входов в режиме №2 (сигнал на входе 50Гц)
+                {
+                    bool io_phaseState = io_inPhase->pin.gpio->IDR & io_inPhase->pin.io;
+                    bool io_offState   = io_inOff->pin.gpio->IDR & io_inOff->pin.io;
+                    bool io_onState    = io_inOn->pin.gpio->IDR & io_inOn->pin.io;
+                    
+                    if((frequency >= (50 - fault) && frequency <= (50 + fault)) == false) // частота меньше или больше 50Гц с учетом погрешности
+                    {
+                        input->filter.c_error++;
+                    }
+                    else if(input == io_inOff && (io_phaseState && !io_offState)) // вход OFF и синал не совпадает с сигнлом на DI_1 - обрыв линии OFF
+                    {
+                        input->filter.c_error++;
+                    }
+                    else
+                    {
+                        if(input == io_inOn)
+                        {
+                            if(!input->state && io_onState && (!io_phaseState && !io_offState) && (io_inPhase->state && io_inOff->state))
+                                input->filter.c_state++;
+                            else if(input->state && !io_onState)
+                                input->filter.c_state++;
+                            else if(io_onState && io_offState && io_phaseState) // ошибка включения диода на линии ON
+                                input->filter.c_error++;
+                        }
+                        else
+                            input->filter.c_state++;
+                    }
+                }
             }
             else if(input->mode == IN_MODE_DC) // режим входа DC
             {
@@ -1012,8 +1060,7 @@ void DEV_Input_Filter(uint8_t index)
             }
             else if(input->filter.c_error >= io_in->set.Nperiod)
             {
-                input->error = true;
-                
+                input->error  = true;
                 Input_Changed = true;
             }
             
@@ -1114,12 +1161,16 @@ void DEV_Input_Set_Default(void)
         io_in->list[i].fault             = 10;
         io_in->list[i].state             = false;
         io_in->list[i].error             = false;
-        io_in->list[i].duration          = 10;
         io_in->list[i].filter.c_clock    = 0;
         io_in->list[i].filter.c_period   = 0;
         io_in->list[i].filter.c_state    = 0;
         io_in->list[i].filter.c_error    = 0;
         io_in->list[i].filter.is_capture = false;
+        
+        if(io_in->list[i].spark_security == SPARK_SECURITY_MODE_2 || io_in->list[i].spark_security == SPARK_SECURITY_MODE_3)
+            io_in->list[i].duration = 20;
+        else
+            io_in->list[i].duration = 10;
     }
 }
 //----------------------------------
