@@ -997,6 +997,7 @@ void DEV_Input_Filter(uint8_t index)
                 }
                 else if(input->spark_security == SPARK_SECURITY_MODE_2) // обработка искробезопасных входов в режиме №2 (сигнал на входе 50Гц)
                 {
+                    // мгновенные значения состояний входов DI_1, DI_2 (СТОП) и DI_3 (ПУСК)
                     bool io_phaseState = io_inPhase->pin.gpio->IDR & io_inPhase->pin.io;
                     bool io_offState   = io_inOff->pin.gpio->IDR & io_inOff->pin.io;
                     bool io_onState    = io_inOn->pin.gpio->IDR & io_inOn->pin.io;
@@ -1013,7 +1014,7 @@ void DEV_Input_Filter(uint8_t index)
                                 input->filter.c_state++;
                             else if(input->state && !io_onState)
                                 input->filter.c_state++;
-                            else if(io_onState && io_offState && io_phaseState) // ошибка включения диода на линии ON
+                            else if(io_onState && io_offState && io_phaseState) // ошибка включения диода на линии ON (должен быть влкючен в обратном)
                                 input->filter.c_error++;
                         }
                         else
@@ -1040,7 +1041,7 @@ void DEV_Input_Filter(uint8_t index)
         {
             if(input->filter.c_state >= (io_in->set.Nperiod - 1))
             {
-                if(input == io_inOff && !act_level && io_inPhase->state)
+                if(input == io_inOff && !act_level && io_inPhase->state && input->spark_security == SPARK_SECURITY_MODE_2)
                 {
                     input->error  = true;
                     input->state  = false;

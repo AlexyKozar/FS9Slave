@@ -37,7 +37,7 @@ void USART1_IRQHandler(void)
                         _rx_buffer.index    = 0; // index clear
                         _rx_buffer.data[_rx_buffer.index++] = ((uint8_t)(byte&0x00FF)); // save first byte in receiver buffer
                         
-                        USART1->RTOR = (cmd.n - 1)*8;
+                        USART1->RTOR = cmd.n*8;
                         USART1->CR2 |= USART_CR2_RTOEN; // enable receive timeout
                         USART1->CR1 |= USART_CR1_RTOIE; // enable timeout interrupt
                     }
