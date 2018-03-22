@@ -720,6 +720,12 @@ bool DEV_Driver(FS9Buffer_t* source, FS9Buffer_t* dest)
                     // присваиваем новое значение режима для четырех искробезопасных входов
                     io_in->list[0].spark_security = io_in->list[1].spark_security = io_in->list[2].spark_security =
                     io_in->list[3].spark_security = source->data[0];
+                    
+                    // в режимах №2 и №3 частота входного сигнала 50Гц
+                    if(source->data[0] == SPARK_SECURITY_MODE_2 || source->data[0] == SPARK_SECURITY_MODE_3)
+                        io_in->list[0].duration = io_in->list[1].duration = io_in->list[2].duration = io_in->list[3].duration = 20;
+                    else
+                        io_in->list[0].duration = io_in->list[1].duration = io_in->list[2].duration = io_in->list[3].duration = 10;
                 }
                 else
                     return false;
@@ -1022,8 +1028,11 @@ void DEV_Input_Filter(uint8_t index)
                                 input->filter.c_state++;
                             else if(input->state && !io_onState)
                                 input->filter.c_state++;
-                            else if(io_onState && io_offState && io_phaseState) // ошибка включения диода на линии ON (должен быть влкючен в обратном)
+                            else if(io_onState && io_offState && io_phaseState && input->spark_security == SPARK_SECURITY_MODE_2)
+                            {
+                                // ошибка включения диода на линии ON (должен быть влкючен в обратном) - только для режим №2 (в режиме №3 норма)
                                 input->filter.c_error++;
+                            }
                         }
                         else
                             input->filter.c_state++;
@@ -1049,6 +1058,7 @@ void DEV_Input_Filter(uint8_t index)
         {
             if(input->filter.c_state >= (io_in->set.Nperiod - 1))
             {
+                // обработка состояния ошибки для искробезопасного входа в режиме 2 и №3
                 if(input == io_inOff && !act_level && io_inPhase->state && (input->spark_security == SPARK_SECURITY_MODE_2 || 
                                                                             input->spark_security == SPARK_SECURITY_MODE_3))
                 {

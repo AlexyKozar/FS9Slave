@@ -277,10 +277,10 @@ void IODevice_Init(uint8_t addr, PORT_Input_Type* in, PORT_Output_Type* out)
         in->list[11].pin.io = GPIO_PIN_11; // input channel 12
         
         // настройка первых четырех входов МДВВ-01 как искробезопасные в режиме 1 (default settings)
-        in->list[0].spark_security  = SPARK_SECURITY_MODE_3;
-        in->list[1].spark_security  = SPARK_SECURITY_MODE_3;
-        in->list[2].spark_security  = SPARK_SECURITY_MODE_3;
-        in->list[3].spark_security  = SPARK_SECURITY_MODE_3;
+        in->list[0].spark_security  = SPARK_SECURITY_MODE_1;
+        in->list[1].spark_security  = SPARK_SECURITY_MODE_1;
+        in->list[2].spark_security  = SPARK_SECURITY_MODE_1;
+        in->list[3].spark_security  = SPARK_SECURITY_MODE_1;
         in->list[10].spark_security = SPARK_SECURITY_MODE_NONE;
         in->list[11].spark_security = SPARK_SECURITY_MODE_NONE;
         
