@@ -334,7 +334,7 @@ uint8_t DEV_Address(void)
 }
 //------------------------------------------------------
 bool DEV_Request(FS9Buffer_t* source, FS9Buffer_t* dest)
-{   
+{
     is_crash = true; // получили запрос от ЦП - сброс аварийной ситуации
    
     ERROR_request_inc(); // увеличиваем счетчик запросов, если адрес устройства верный
@@ -715,7 +715,7 @@ bool DEV_Driver(FS9Buffer_t* source, FS9Buffer_t* dest)
         case 0x19: // запись байта конфигурации искробезопасных входов
             if(devAddr == DEVICE_MDVV_01 && source->size == 1) // настройка искробезопасных входов только для МДВВ-01
             {
-                if(source->data[0] >= SPARK_SECURITY_MODE_1 && source->data[0] <= SPARK_SECURITY_MODE_3)
+                if((int8_t)source->data[0] >= SPARK_SECURITY_MODE_NONE && (int8_t)source->data[0] <= SPARK_SECURITY_MODE_3)
                 {
                     // присваиваем новое значение режима для четырех искробезопасных входов
                     io_in->list[0].spark_security = io_in->list[1].spark_security = io_in->list[2].spark_security =
@@ -995,8 +995,16 @@ void DEV_Input_Filter(uint8_t index)
                     else
                         input->filter.c_error++;
                 }
-                else if(input->spark_security == SPARK_SECURITY_MODE_2) // обработка искробезопасных входов в режиме №2 (сигнал на входе 50Гц)
+                else if(input->spark_security == SPARK_SECURITY_MODE_2 || input->spark_security == SPARK_SECURITY_MODE_3)
                 {
+                    /*! обработка искробезопасных входов в режиме №2 и №3 (сигнал на входе 50Гц)
+                     *  Алгоритм работает следующим образом:
+                     *  Вход ON фиксирует входной сигнал только в том случае, если на входе DI_1 и DI_3 (ПУСК) присутсвтвует сигнал 50Гц в противофазе
+                     *  Состояние входа DI_3 (ПУСК) считается ошибкой, если сигнал находится в фазе с сигналом на входе DI_1 (прямое включение диода)
+                     *  Состосние входа DI_2 (СТОП) считается ошибкой, если сигнал 50Гц на входе DI_1 присутствует, а налинии DI_2 нет (обрыв линии)
+                     *  Состояние на любом из искробезопасных входов DI_1 - DI_4 является ошибкой, если частота сигнала меньше или больше 50Гц
+                     */
+                    
                     // мгновенные значения состояний входов DI_1, DI_2 (СТОП) и DI_3 (ПУСК)
                     bool io_phaseState = io_inPhase->pin.gpio->IDR & io_inPhase->pin.io;
                     bool io_offState   = io_inOff->pin.gpio->IDR & io_inOff->pin.io;
@@ -1041,7 +1049,8 @@ void DEV_Input_Filter(uint8_t index)
         {
             if(input->filter.c_state >= (io_in->set.Nperiod - 1))
             {
-                if(input == io_inOff && !act_level && io_inPhase->state && input->spark_security == SPARK_SECURITY_MODE_2)
+                if(input == io_inOff && !act_level && io_inPhase->state && (input->spark_security == SPARK_SECURITY_MODE_2 || 
+                                                                            input->spark_security == SPARK_SECURITY_MODE_3))
                 {
                     input->error  = true;
                     input->state  = false;
