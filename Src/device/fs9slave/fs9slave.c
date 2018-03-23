@@ -9,6 +9,18 @@ volatile uint8_t     _address       = 0xFF; // default device address
 void FS9Slave_Init(uint8_t address)
 {
     _address = address;
+    
+    RCC->AHBENR |= RCC_AHBENR_DMA1EN;
+    
+    DMA1_Channel2->CPAR  = (uint32_t)(&(USART1->TDR));
+    DMA1_Channel2->CMAR  = (uint32_t)(&(_tx_buffer.data[0]));
+    DMA1_Channel2->CCR  &= ~(DMA_CCR_MSIZE | DMA_CCR_PSIZE | DMA_CCR_MINC | DMA_CCR_PINC | DMA_CCR_CIRC | DMA_CCR_DIR);
+    DMA1_Channel2->CCR   = DMA_CCR_MSIZE_0 | DMA_CCR_PSIZE_0 | DMA_CCR_PL | DMA_CCR_MINC | DMA_CCR_DIR | DMA_CCR_TCIE;
+    
+    USART1->CR3 |= USART_CR3_DMAT;
+    
+    NVIC_SetPriority(DMA1_Ch2_3_DMA2_Ch1_2_IRQn, 0);
+    NVIC_EnableIRQ(DMA1_Ch2_3_DMA2_Ch1_2_IRQn);
 }
 //--------------------------
 void USART1_IRQHandler(void)
@@ -35,7 +47,7 @@ void USART1_IRQHandler(void)
                         _rx_buffer.cmd      = cmd; // save command data
                         _rx_buffer.size     = cmd.n; // save command size
                         _rx_buffer.index    = 0; // index clear
-                        _rx_buffer.data[_rx_buffer.index++] = ((uint8_t)(byte&0x00FF)); // save first byte in receiver buffer
+                        _rx_buffer.data[_rx_buffer.index++] = (byte&0x00FF); // save first byte in receiver buffer
                         
                         USART1->RTOR = cmd.n*8;
                         USART1->CR2 |= USART_CR2_RTOEN; // enable receive timeout
@@ -47,7 +59,7 @@ void USART1_IRQHandler(void)
             }
             else if(_is_cmd) // flag command is set
             {
-                _rx_buffer.data[_rx_buffer.index++] = ((uint8_t)(byte&0x00FF)); // save next byte in receiver buffer
+                _rx_buffer.data[_rx_buffer.index++] = (byte&0x00FF); // save next byte in receiver buffer
                 
                 if(_rx_buffer.size == _rx_buffer.index) // received all data
                 {
@@ -95,6 +107,19 @@ void USART1_IRQHandler(void)
         USART1->ICR |= USART_ICR_ORECF; // clear flag
     }
 }
+//-----------------------------------------
+void DMA1_Ch2_3_DMA2_Ch1_2_IRQHandler(void)
+{
+    if((DMA1->ISR & DMA_ISR_GIF2) == DMA_ISR_GIF2)
+    {
+        DMA1_Channel2->CCR &= ~DMA_CCR_EN;
+        USART1->CR1        &= ~USART_CR1_TE;
+        DMA1->IFCR         |= DMA_IFCR_CGIF2;
+        
+        _tx_buffer.size  = 0;
+        _tx_buffer.index = 0;
+    }
+}
 //-------------------------
 bool FS9Slave_IsReady(void)
 {
@@ -110,7 +135,7 @@ bool FS9Slave_Read(FS9Buffer_t* dest)
         dest->cmd      = _rx_buffer.cmd;
         _is_data_ready = false;
         
-        memcpy(&dest->data[0], (const uint8_t*)&_rx_buffer.data[0], _rx_buffer.size);
+        memcpy(&dest->data[0], (const uint16_t*)&_rx_buffer.data[0], sizeof(_rx_buffer.size)*_rx_buffer.size);
         
         return true;
     }
@@ -123,9 +148,11 @@ void FS9Slave_Write(FS9Buffer_t* packet)
     _tx_buffer.size  = packet->size;
     _tx_buffer.index = 0;
     
-    memcpy((uint8_t*)&_tx_buffer.data[0], (const uint8_t*)&packet->data[0], _tx_buffer.size);
+    memcpy((uint16_t*)&_tx_buffer.data[0], (const uint16_t*)&packet->data[0], sizeof(_tx_buffer.size)*_tx_buffer.size);
     
-    USART1->CR1 |= USART_CR1_TE | USART_CR1_TXEIE;
+    DMA1_Channel2->CMAR   = (uint32_t)(&(_tx_buffer.data[0]));
+    DMA1_Channel2->CNDTR  = _tx_buffer.size;
+    DMA1_Channel2->CCR   |= DMA_CCR_EN;
     
-    USART1->TDR = _tx_buffer.data[_tx_buffer.index++];
+    USART1->CR1 |= USART_CR1_TE;
 }

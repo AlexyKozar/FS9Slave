@@ -5,7 +5,7 @@
     #include <stdbool.h>
     //------------------------------------
     #define CMD_MASK      (uint16_t)0x0100
-    #define CMD_CODE_MASK (uint8_t)0x3F
+    #define CMD_CODE_MASK (uint16_t)0x003F
     //-------------------------------
     #define MAX_CMD_NUM (uint8_t)0x40
     //--------------------------------------

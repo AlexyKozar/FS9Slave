@@ -341,7 +341,7 @@ bool DEV_Request(FS9Buffer_t* source, FS9Buffer_t* dest)
     
     uint8_t checksum = DEV_Checksum(source, source->size - 1);
     
-    if(checksum != source->data[source->size - 1]) // ошибка контрольной суммы
+    if(checksum != (uint8_t)source->data[source->size - 1]) // ошибка контрольной суммы
     {
         ERROR_checksum_inc(); // увеличиваем счетчик ошибок контрольной суммы
         
@@ -355,7 +355,9 @@ bool DEV_Request(FS9Buffer_t* source, FS9Buffer_t* dest)
     data.size     = source->size - 2;
     
     if(data.size > 0)
-        memcpy(&source->data[1], &data.data[0], data.size);
+    {
+        memcpy(&data.data[0], &source->data[1], sizeof(data.data[0])*data.size);
+    }
     
     bool answer = DEV_Driver(&data, dest);
     
@@ -875,7 +877,7 @@ uint8_t DEV_Checksum(FS9Buffer_t* packet, uint8_t size)
     
     for(uint8_t i = 0; i < size; ++i)
     {
-        checksum += packet->data[i];
+        checksum += (uint8_t)(packet->data[i]&0x00FF);
     }
     
     checksum += size;
