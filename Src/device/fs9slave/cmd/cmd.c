@@ -20,7 +20,7 @@ cmd_t cmd_list[MAX_CMD_NUM] =
     { 2, 2, true },      // 0x0F
     { 2, 2, true },      // 0x10
     { 2, 2, true },      // 0x11
-    { 2, 2, false },     // 0x12
+    { 2, 2, true },      // 0x12
     { 2, 2, true },      // 0x13
     { 2, 2, true },      // 0x14
     { 2, 2, true },      // 0x15
