@@ -15,6 +15,8 @@ void  crash(void* output); // для обработки аварийной си�
 void  queue_init(void);
 void  insert_task(uint8_t id); // вставка задачи в очередь для мигания (МИК-01)
 void  kill_task(uint8_t id); // убить задачу в очереди для мигания (МИК-01)
+void  getDateBCD(uint8_t* date); // получение текущей даты
+uint8_t convertByteToBCD(int value); // конвертирование числа в код BCD
 //----------------------
 PORT_Input_Type*  io_in;
 PORT_Output_Type* io_out;
@@ -29,6 +31,8 @@ output_t* out_crash  = NULL; // выход аварийной сигнализа
 input_t*  io_inOff   = 0;
 input_t*  io_inOn    = 0;
 input_t*  io_inPhase = NULL;
+//--------------------------
+uint8_t deviceSN[8] = { 0 }; // серийный номер устройства
 //--------------------------------------------------------------------------------
 key_t keys = { 0x00000000, KEY_EMPTY_MASK, KEY_EMPTY_MASK, KEY_MODE_NONE, false };
 //-----------------------------
@@ -147,6 +151,62 @@ void DEV_Init(PORT_Input_Type* inputs, PORT_Output_Type* outputs)
     }
     
     TIM_INT_Init();
+    
+    // Формирование серийного номера устройства
+    deviceSN[0] = devID; // код изделия
+    deviceSN[1] = convertByteToBCD(DEVICE_NUMBER >> 8); // старший байт номера устройства
+    deviceSN[2] = convertByteToBCD(DEVICE_NUMBER&0x00FF); // младший байт номера устройства
+    deviceSN[3] = convertByteToBCD(DEVICE_LOT); // номер в партии
+    deviceSN[4] = convertByteToBCD(DEVICE_FIRMWARE_VARIANT); // вариант прошивки
+    
+    uint8_t current_date[3] = { 0 };
+    getDateBCD(current_date);
+    
+    deviceSN[5] = current_date[0]; // год прошивки
+    deviceSN[6] = current_date[1]; // месяц прошивки
+    deviceSN[7] = current_date[2]; // день прошивки
+}
+/*!
+ * date - буфер для хранения даты
+ */
+void getDateBCD(uint8_t* date)
+{
+    const char* months[] = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
+
+    uint8_t tdate[] = __DATE__;
+    
+    if(strlen((const char*)tdate) == 11)
+    {
+        tdate[3] = 0;
+        tdate[6] = 0;
+
+        int year  = atoi((const char*)tdate + 9);
+        int month = -1;
+        int day   = atoi((const char*)tdate + 4);
+
+        for(int i = 0; i < 12; i++)
+        {
+            if(strcmp((const char*)tdate, months[i]) == 0)
+            {
+                month = i + 1;
+                break;
+            }
+        }
+
+        if(month != -1)
+        {
+            date[0] = convertByteToBCD(year); // год в формате BCD
+            date[1] = convertByteToBCD(month); // месяц в формате BCD
+            date[2] = convertByteToBCD(day); // день в формате BCD
+        }
+    }
+}
+/*!
+ * value - значение которое переводится в BCD
+ */
+uint8_t convertByteToBCD(int value)
+{
+    return (((value/10) << 4) | (value%10));
 }
 //--------------------------------------
 void IO_Clock_Enable(GPIO_TypeDef* gpio)
@@ -773,16 +833,12 @@ bool DEV_Driver(FS9Buffer_t* source, FS9Buffer_t* dest)
         break;
         
         case 0x1E:
-            dest->data[0] = devID;
-            dest->data[1] = DEVICE_NUMBER&0x00FF;
-            dest->data[2] = DEVICE_NUMBER&0xFF00;
-            dest->data[3] = DEVICE_LOT;
-            dest->data[4] = DEVICE_FIRMWARE_VARIANT;
-            dest->data[5] = (DEVICE_FIRMWARE_DATE&0x00FF0000) >> 16; // year
-            dest->data[6] = (DEVICE_FIRMWARE_DATE&0x0000FF00) >> 8; // month
-            dest->data[7] = DEVICE_FIRMWARE_DATE&0x000000FF; // day
+            for(int i = 0; i < sizeof(deviceSN); i++)
+            {
+                dest->data[i] = deviceSN[i];
+            }
         
-            dest->size = 8;
+            dest->size = sizeof(deviceSN);
         break;
             
         case 0x1F: // чтение времени срабатывания выделенного входного дискретного канала                
