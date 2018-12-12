@@ -48,10 +48,6 @@ void USART1_IRQHandler(void)
                         _rx_buffer.size     = cmd.n; // save command size
                         _rx_buffer.index    = 0; // index clear
                         _rx_buffer.data[_rx_buffer.index++] = (byte&0x00FF); // save first byte in receiver buffer
-                        
-                        USART1->RTOR = cmd.n*8;
-                        USART1->CR2 |= USART_CR2_RTOEN; // enable receive timeout
-                        USART1->CR1 |= USART_CR1_RTOIE; // enable timeout interrupt
                     }
                     else
                         ERROR_command_inc();
@@ -65,9 +61,6 @@ void USART1_IRQHandler(void)
                 {
                     _is_cmd        = false;
                     _is_data_ready = true;
-                    
-                    USART1->CR2 &= ~USART_CR2_RTOEN; // disable receive timeout
-                    USART1->CR1 &= ~USART_CR1_RTOIE; // disable timeout interrupt
                 }
             }
         }
@@ -87,15 +80,6 @@ void USART1_IRQHandler(void)
         }
         
         USART1->ISR &= ~USART_ISR_TXE;
-    }
-    
-    if((USART1->ISR & USART_ISR_RTOF) == USART_ISR_RTOF)
-    {   
-        _is_cmd = false;
-        
-        ERROR_timeout_inc(); // timeout error counter increment
-        
-        USART1->ICR |= USART_ICR_RTOCF; // clear flag
     }
     
     if((USART1->ISR & USART_ISR_ORE) == USART_ISR_ORE)

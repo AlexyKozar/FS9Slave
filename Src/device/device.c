@@ -842,35 +842,35 @@ bool DEV_Driver(FS9Buffer_t* source, FS9Buffer_t* dest)
         break;
             
         case 0x1F: // чтение времени срабатывания выделенного входного дискретного канала                
-			if(_pwr_ok.is_crash == true)
-			{
-				uint8_t state = DSDIN_TRIGGER_ON_0;
-				
-				if(_pwr_ok.IN_change == true)
-				{
-					state = (_pwr_ok.IN_state == true)?DSDIN_TRIGGER_ON_1:DSDIN_TRIGGER_ON_0;
-					time  = _pwr_ok.IN_time;
-				}
-				else
-				{
-					state = (io_in->list[PWROK_INPUT].state == true)?DSDIN_TRIGGER_ON_1:
-						                                             DSDIN_TRIGGER_ON_0;
-				}
-				
-				_pwr_ok.is_crash  = false;
-				_pwr_ok.IN_change = false;
-				_pwr_ok.IN_state  = false;
-				_pwr_ok.IN_time   = 0x0000;
-				
-				dest->data[0] = state;
-			}
-			else
-			{
-				dest->data[0] = DSDIN_TRIGGER_OFF;
-			}
-			
-			dest->data[1] = (uint8_t)(time&0x00FF);
-			dest->data[2] = (uint8_t)((time&0xFF00) >> 8);
+					if(_pwr_ok.is_crash == true)
+					{
+						uint8_t state = DSDIN_TRIGGER_ON_0;
+						
+						if(_pwr_ok.IN_change == true)
+						{
+							state = (_pwr_ok.IN_state == true)?DSDIN_TRIGGER_ON_1:DSDIN_TRIGGER_ON_0;
+							time  = _pwr_ok.IN_time;
+						}
+						else
+						{
+							state = (io_in->list[PWROK_INPUT].state == true)?DSDIN_TRIGGER_ON_1:
+																														 DSDIN_TRIGGER_ON_0;
+						}
+						
+						_pwr_ok.is_crash  = false;
+						_pwr_ok.IN_change = false;
+						_pwr_ok.IN_state  = false;
+						_pwr_ok.IN_time   = 0x0000;
+						
+						dest->data[0] = state;
+					}
+					else
+					{
+						dest->data[0] = DSDIN_TRIGGER_OFF;
+					}
+					
+					dest->data[1] = (uint8_t)(time&0x00FF);
+					dest->data[2] = (uint8_t)((time&0xFF00) >> 8);
             
             dest->size = 3;
         break;
