@@ -6,8 +6,8 @@
     #include <string.h>
     #include "stm32f0xx.h"
     #include "cmd/cmd.h"
-    //------------------------
-    #define BUFFER_MAX_SIZE 20 // max size rx and tx buffer
+    //--------------------------
+    #define BUFFER_MAX_SIZE 0x14 // max size rx and tx buffer
     #define ACK             0x06
     #define NAK             0x15
     /*!
@@ -15,11 +15,11 @@
      */
     typedef struct _FS9Buffer_t
     {
-        uint8_t data[BUFFER_MAX_SIZE];
-        uint8_t cmd_code; // command code
-        cmd_t   cmd; // command data
-        uint8_t size; // data buffer size
-        uint8_t index; // current data index
+        uint16_t data[BUFFER_MAX_SIZE]; // messages buffer
+        uint8_t  cmd_code; // command code
+        cmd_t    cmd; // command data
+        uint16_t size; // data buffer size
+        uint16_t index; // current data index
     } FS9Buffer_t;    
     /*!
      * /brief Protocol initialize
