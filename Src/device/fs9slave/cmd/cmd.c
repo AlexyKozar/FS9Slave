@@ -60,7 +60,7 @@ cmd_t cmd_list[MAX_CMD_NUM] =
     { 0, 0, false },     // 0x37
     { 0, 0, false },     // 0x38
     { 0, 0, false },     // 0x39
-    { 0, 0, false },     // 0x3A
+    { 17, 2, true },     // 0x3A - запись нового серийного номера
     { 2, 2, true },      // 0x3B - чтение из памяти (тест eeprom)
     { 2, 2, true },      // 0x3C - запись в память (тест eeprom)
     { 0, 0, false },     // 0x3D

@@ -8,10 +8,13 @@
     //--------------------------------------
     #define FLASH_KEY_1 (uint32_t)0x45670123
     #define FLASH_KEY_2 (uint32_t)0xCDEF89AB
-    //---------------------------------------------
-    #define FLASH_BASE_ADDRESS (uint32_t)0x08007C00
-    #define FLASH_END_ADDRESS  (uint32_t)0x08007FFF
-    #define FLASH_CELL_EMPTY   (uint32_t)0xFFFFFFFF
+    //--------------------------------------------
+    #define SERIAL_NUMBER_KEY (uint32_t)0xAABBCCDD
+    //-----------------------------------------------
+    #define FLASH_BASE_ADDRESS   (uint32_t)0x08007C00 // base address write data
+    #define FLASH_END_ADDRESS    (uint32_t)0x08007FFF // end address write data
+    #define FLASH_CELL_EMPTY     (uint32_t)0xFFFFFFFF // cell is empty
+    #define FLASH_SERIAL_ADDRESS (uint32_t)0x08007800 // start page serial number
     //------------------------
     void     FLASH_Init(void);
     bool     FLASH_Unlock(void);

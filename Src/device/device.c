@@ -64,6 +64,9 @@ uint16_t AIN_TEMP[MAX_SIZE_AIN_TEMP][3] =
     { 195, 32200, 32100 },
     { 200, 32900, 32900 }
 };
+
+uint32_t key_read = 0;
+uint32_t key_receive = 0;
 //-----------------------------------------------------
 void DEV_Create(GPIO_TypeDef* gpio, uint16_t addr_pins)
 {
@@ -165,6 +168,45 @@ void DEV_Init(PORT_Input_Type* inputs, PORT_Output_Type* outputs)
     deviceSN[5] = current_date[0]; // год прошивки
     deviceSN[6] = current_date[1]; // месяц прошивки
     deviceSN[7] = current_date[2]; // день прошивки
+    
+    if(FLASH_Unlock())
+    {
+        uint32_t serial_key = FLASH_Read(FLASH_SERIAL_ADDRESS);
+        uint32_t data = 0;    
+        
+        if(serial_key != FLASH_CELL_EMPTY) // serial key is not empty
+        {
+            // read serial number
+            data = FLASH_Read(FLASH_SERIAL_ADDRESS + 4);
+            
+            deviceSN[0] = (data >> 24)&0x000000FF;
+            deviceSN[1] = (data >> 16)&0x000000FF;
+            deviceSN[2] = (data >> 8)&0x000000FF;
+            deviceSN[3] = data&0x000000FF;
+            
+            data = FLASH_Read(FLASH_SERIAL_ADDRESS + 8);
+            
+            deviceSN[4] = (data >> 24)&0x000000FF;
+            deviceSN[5] = (data >> 16)&0x000000FF;
+            deviceSN[6] = (data >> 8)&0x000000FF;
+            deviceSN[7] = data&0x000000FF;
+        }
+        else // write default serial key to flash
+        {
+            if(FLASH_Erase(FLASH_SERIAL_ADDRESS))
+            {
+                FLASH_Write(FLASH_SERIAL_ADDRESS, SERIAL_NUMBER_KEY);
+                
+                data = ((deviceSN[0] << 24) | (deviceSN[1] << 16) | (deviceSN[2] << 8) | deviceSN[3]);
+                FLASH_Write(FLASH_SERIAL_ADDRESS + 4, data);
+                
+                data = ((deviceSN[4] << 24) | (deviceSN[5] << 16) | (deviceSN[6] << 8) | deviceSN[7]);
+                FLASH_Write(FLASH_SERIAL_ADDRESS + 8, data);
+            }
+        }
+        			
+        FLASH_Lock();
+    }
 }
 /*!
  * date - буфер для хранения даты
@@ -447,7 +489,7 @@ bool DEV_Driver(FS9Buffer_t* source, FS9Buffer_t* dest)
     uint8_t   byte  = 0x00;
     uint8_t   state = 0x00;
     uint8_t   n_out = 0x00;
-	uint16_t  time  = 0x0000;
+    uint16_t  time  = 0x0000;
     output_t* out   = NULL;
     
     uint8_t eeprom[15] = { 0x10, 0x20, 0x30, 0x40, 0x5F, 0x07, 0x32, 0x14, 0x02, 0x0A,
@@ -842,37 +884,50 @@ bool DEV_Driver(FS9Buffer_t* source, FS9Buffer_t* dest)
         break;
             
         case 0x1F: // чтение времени срабатывания выделенного входного дискретного канала                
-					if(_pwr_ok.is_crash == true)
-					{
-						uint8_t state = DSDIN_TRIGGER_ON_0;
-						
-						if(_pwr_ok.IN_change == true)
-						{
-							state = (_pwr_ok.IN_state == true)?DSDIN_TRIGGER_ON_1:DSDIN_TRIGGER_ON_0;
-							time  = _pwr_ok.IN_time;
-						}
-						else
-						{
-							state = (io_in->list[PWROK_INPUT].state == true)?DSDIN_TRIGGER_ON_1:
-																														 DSDIN_TRIGGER_ON_0;
-						}
-						
-						_pwr_ok.is_crash  = false;
-						_pwr_ok.IN_change = false;
-						_pwr_ok.IN_state  = false;
-						_pwr_ok.IN_time   = 0x0000;
-						
-						dest->data[0] = state;
-					}
-					else
-					{
-						dest->data[0] = DSDIN_TRIGGER_OFF;
-					}
-					
-					dest->data[1] = (uint8_t)(time&0x00FF);
-					dest->data[2] = (uint8_t)((time&0xFF00) >> 8);
+            if(_pwr_ok.is_crash == true)
+            {
+                uint8_t state = DSDIN_TRIGGER_ON_0;
+                
+                if(_pwr_ok.IN_change == true)
+                {
+                    state = (_pwr_ok.IN_state == true)?DSDIN_TRIGGER_ON_1:DSDIN_TRIGGER_ON_0;
+                    time  = _pwr_ok.IN_time;
+                }
+                else
+                {
+                    state = (io_in->list[PWROK_INPUT].state == true)?DSDIN_TRIGGER_ON_1:
+                                                                                                                 DSDIN_TRIGGER_ON_0;
+                }
+                
+                _pwr_ok.is_crash  = false;
+                _pwr_ok.IN_change = false;
+                _pwr_ok.IN_state  = false;
+                _pwr_ok.IN_time   = 0x0000;
+                
+                dest->data[0] = state;
+            }
+            else
+            {
+                dest->data[0] = DSDIN_TRIGGER_OFF;
+            }
             
+            dest->data[1] = (uint8_t)(time&0x00FF);
+            dest->data[2] = (uint8_t)((time&0xFF00) >> 8);
+
             dest->size = 3;
+        break;
+					
+        case 0x3A: // запись серийного номера
+            if(FLASH_Unlock())
+            {
+                key_read = FLASH_Read(FLASH_SERIAL_ADDRESS);
+                key_receive = ((source->data[0] << 24) | (source->data[1] << 16) | (source->data[2] << 8) | source->data[3]);
+                
+                if(key_read != key_receive)
+                    return false;
+                
+                FLASH_Lock();
+            }
         break;
 
         case 0x3B: // чтение из памяти (тест eeprom и flash)
