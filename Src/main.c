@@ -104,7 +104,7 @@ int main(void)
     PORT_Output_Type output; // the output channels
     
     EVENT_Init();
-    IODevice_Init(addr, &input, &output);
+    IODevice_Init(addr, &input, &output);    
     DEV_Init(&input, &output);
 
     if(addr == DEVICE_MDVV_01)

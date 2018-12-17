@@ -179,17 +179,16 @@ void DEV_Init(PORT_Input_Type* inputs, PORT_Output_Type* outputs)
             // read serial number
             data = FLASH_Read(FLASH_SERIAL_ADDRESS + 4);
             
-            deviceSN[0] = (data >> 24)&0x000000FF;
-            deviceSN[1] = (data >> 16)&0x000000FF;
-            deviceSN[2] = (data >> 8)&0x000000FF;
-            deviceSN[3] = data&0x000000FF;
+            deviceSN[1] = (data >> 24)&0x000000FF;
+            deviceSN[2] = (data >> 16)&0x000000FF;
+            deviceSN[3] = (data >> 8)&0x000000FF;
+            deviceSN[4] = data&0x000000FF;
             
             data = FLASH_Read(FLASH_SERIAL_ADDRESS + 8);
             
-            deviceSN[4] = (data >> 24)&0x000000FF;
-            deviceSN[5] = (data >> 16)&0x000000FF;
-            deviceSN[6] = (data >> 8)&0x000000FF;
-            deviceSN[7] = data&0x000000FF;
+            deviceSN[5] = (data >> 24)&0x000000FF;
+            deviceSN[6] = (data >> 16)&0x000000FF;
+            deviceSN[7] = (data >> 8)&0x000000FF;
         }
         else // write default serial key to flash
         {
@@ -197,10 +196,10 @@ void DEV_Init(PORT_Input_Type* inputs, PORT_Output_Type* outputs)
             {
                 FLASH_Write(FLASH_SERIAL_ADDRESS, SERIAL_NUMBER_KEY);
                 
-                data = ((deviceSN[0] << 24) | (deviceSN[1] << 16) | (deviceSN[2] << 8) | deviceSN[3]);
+                data = ((deviceSN[1] << 24) | (deviceSN[2] << 16) | (deviceSN[3] << 8) | deviceSN[4]);
                 FLASH_Write(FLASH_SERIAL_ADDRESS + 4, data);
                 
-                data = ((deviceSN[4] << 24) | (deviceSN[5] << 16) | (deviceSN[6] << 8) | deviceSN[7]);
+                data = ((deviceSN[5] << 24) | (deviceSN[6] << 16) | (deviceSN[7] << 8) | 0x00);
                 FLASH_Write(FLASH_SERIAL_ADDRESS + 8, data);
             }
         }
@@ -925,6 +924,34 @@ bool DEV_Driver(FS9Buffer_t* source, FS9Buffer_t* dest)
                 
                 if(key_read != key_receive)
                     return false;
+                
+                if(FLASH_Erase(FLASH_SERIAL_ADDRESS))
+                {
+                    uint32_t key_new = ((source->data[4] << 24) | (source->data[5] << 16) | (source->data[6] << 8) | source->data[7]);
+                    
+                    if(key_new != 0x00000000)
+                    {
+                        FLASH_Write(FLASH_SERIAL_ADDRESS, key_new);
+                    }
+                    else
+                        FLASH_Write(FLASH_SERIAL_ADDRESS, key_receive);
+                }
+                
+                uint32_t data = 0;
+                
+                deviceSN[1] = source->data[8];
+                deviceSN[2] = source->data[9];
+                deviceSN[3] = source->data[10];
+                deviceSN[4] = source->data[11];
+                deviceSN[5] = source->data[12];
+                deviceSN[6] = source->data[13];
+                deviceSN[7] = source->data[14];
+                
+                data = ((deviceSN[1] << 24) | (deviceSN[2] << 16) | (deviceSN[3] << 8) | deviceSN[4]);
+                FLASH_Write(FLASH_SERIAL_ADDRESS + 4, data);
+                
+                data = ((deviceSN[5] << 24) | (deviceSN[6] << 16) | (deviceSN[7] << 8) | 0x00);
+                FLASH_Write(FLASH_SERIAL_ADDRESS + 8, data);
                 
                 FLASH_Lock();
             }
