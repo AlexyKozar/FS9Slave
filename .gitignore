@@ -6,4 +6,4 @@
 MDK-ARM/FS9Slave/
 *.*.*
 *.uvprojx
-*.lst
+MDK-ARM/*.lst
