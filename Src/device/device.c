@@ -1,24 +1,26 @@
 #include "device.h"
-//-------------------------------------------
-void     IO_Clock_Enable(GPIO_TypeDef* gpio);
-void     IO_Init(io_t io, uint8_t io_dir);
-void     CHANNEL_Out_Set(uint8_t index);
-void     CHANNEL_Out_Reset(uint8_t index);
-void     TIM_Scan_Init(void);
-void     TIM_Scan_Update(void);
-void     TIM_INT_Init(void);
-void     TIM_INT_Start(void);
-float    Get_Temp(uint16_t val, uint8_t in_num);
-float    UAIN_to_TResistance(uint16_t val, uint8_t in_num); // преобразование напряжения в сопротивление температуры
-void     blink2Hz(void* output); // мигание с частотой 2Гц (для МИК-01)
-void     crash(void* output); // для обработки аварийной ситуации (нет запросов от ЦП 5 сек)
-void     int_timeout(void* param); // для обработки таймаута отправки данных по изменению состояний входов
-void     queue_init(void);
-void     insert_task(uint8_t id); // вставка задачи в очередь для мигания (МИК-01)
-void     kill_task(uint8_t id); // убить задачу в очереди для мигания (МИК-01)
-void     getDateBCD(uint8_t* date); // получение текущей даты
-uint8_t  convertByteToBCD(int value); // конвертирование числа в код BCD
-uint32_t convertInputState(void); // конвертирование состояний входов (значащие только 3 младших байта)
+//------------------------------------------
+void    IO_Clock_Enable(GPIO_TypeDef* gpio);
+void    IO_Init(io_t io, uint8_t io_dir);
+void    CHANNEL_Out_Set(uint8_t index);
+void    CHANNEL_Out_Reset(uint8_t index);
+void    TIM_Scan_Init(void);
+void    TIM_Scan_Update(void);
+void    TIM_INT_Init(void);
+void    TIM_INT_Start(void);
+float   Get_Temp(uint16_t val, uint8_t in_num);
+float   UAIN_to_TResistance(uint16_t val, uint8_t in_num); // преобразование напряжения в сопротивление температуры
+void    blink2Hz(void* output); // мигание с частотой 2Гц (для МИК-01)
+void    crash(void* output); // для обработки аварийной ситуации (нет запросов от ЦП 5 сек)
+void    int_timeout(void* param); // для обработки таймаута отправки данных по изменению состояний входов
+void    queue_init(void);
+void    insert_task(uint8_t id); // вставка задачи в очередь для мигания (МИК-01)
+void    kill_task(uint8_t id); // убить задачу в очереди для мигания (МИК-01)
+void    getDateBCD(uint8_t* date); // получение текущей даты
+uint8_t convertByteToBCD(int value); // конвертирование числа в код BCD
+void    convertInputState(uint8_t* data); // конвертирование состояний входов (data - массив из трех байт)
+bool    isEqualIputState(uint8_t* data); // проверка на эквивалентность состояний входов
+void    inputStateUpdate(void);
 //----------------------
 PORT_Input_Type*  io_in;
 PORT_Output_Type* io_out;
@@ -27,14 +29,14 @@ uint8_t devAddr = 0xFF;
 uint8_t devID   = 0xFF;
 //-------------------------
 bool InputStateChanged = false;
-//---------------------------
-bool      is_crash   = false; // авария - отключение выхода (происходит в случае отсутствия запросов от ЦП 5 сек)
-output_t* out_crash  = NULL; // выход аварийной сигнализации
-input_t*  io_inOff   = 0;
-input_t*  io_inOn    = 0;
-input_t*  io_inPhase = NULL;
-
-int_state_t int_state = { 0x00000000, INT_STATE_IDLE };
+//-----------------------------
+bool        is_crash   = false; // авария - отключение выхода (происходит в случае отсутствия запросов от ЦП 5 сек)
+output_t*   out_crash  = NULL; // выход аварийной сигнализации
+input_t*    io_inOff   = 0;
+input_t*    io_inOn    = 0;
+input_t*    io_inPhase = NULL;
+//--------------------
+int_state_t int_state; // буфер для храненя состояния входов (один снимок)
 //--------------------------
 uint8_t deviceSN[8] = { 0 }; // серийный номер устройства
 //--------------------------------------------------------------------------------
@@ -210,6 +212,12 @@ void DEV_Init(PORT_Input_Type* inputs, PORT_Output_Type* outputs)
         			
         FLASH_Lock();
     }
+    
+    // начальная инициализация буфера хранения состояний входов
+    int_state.mode = INT_STATE_IDLE;
+    int_state.state[0] = 0x00;
+    int_state.state[1] = 0x00;
+    int_state.state[2] = 0x00;
 }
 /*!
  * date - буфер для хранения даты
@@ -267,19 +275,23 @@ void IO_Clock_Enable(GPIO_TypeDef* gpio)
     else if(gpio == GPIOF)
         RCC->AHBENR |= RCC_AHBENR_GPIOFEN;
 }
-//------------------------------
-uint32_t convertInputState(void)
+//-----------------------------------
+void convertInputState(uint8_t* data)
 {
-    uint32_t state      = 0x00000000;
-    uint8_t  bit_count  = 0; // счетчик битов
-    uint8_t  byte_index = 0; // индекс текущего байта
+    uint8_t  bit_count  = 0x00; // счетчик битов
+    uint8_t  byte_index = 0x00; // индекс текущего байта
+    
+    // обнуление массива состояний входов
+    data[0] = 0x00;
+    data[1] = 0x00;
+    data[2] = 0x00;
         
     for(uint8_t i = 0; i < io_in->size; ++i)
     {
         if(bit_count == 8)
         {
             bit_count = 0;
-            byte_index += 8;
+            byte_index++;
         }
         
         uint8_t  channel_state = 0x00;
@@ -295,15 +307,44 @@ uint32_t convertInputState(void)
             // зафиксирована ошибка канала входа
             channel_state = 0x02;
             
+            if(channel->state == true) // если вход установлен, то добавляем активное состояние
+                channel_state |= 0x01;
+            
             // сбрасываем ошибку канала входа при чтении
             channel->error = false;
         }
         
-        state |= (channel_state << bit_count) << byte_index;
+        data[byte_index] |= channel_state << bit_count;
         bit_count += 2;
     }
+}
+//----------------------------------
+bool isEqualIputState(uint8_t* data)
+{
+    if(data[0] == int_state.state[0] && 
+       data[1] == int_state.state[1] && 
+       data[2] == int_state.state[2])
+    {
+        return true;
+    }
     
-    return state;
+    return false;
+}
+//-------------------------
+void inputStateUpdate(void)
+{
+    uint8_t state[3];
+    convertInputState(state); // создаем снимок текущего состояния входов
+    
+    if(!isEqualIputState(state)) // если текущее состоние не равно последнему снимку
+    {
+        int_state.state[0] = state[0]; // то меняем состояние снимка на текущее
+        int_state.state[1] = state[1];
+        int_state.state[2] = state[2];
+        
+        InputStateChanged = false; // очистка флага изменения состояния входов
+        GPIO_INT->BSRR |= GPIO_INT_RESET; // прижимаем линию INT (сигxнал для МЦП - состояния входов изменились)
+    }
 }
 //------------------------------------
 void IO_Init(io_t pin, uint8_t io_dir)
@@ -431,7 +472,7 @@ void DEV_PWROKInit(void)
 {
     RCC->AHBENR  |= RCC_AHBENR_GPIOAEN;
     RCC->APB2ENR |= RCC_APB2ENR_SYSCFGEN;
-		RCC->APB1ENR |= RCC_APB1ENR_TIM14EN;
+    RCC->APB1ENR |= RCC_APB1ENR_TIM14EN;
     
     GPIOA->MODER &= ~GPIO_MODER_MODER12;
     GPIOA->PUPDR &= ~GPIO_PUPDR_PUPDR12;
@@ -547,9 +588,9 @@ bool DEV_Driver(FS9Buffer_t* source, FS9Buffer_t* dest)
     {
         case 0x00: // чтение дискретных каналов входов
             // чтения байт из снимка состояний входов
-            dest->data[0] = (int_state.state >> 8)&0xFF;
-            dest->data[1] = (int_state.state >> 16)&0xFF;
-            dest->data[2] = (int_state.state >> 24)&0xFF;
+            dest->data[0] = int_state.state[0];
+            dest->data[1] = int_state.state[1];
+            dest->data[2] = int_state.state[2];
             dest->size = 3;
             int_state.mode = INT_STATE_TIMEOUT; // включение режима ожидания таймаута перед очередной отправкой
             GPIO_INT->BSRR |= GPIO_INT_SET; // поднимаем сигнал INT
@@ -937,7 +978,10 @@ bool DEV_Driver(FS9Buffer_t* source, FS9Buffer_t* dest)
                 key_receive = ((source->data[0] << 24) | (source->data[1] << 16) | (source->data[2] << 8) | source->data[3]);
                 
                 if(key_read != key_receive)
+                {
+                    FLASH_Lock();
                     return false;
+                }
                 
                 if(FLASH_Erase(FLASH_SERIAL_ADDRESS))
                 {
@@ -1056,14 +1100,7 @@ void DEV_InputScan(void)
     {
         if(int_state.mode == INT_STATE_IDLE) // если данные уже были прочитаны МЦП
         {
-            uint32_t state = convertInputState(); // читает текущее состояние входов
-            
-            if(state != int_state.state) // если текущее состоние не равно последнему снимку
-            {
-                int_state.state = state; // то меняем состояние снимка на текущее
-                InputStateChanged = false; // очистка флага изменения состояния входов
-                GPIO_INT->BSRR |= GPIO_INT_RESET; // прижимаем линию INT (сигxнал для МЦП - состояния входов изменились)
-            }
+            inputStateUpdate();
         }
     }
 }
@@ -1334,14 +1371,7 @@ void DEV_KeyboardScan(void* data)
     {
         if(int_state.mode == INT_STATE_IDLE) // если данные уже были прочитаны МЦП
         {
-            uint32_t state = convertInputState(); // читает текущее состояние входов
-            
-            if(state != int_state.state) // если текущее состоние не равно последнему снимку
-            {
-                int_state.state = state; // то меняем состояние снимка на текущее
-				InputStateChanged = false; // очистка флага изменения состояния входов
-                GPIO_INT->BSRR |= GPIO_INT_RESET; // прижимаем линию INT (сигнал для МЦП - состояния входов изменились)
-            }
+            inputStateUpdate();
         }
     }
 }
