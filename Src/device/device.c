@@ -1,22 +1,24 @@
 #include "device.h"
-//---------------------------------------
-void IO_Clock_Enable(GPIO_TypeDef* gpio);
-void IO_Init(io_t io, uint8_t io_dir);
-void CHANNEL_Out_Set(uint8_t index);
-void CHANNEL_Out_Reset(uint8_t index);
-void TIM_Scan_Init(void);
-void TIM_Scan_Update(void);
-void TIM_INT_Init(void);
-void TIM_INT_Start(void);
-float Get_Temp(uint16_t val, uint8_t in_num);
-float UAIN_to_TResistance(uint16_t val, uint8_t in_num); // преобразование напряжения в сопротивление температуры
-void  blink2Hz(void* output); // мигание с частотой 2Гц (для МИК-01)
-void  crash(void* output); // для обработки аварийной ситуации (нет запросов от ЦП 5 сек)
-void  queue_init(void);
-void  insert_task(uint8_t id); // вставка задачи в очередь для мигания (МИК-01)
-void  kill_task(uint8_t id); // убить задачу в очереди для мигания (МИК-01)
-void  getDateBCD(uint8_t* date); // получение текущей даты
-uint8_t convertByteToBCD(int value); // конвертирование числа в код BCD
+//-------------------------------------------
+void     IO_Clock_Enable(GPIO_TypeDef* gpio);
+void     IO_Init(io_t io, uint8_t io_dir);
+void     CHANNEL_Out_Set(uint8_t index);
+void     CHANNEL_Out_Reset(uint8_t index);
+void     TIM_Scan_Init(void);
+void     TIM_Scan_Update(void);
+void     TIM_INT_Init(void);
+void     TIM_INT_Start(void);
+float    Get_Temp(uint16_t val, uint8_t in_num);
+float    UAIN_to_TResistance(uint16_t val, uint8_t in_num); // преобразование напряжения в сопротивление температуры
+void     blink2Hz(void* output); // мигание с частотой 2Гц (для МИК-01)
+void     crash(void* output); // для обработки аварийной ситуации (нет запросов от ЦП 5 сек)
+void     int_timeout(void* param); // для обработки таймаута отправки данных по изменению состояний входов
+void     queue_init(void);
+void     insert_task(uint8_t id); // вставка задачи в очередь для мигания (МИК-01)
+void     kill_task(uint8_t id); // убить задачу в очереди для мигания (МИК-01)
+void     getDateBCD(uint8_t* date); // получение текущей даты
+uint8_t  convertByteToBCD(int value); // конвертирование числа в код BCD
+uint32_t convertInputState(void); // конвертирование состояний входов (значащие только 3 младших байта)
 //----------------------
 PORT_Input_Type*  io_in;
 PORT_Output_Type* io_out;
@@ -24,13 +26,15 @@ PORT_Output_Type* io_out;
 uint8_t devAddr = 0xFF;
 uint8_t devID   = 0xFF;
 //-------------------------
-bool Input_Changed = false;
+bool InputStateChanged = false;
 //---------------------------
 bool      is_crash   = false; // авария - отключение выхода (происходит в случае отсутствия запросов от ЦП 5 сек)
 output_t* out_crash  = NULL; // выход аварийной сигнализации
 input_t*  io_inOff   = 0;
 input_t*  io_inOn    = 0;
 input_t*  io_inPhase = NULL;
+
+int_state_t int_state = { 0x00000000, INT_STATE_IDLE };
 //--------------------------
 uint8_t deviceSN[8] = { 0 }; // серийный номер устройства
 //--------------------------------------------------------------------------------
@@ -64,7 +68,7 @@ uint16_t AIN_TEMP[MAX_SIZE_AIN_TEMP][3] =
     { 195, 32200, 32100 },
     { 200, 32900, 32900 }
 };
-
+//--------------------
 uint32_t key_read = 0;
 uint32_t key_receive = 0;
 //-----------------------------------------------------
@@ -123,7 +127,7 @@ void DEV_Init(PORT_Input_Type* inputs, PORT_Output_Type* outputs)
         io_out->list[i].pin.num = i;
         io_out->list[i].state   = OUTPUT_STATE_OFF;
 
-        DEV_Out_Reset(&io_out->list[i]); // выключить выход - состояние по умолчанию
+        DEV_OutReset(&io_out->list[i]); // выключить выход - состояние по умолчанию
     }
     
     io_t pin_int = { GPIO_INT, GPIO_INT_PIN };
@@ -131,7 +135,7 @@ void DEV_Init(PORT_Input_Type* inputs, PORT_Output_Type* outputs)
     
     GPIO_INT->BSRR |= GPIO_INT_SET; // включить выход INT (default state)
     
-    DEV_Input_Set_Default();
+    DEV_InputSetDefault();
     
     if(devAddr != DEVICE_MIK_01) // только для МДВВ
     {
@@ -146,7 +150,7 @@ void DEV_Init(PORT_Input_Type* inputs, PORT_Output_Type* outputs)
     }
     else
     {
-        EVENT_Create(5, false, DEV_Keyboard_Scan, NULL, 0xFF); // опрос клавиатуры
+        EVENT_Create(5, false, DEV_KeyboardScan, NULL, 0xFF); // опрос клавиатуры
         
         queue_init(); // инициализация очереди входов для работы в режиме мигания
         
@@ -263,6 +267,44 @@ void IO_Clock_Enable(GPIO_TypeDef* gpio)
     else if(gpio == GPIOF)
         RCC->AHBENR |= RCC_AHBENR_GPIOFEN;
 }
+//------------------------------
+uint32_t convertInputState(void)
+{
+    uint32_t state      = 0x00000000;
+    uint8_t  bit_count  = 0; // счетчик битов
+    uint8_t  byte_index = 0; // индекс текущего байта
+        
+    for(uint8_t i = 0; i < io_in->size; ++i)
+    {
+        if(bit_count == 8)
+        {
+            bit_count = 0;
+            byte_index += 8;
+        }
+        
+        uint8_t  channel_state = 0x00;
+        input_t* channel       = &io_in->list[i];
+        
+        if(channel->state == true && channel->error == false)
+        {
+            // состояние канала входа активно и ошибок в канале нет
+            channel_state = 0x01; // сигнал на входе присутствует
+        }
+        else if(channel->error == true)
+        {
+            // зафиксирована ошибка канала входа
+            channel_state = 0x02;
+            
+            // сбрасываем ошибку канала входа при чтении
+            channel->error = false;
+        }
+        
+        state |= (channel_state << bit_count) << byte_index;
+        bit_count += 2;
+    }
+    
+    return state;
+}
 //------------------------------------
 void IO_Init(io_t pin, uint8_t io_dir)
 {
@@ -276,8 +318,8 @@ void IO_Init(io_t pin, uint8_t io_dir)
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     HAL_GPIO_Init(pin.gpio, &GPIO_InitStruct);
 }
-//-----------------------------
-void DEV_Out_Set(output_t* out)
+//----------------------------
+void DEV_OutSet(output_t* out)
 {
     uint32_t io = ((uint32_t)out->pin.io);
     
@@ -288,8 +330,8 @@ void DEV_Out_Set(output_t* out)
     
     out->pin.gpio->BSRR |= io;
 }
-//-------------------------------
-void DEV_Out_Reset(output_t* out)
+//------------------------------
+void DEV_OutReset(output_t* out)
 {
     uint32_t io = ((uint32_t)out->pin.io);
     
@@ -300,20 +342,20 @@ void DEV_Out_Reset(output_t* out)
     
     out->pin.gpio->BSRR |= io;
 }
-//--------------------------------
-void DEV_Out_Toggle(output_t* out)
+//-------------------------------
+void DEV_OutToggle(output_t* out)
 {
-    if(DEV_Is_Out(out))
+    if(DEV_IsOut(out))
     {
-        DEV_Out_Reset(out);
+        DEV_OutReset(out);
     }
     else
     {
-        DEV_Out_Set(out);
+        DEV_OutSet(out);
     }
 }
-//----------------------------
-bool DEV_Is_Out(output_t* out)
+//---------------------------
+bool DEV_IsOut(output_t* out)
 {
     bool state = (out->pin.gpio->ODR & out->pin.io);
     
@@ -331,7 +373,7 @@ void CHANNEL_Out_Set(uint8_t index)
     {
         output_t* out = &io_out->list[index];
 
-        DEV_Out_Set(out);
+        DEV_OutSet(out);
     }
 }
 //-----------------------------------
@@ -341,7 +383,7 @@ void CHANNEL_Out_Reset(uint8_t index)
     {
         output_t* out = &io_out->list[index];
 
-        DEV_Out_Reset(out);
+        DEV_OutReset(out);
     }
 }
 //----------------------
@@ -382,11 +424,10 @@ void TIM_INT_Init(void)
 //----------------------
 void TIM_INT_Start(void)
 {
-    GPIO_INT->BSRR |= GPIO_INT_RESET;
     TIM17->CR1 |= TIM_CR1_CEN;
 }
-//-----------------------
-void DEV_PWROK_Init(void)
+//----------------------
+void DEV_PWROKInit(void)
 {
     RCC->AHBENR  |= RCC_AHBENR_GPIOAEN;
     RCC->APB2ENR |= RCC_APB2ENR_SYSCFGEN;
@@ -419,14 +460,14 @@ void DEV_PWROK_Init(void)
     
     TIM14->CR1 |= TIM_CR1_CEN;
 }
-//-----------------------
-void DEV_Crash_Init(void)
+//----------------------
+void DEV_CrashInit(void)
 {
     // настройка аварийного выхода
     out_crash        = &io_out->list[2];
     out_crash->param = EVENT_Create(5000, true, crash, out_crash, 0xFF);
 
-    //DEV_Out_Set(out_crash); // включаем аварийный выход - только для теста
+    //DEV_OutSet(out_crash); // включаем аварийный выход - только для теста
 }
 //-----------------------
 uint8_t DEV_Address(void)
@@ -482,14 +523,13 @@ bool DEV_Request(FS9Buffer_t* source, FS9Buffer_t* dest)
 //-----------------------------------------------------
 bool DEV_Driver(FS9Buffer_t* source, FS9Buffer_t* dest)
 {
-    uint8_t bit_count = 0; // счетчик бит (позиция канала в байте)
-    
-    int32_t   temp  = 0x00;
-    uint8_t   byte  = 0x00;
-    uint8_t   state = 0x00;
-    uint8_t   n_out = 0x00;
-    uint16_t  time  = 0x0000;
-    output_t* out   = NULL;
+    uint8_t   bit_count = 0; // счетчик бит (позиция канала в байте)
+    int32_t   temp      = 0x00;
+    uint8_t   byte      = 0x00;
+    uint8_t   state     = 0x00;
+    uint8_t   n_out     = 0x00;
+    uint16_t  time      = 0x0000;
+    output_t* out       = NULL;
     
     uint8_t eeprom[15] = { 0x10, 0x20, 0x30, 0x40, 0x5F, 0x07, 0x32, 0x14, 0x02, 0x0A,
                            0x11, 0x21, 0x31, 0x41, 0x60}; // data write to eeprom - test
@@ -506,40 +546,15 @@ bool DEV_Driver(FS9Buffer_t* source, FS9Buffer_t* dest)
     switch(source->cmd_code)
     {
         case 0x00: // чтение дискретных каналов входов
-            bit_count = 0;
-        
-            for(uint8_t i = 0; i < io_in->size; ++i)
+            for(uint8_t i = 0; i < 3; i++)
             {
-                if(bit_count == 8)
-                {
-                    bit_count = 0;
-                    dest->index++;
-                    dest->data[dest->index] = 0x00;
-                }
-                
-                uint8_t  channel_state = 0x00;
-                input_t* channel       = &io_in->list[i];
-                
-                if(channel->state == true && channel->error == false)
-                {
-                    // состояние канала входа активно и ошибок в канале нет
-                    channel_state = 0x01; // сигнал на входе присутствует
-                }
-                else if(channel->error == true)
-                {
-                    // зафиксирована ошибка канала входа
-                    channel_state = 0x02;
-                    
-                    // сбрасываем ошибку канала входа при чтении
-                    channel->error = false;
-                }
-                
-                dest->data[dest->index] |= channel_state << bit_count;
-                
-                bit_count += 2;
+                byte = (int_state.state >> (i << 3))&0xFF; // чтения байта из снимка состояний входов ((i << 3) = умножение на 8 бит)
+                dest->data[i] = byte;
             }
-            
             dest->size = 3;
+            int_state.mode = INT_STATE_TIMEOUT; // включение режима ожидания таймаута перед очередной отправкой
+            GPIO_INT->BSRR |= GPIO_INT_SET; // поднимаем сигнал INT
+            EVENT_Create(5, false, int_timeout, NULL, 0xFF); // создание задачи ожидания таймаута (5мс)
         break;
             
         case 0x01: // чтение дискретных каналов выходов
@@ -698,7 +713,7 @@ bool DEV_Driver(FS9Buffer_t* source, FS9Buffer_t* dest)
                             
                             out->state = OUTPUT_STATE_OFF;
 
-                            DEV_Out_Reset(out);
+                            DEV_OutReset(out);
                         break;
                         
                         case OUTPUT_STATE_ON: // включение выхода
@@ -710,12 +725,12 @@ bool DEV_Driver(FS9Buffer_t* source, FS9Buffer_t* dest)
                             {
                                 kill_task(n_out);
 
-                                DEV_Out_Reset(out);
+                                DEV_OutReset(out);
                             }
                             
                             out->state = OUTPUT_STATE_ON;
                             
-                            DEV_Out_Set(out);
+                            DEV_OutSet(out);
                         break;
                         
                         case OUTPUT_STATE_FREQ_2HZ: // включение выхода с альтернативной функцией
@@ -726,7 +741,7 @@ bool DEV_Driver(FS9Buffer_t* source, FS9Buffer_t* dest)
                             }
                             else if(out->state == OUTPUT_STATE_ON)
                             {
-                                DEV_Out_Reset(out);
+                                DEV_OutReset(out);
                             }
                             
                             out->state = OUTPUT_STATE_FREQ_2HZ;
@@ -1023,28 +1038,38 @@ uint8_t DEV_Checksum(FS9Buffer_t* packet, uint8_t size)
     
     return checksum;
 }
-//-----------------------
-void DEV_Input_Scan(void)
+//----------------------
+void DEV_InputScan(void)
 {    
     if(_pwr_ok.state == false)
     {
         for(uint8_t i = 0; i < io_in->size; ++i)
         {
-            DEV_Input_Filter(i);
+            DEV_InputFilter(i);
         }
     }
     else
     {
-        DEV_Input_Filter(4);
+        DEV_InputFilter(4);
     }
     
-    if(Input_Changed)
+    if(InputStateChanged) // состояние входов изменилось
     {
-        TIM_INT_Start();
+        if(int_state.mode == INT_STATE_IDLE) // если данные уже были прочитаны МЦП
+        {
+            uint32_t state = convertInputState(); // читает текущее состояние входов
+            
+            if(state != int_state.state) // если текущее состоние не равно последнему снимку
+            {
+                int_state.state = state; // то меняем состояние снимка на текущее
+                InputStateChanged = false; // очистка флага изменения состояния входов
+                GPIO_INT->BSRR |= GPIO_INT_RESET; // прижимаем линию INT (сигxнал для МЦП - состояния входов изменились)
+            }
+        }
     }
 }
-//----------------------------------
-void DEV_Input_Filter(uint8_t index)
+//---------------------------------
+void DEV_InputFilter(uint8_t index)
 {
     input_t* input = &io_in->list[index];
     
@@ -1204,13 +1229,13 @@ void DEV_Input_Filter(uint8_t index)
                 {
                     input->error  = true;
                     input->state  = false;
-                    Input_Changed = true;
+                    InputStateChanged = true;
                 }
                 else
                 {
                     input->error  = false;
                     input->state  = act_level;
-                    Input_Changed = true;
+                    InputStateChanged = true;
                     
                     if(_pwr_ok.state == true && index == PWROK_INPUT)
                     {
@@ -1226,7 +1251,7 @@ void DEV_Input_Filter(uint8_t index)
             else if(input->filter.c_error >= io_in->set.Nperiod)
             {
                 input->error  = true;
-                Input_Changed = true;
+                InputStateChanged = true;
             }
             
             input->filter.c_clock    = 0;
@@ -1239,8 +1264,8 @@ void DEV_Input_Filter(uint8_t index)
         }
     }
 }
-//--------------------------------
-void DEV_Keyboard_Scan(void* data)
+//-------------------------------
+void DEV_KeyboardScan(void* data)
 {
     io_t scan;
     
@@ -1252,7 +1277,7 @@ void DEV_Keyboard_Scan(void* data)
         
             keys.mode = KEY_MODE_SCAN_1;
         
-            EVENT_Create(5, false, DEV_Keyboard_Scan, NULL, 0xFF);
+            EVENT_Create(5, false, DEV_KeyboardScan, NULL, 0xFF);
         break;
         
         case KEY_MODE_SCAN_1:
@@ -1267,7 +1292,7 @@ void DEV_Keyboard_Scan(void* data)
         
             keys.mode = KEY_MODE_SCAN_2;
         
-            EVENT_Create(5, false, DEV_Keyboard_Scan, NULL, 0xFF);
+            EVENT_Create(5, false, DEV_KeyboardScan, NULL, 0xFF);
         break;
         
         case KEY_MODE_SCAN_2:
@@ -1291,7 +1316,7 @@ void DEV_Keyboard_Scan(void* data)
                     {
                         keys.last_state = keys.temp; // сохраняем текущее состояние входов
                         
-                        Input_Changed = true; // устанавливаем сигнал INT для оповещении ЦП об изменении состояния входов
+                        InputStateChanged = true; // устанавливаем сигнал INT для оповещении ЦП об изменении состояния входов
                     }
                 }
                 
@@ -1302,17 +1327,26 @@ void DEV_Keyboard_Scan(void* data)
             keys.temp = KEY_EMPTY_MASK;
             keys.mode = KEY_MODE_NONE;
             
-            EVENT_Create(5, false, DEV_Keyboard_Scan, NULL, 0xFF);
+            EVENT_Create(5, false, DEV_KeyboardScan, NULL, 0xFF);
         break;
     }
     
-    if(Input_Changed == true)
+    if(InputStateChanged)
     {
-        TIM_INT_Start();
+        if(int_state.mode == INT_STATE_IDLE) // если данные уже были прочитаны МЦП
+        {
+            uint32_t state = convertInputState(); // читает текущее состояние входов
+            
+            if(state != int_state.state) // если текущее состоние не равно последнему снимку
+            {
+                int_state.state = state; // то меняем состояние снимка на текущее
+                GPIO_INT->BSRR |= GPIO_INT_RESET; // прижимаем линию INT (сигнал для МЦП - состояния входов изменились)
+            }
+        }
     }
 }
-//------------------------------
-void DEV_Input_Set_Default(void)
+//----------------------------
+void DEV_InputSetDefault(void)
 {
     io_in->set.Ndiscret = 10;
     io_in->set.Nperiod  = 3;
@@ -1338,10 +1372,10 @@ void DEV_Input_Set_Default(void)
             io_in->list[i].duration = 10;
     }
 }
-//----------------------------------
-bool DEV_Input_Changed_Channel(void)
+//-------------------------------------
+bool DEV_InputStateChangedChannel(void)
 {
-    return Input_Changed;
+    return InputStateChanged;
 }
 //----------------------------
 void EXTI4_15_IRQHandler(void)
@@ -1399,7 +1433,7 @@ void TIM16_IRQHandler(void)
 {
     if((TIM16->SR & TIM_SR_UIF) == TIM_SR_UIF)
     {
-        DEV_Input_Scan();
+        DEV_InputScan();
         
         TIM16->SR &= ~TIM_SR_UIF;
     }
@@ -1408,11 +1442,7 @@ void TIM16_IRQHandler(void)
 void TIM17_IRQHandler(void)
 {
     if((TIM17->SR & TIM_SR_UIF) == TIM_SR_UIF)
-    {
-        GPIO_INT->BSRR |= GPIO_INT_SET; // отключить выход INT
-        
-        Input_Changed = false;
-        
+    {   
         TIM17->SR &= ~TIM_SR_UIF;
     }
 }
@@ -1477,11 +1507,11 @@ void blink2Hz(void* output)
             
             if(out_queue_blink.state == true)
             {
-                DEV_Out_Set(out);
+                DEV_OutSet(out);
             }
             else
             {
-                DEV_Out_Reset(out);
+                DEV_OutReset(out);
             }
         }
     }
@@ -1499,8 +1529,13 @@ void crash(void* output)
     }
     else // запроса нет - отключаем выход
     {
-        DEV_Out_Reset(out);
+        DEV_OutReset(out);
     }
+}
+//---------------------------
+void int_timeout(void* param)
+{
+    int_state.mode = INT_STATE_IDLE;
 }
 //--------------------
 void  queue_init(void)

@@ -110,7 +110,7 @@ int main(void)
     if(addr == DEVICE_MDVV_01)
     {
         DS18B20_Init();
-        DEV_Crash_Init();
+        DEV_CrashInit();
         I2C_EE_Init();
         
         EVENT_Create(2000, false, DS18B20_Convert, NULL, 0xFF);
@@ -120,7 +120,7 @@ int main(void)
         FLASH_Init();
     }
     
-    DEV_PWROK_Init();
+    DEV_PWROKInit();
     AIN_Init(addr);
 
   /* Infinite loop */

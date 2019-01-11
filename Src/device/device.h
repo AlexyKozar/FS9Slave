@@ -73,6 +73,9 @@
     //----------------------
     #define PWROK_INPUT 0x04
     #define PWROK_TIME  2000 // scan time for pwrok
+    //----------------------------
+    #define INT_STATE_IDLE    0x01 // состояние сигнала INT - свободен
+    #define INT_STATE_TIMEOUT 0x02 // состояние сигнала INT - ожидание таймаута, перед отправкой следующего сигнала INT
     //--------------------------------------
     typedef struct _FS9Buffer_t FS9Buffer_t;
     //-------------------------
@@ -163,6 +166,12 @@
         bool    state;
         uint8_t count;
     } Blink_queue_t;
+    //-------------------------
+    typedef struct _int_state_t // структура управления выходом INT (событие обновления состояния входов)
+    {
+        uint8_t  mode;  // режим выхода INT
+        uint32_t state; // состояние входов (снимок последнего состояния - обновляется только после прочтения предыдущего состояния)
+    } int_state_t;
     //-----------
     union float_t
     {
@@ -176,15 +185,15 @@
     bool    DEV_Request(FS9Buffer_t* source, FS9Buffer_t* dest);
     bool    DEV_Driver(FS9Buffer_t* source, FS9Buffer_t* dest);
     uint8_t DEV_Checksum(FS9Buffer_t* packet, uint8_t size);
-    void    DEV_Input_Scan(void);
-    void    DEV_Input_Set_Default(void);
-    void    DEV_Input_Filter(uint8_t index);
-    void    DEV_Keyboard_Scan(void* data);
-    bool    DEV_Input_Changed_Channel(void);
-    void    DEV_Crash_Init(void);
-    void    DEV_PWROK_Init(void);
-    void    DEV_Out_Set(output_t* out);
-    void    DEV_Out_Reset(output_t* out);
-    void    DEV_Out_Toggle(output_t* out);
-    bool    DEV_Is_Out(output_t* out);
+    void    DEV_InputScan(void);
+    void    DEV_InputSetDefault(void);
+    void    DEV_InputFilter(uint8_t index);
+    void    DEV_KeyboardScan(void* data);
+    bool    DEV_InputChangedChannel(void);
+    void    DEV_CrashInit(void);
+    void    DEV_PWROKInit(void);
+    void    DEV_OutSet(output_t* out);
+    void    DEV_OutReset(output_t* out);
+    void    DEV_OutToggle(output_t* out);
+    bool    DEV_IsOut(output_t* out);
 #endif
