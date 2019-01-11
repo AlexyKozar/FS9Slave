@@ -157,7 +157,7 @@ void DEV_Init(PORT_Input_Type* inputs, PORT_Output_Type* outputs)
         EVENT_Create(1000, true, blink2Hz, NULL, 0xFF); // создание задачи мигания
     }
     
-    TIM_INT_Init();
+    // TIM_INT_Init();
     
     // Формирование серийного номера устройства
     deviceSN[0] = devID; // код изделия
@@ -546,11 +546,10 @@ bool DEV_Driver(FS9Buffer_t* source, FS9Buffer_t* dest)
     switch(source->cmd_code)
     {
         case 0x00: // чтение дискретных каналов входов
-            for(uint8_t i = 0; i < 3; i++)
-            {
-                byte = (int_state.state >> (i << 3))&0xFF; // чтения байта из снимка состояний входов ((i << 3) = умножение на 8 бит)
-                dest->data[i] = byte;
-            }
+            // чтения байт из снимка состояний входов
+            dest->data[0] = (int_state.state >> 8)&0xFF;
+            dest->data[1] = (int_state.state >> 16)&0xFF;
+            dest->data[2] = (int_state.state >> 24)&0xFF;
             dest->size = 3;
             int_state.mode = INT_STATE_TIMEOUT; // включение режима ожидания таймаута перед очередной отправкой
             GPIO_INT->BSRR |= GPIO_INT_SET; // поднимаем сигнал INT
@@ -1340,6 +1339,7 @@ void DEV_KeyboardScan(void* data)
             if(state != int_state.state) // если текущее состоние не равно последнему снимку
             {
                 int_state.state = state; // то меняем состояние снимка на текущее
+				InputStateChanged = false; // очистка флага изменения состояния входов
                 GPIO_INT->BSRR |= GPIO_INT_RESET; // прижимаем линию INT (сигнал для МЦП - состояния входов изменились)
             }
         }

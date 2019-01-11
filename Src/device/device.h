@@ -74,8 +74,8 @@
     #define PWROK_INPUT 0x04
     #define PWROK_TIME  2000 // scan time for pwrok
     //----------------------------
-    #define INT_STATE_IDLE    0x01 // состояние сигнала INT - свободен
-    #define INT_STATE_TIMEOUT 0x02 // состояние сигнала INT - ожидание таймаута, перед отправкой следующего сигнала INT
+    #define INT_STATE_IDLE    0x00 // состояние сигнала INT - свободен
+    #define INT_STATE_TIMEOUT 0x01 // состояние сигнала INT - ожидание таймаута, перед отправкой следующего сигнала INT
     //--------------------------------------
     typedef struct _FS9Buffer_t FS9Buffer_t;
     //-------------------------
