@@ -286,36 +286,45 @@ void convertInputState(uint8_t* data)
     data[1] = 0x00;
     data[2] = 0x00;
         
-    for(uint8_t i = 0; i < io_in->size; ++i)
+    if(devAddr == DEVICE_MIK_01) // для модуля МИК-01 отдельный алгоритм конвертирования (матричная клавиатура)
     {
-        if(bit_count == 8)
+        data[0] = keys.last_state&0x000000FF;
+        data[1] = (keys.last_state >> 8)&0x000000FF;
+        data[2] = (keys.last_state >> 16)&0x0000000F;
+    }
+    else
+    {
+        for(uint8_t i = 0; i < io_in->size; ++i)
         {
-            bit_count = 0;
-            byte_index++;
-        }
-        
-        uint8_t  channel_state = 0x00;
-        input_t* channel       = &io_in->list[i];
-        
-        if(channel->state == true && channel->error == false)
-        {
-            // состояние канала входа активно и ошибок в канале нет
-            channel_state = 0x01; // сигнал на входе присутствует
-        }
-        else if(channel->error == true)
-        {
-            // зафиксирована ошибка канала входа
-            channel_state = 0x02;
+            if(bit_count == 8)
+            {
+                bit_count = 0;
+                byte_index++;
+            }
             
-            if(channel->state == true) // если вход установлен, то добавляем активное состояние
-                channel_state |= 0x01;
+            uint8_t  channel_state = 0x00;
+            input_t* channel       = &io_in->list[i];
             
-            // сбрасываем ошибку канала входа при чтении
-            channel->error = false;
+            if(channel->state == true && channel->error == false)
+            {
+                // состояние канала входа активно и ошибок в канале нет
+                channel_state = 0x01; // сигнал на входе присутствует
+            }
+            else if(channel->error == true)
+            {
+                // зафиксирована ошибка канала входа
+                channel_state = 0x02;
+                
+                if(channel->state == true) // если вход установлен, то добавляем активное состояние
+                    channel_state |= 0x01;
+                
+                // сбрасываем ошибку канала входа при чтении
+                channel->error = false;
+            }
+            
+            data[byte_index] |= channel_state << bit_count;
+            bit_count += 2;
         }
-        
-        data[byte_index] |= channel_state << bit_count;
-        bit_count += 2;
     }
 }
 //----------------------------------
@@ -686,10 +695,15 @@ bool DEV_Driver(FS9Buffer_t* source, FS9Buffer_t* dest)
             dest->size = 16;
         break;
             
-        case 0x03: // чтение регистра расширения дискретных каналов входов
-            dest->data[0] = keys.last_state&0x000000FF;
-            dest->data[1] = (keys.last_state >> 8)&0x000000FF;
-            dest->data[2] = (keys.last_state >> 16)&0x0000000F;
+        case 0x03: // чтение регистра расширения дискретных каналов входов (кнопки МИК-01)
+            // чтения байт из снимка состояний входов
+            dest->data[0] = int_state.state[0];
+            dest->data[1] = int_state.state[1];
+            dest->data[2] = int_state.state[2];
+            dest->size = 3;
+            int_state.mode = INT_STATE_TIMEOUT; // включение режима ожидания таймаута перед очередной отправкой
+            GPIO_INT->BSRR |= GPIO_INT_SET; // поднимаем сигнал INT
+            EVENT_Create(5, false, int_timeout, NULL, 0xFF); // создание задачи ожидания таймаута (5мс)
             
             dest->size = 3;
         break;
