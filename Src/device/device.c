@@ -189,12 +189,6 @@ void DEV_Init(PORT_Input_Type* inputs, PORT_Output_Type* outputs)
             deviceSN[2] = (data >> 16)&0x000000FF;
             deviceSN[3] = (data >> 8)&0x000000FF;
             deviceSN[4] = data&0x000000FF;
-            
-            data = FLASH_Read(FLASH_SERIAL_ADDRESS + 8);
-            
-            deviceSN[5] = (data >> 24)&0x000000FF;
-            deviceSN[6] = (data >> 16)&0x000000FF;
-            deviceSN[7] = (data >> 8)&0x000000FF;
         }
         else // write default serial key to flash
         {
@@ -204,9 +198,6 @@ void DEV_Init(PORT_Input_Type* inputs, PORT_Output_Type* outputs)
                 
                 data = ((deviceSN[1] << 24) | (deviceSN[2] << 16) | (deviceSN[3] << 8) | deviceSN[4]);
                 FLASH_Write(FLASH_SERIAL_ADDRESS + 4, data);
-                
-                data = ((deviceSN[5] << 24) | (deviceSN[6] << 16) | (deviceSN[7] << 8) | 0x00);
-                FLASH_Write(FLASH_SERIAL_ADDRESS + 8, data);
             }
         }
         			
@@ -1015,15 +1006,9 @@ bool DEV_Driver(FS9Buffer_t* source, FS9Buffer_t* dest)
                 deviceSN[2] = source->data[9];
                 deviceSN[3] = source->data[10];
                 deviceSN[4] = source->data[11];
-                deviceSN[5] = source->data[12];
-                deviceSN[6] = source->data[13];
-                deviceSN[7] = source->data[14];
                 
                 data = ((deviceSN[1] << 24) | (deviceSN[2] << 16) | (deviceSN[3] << 8) | deviceSN[4]);
                 FLASH_Write(FLASH_SERIAL_ADDRESS + 4, data);
-                
-                data = ((deviceSN[5] << 24) | (deviceSN[6] << 16) | (deviceSN[7] << 8) | 0x00);
-                FLASH_Write(FLASH_SERIAL_ADDRESS + 8, data);
                 
                 FLASH_Lock();
             }
