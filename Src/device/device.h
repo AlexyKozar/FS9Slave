@@ -13,6 +13,8 @@
     #include "i2c/i2c.h"
     #include "flash/flash.h"
     #include "error.h"
+    #include "../RTT/SEGGER_RTT.h"
+    #include "../RTT/SEGGER_RTT_Conf.h"
     //----------------------
     #define F_CPU 48000000UL
     //-------------------------

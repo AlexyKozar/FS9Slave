@@ -21,6 +21,7 @@ uint8_t convertByteToBCD(int value); // конвертирование числ�
 void    convertInputState(uint8_t* data); // конвертирование состояний входов (data - массив из трех байт)
 bool    isEqualIputState(uint8_t* data); // проверка на эквивалентность состояний входов
 void    inputStateUpdate(void);
+void    inputSettings(uint8_t number, uint8_t mode, uint8_t duration, uint8_t fault);
 //----------------------
 PORT_Input_Type*  io_in;
 PORT_Output_Type* io_out;
@@ -174,7 +175,7 @@ void DEV_Init(PORT_Input_Type* inputs, PORT_Output_Type* outputs)
     deviceSN[5] = current_date[0]; // год прошивки
     deviceSN[6] = current_date[1]; // месяц прошивки
     deviceSN[7] = current_date[2]; // день прошивки
-    
+
     if(FLASH_Unlock())
     {
         uint32_t serial_key = FLASH_Read(FLASH_SERIAL_ADDRESS);
@@ -1013,18 +1014,6 @@ bool DEV_Driver(FS9Buffer_t* source, FS9Buffer_t* dest)
                 FLASH_Lock();
             }
         break;
-
-        case 0x3B: // чтение из памяти (тест eeprom и flash)
-            //return I2C_EE_ReadBytes(0xA0, 0x00, eeprom2, 5);
-            FLASH_Unlock();
-            FLASH_Erase(FLASH_BASE_ADDRESS);
-            FLASH_Lock();
-        break;
-            
-        case 0x3C: // запись в память (тест eeprom и flash)
-            //return I2C_EE_WriteBytes(0xA0, 0x00, eeprom, 5);
-            FLASH_WriteBlock(eeprom, 15);
-        break;
         
         case 0x3E: // изменение параметров фильтрации
             if(source->size == 3)
@@ -1037,21 +1026,29 @@ bool DEV_Driver(FS9Buffer_t* source, FS9Buffer_t* dest)
             }
         break;
             
-        case 0x3F: // изменение входа
-            if(source->size == 4)
+        case 0x3F: // установка настроек входа или группы входов
+//          ------------------------------------------------------------------------------------------------
+//          | номер входа или группа входов - 2 байта | режим (AC|DC) | длительность периода | погрешность |
+//          ------------------------------------------------------------------------------------------------
+            if(source->size == 5)
             {
-                uint8_t in_num = source->data[0]; // номер настраиваемого входа
-                io_in->list[in_num].mode  = source->data[1]; // режим работы входа AC или DC
-              
-                io_in->list[in_num].duration = source->data[2]; // длительность периода
-                
-                if(io_in->list[in_num].mode == IN_MODE_AC)
+                uint8_t type = (source->data[0]&0x80); // определяем тип настроек (0 - одиночный вход, 1 - группа входов)
+
+                if(type == 0) // настройка одиночного входа по его номеру
                 {
-                    io_in->list[in_num].fault = source->data[3]; // погрешность допускаемая за один период - в процентах
+                    inputSettings(source->data[1], source->data[2], source->data[3], source->data[4]);
                 }
-                else
+                else // настройка группы входов
                 {
-                    io_in->set.P0dc = io_in->set.P1dc = source->data[3];
+                    uint16_t input = ((source->data[0] << 8) | source->data[1]);
+
+                    for(int i = 0; i < io_in->size; i++)
+                    {
+                        if(input & (1 << i)) // вход выбран
+                        {
+                            inputSettings(i, source->data[2], source->data[3], source->data[4]);
+                        }
+                    }
                 }
             }
         break;
@@ -1064,6 +1061,21 @@ bool DEV_Driver(FS9Buffer_t* source, FS9Buffer_t* dest)
     };
     
     return true;
+}
+//-------------------------------------------------------------------------------
+void inputSettings(uint8_t number, uint8_t mode, uint8_t duration, uint8_t fault)
+{
+    io_in->list[number].mode  = mode; // режим работы входа AC или DC
+    io_in->list[number].duration = duration; // длительность периода
+
+    if(mode == IN_MODE_AC)
+    {
+        io_in->list[number].fault = fault; // погрешность допускаемая за один период - в процентах
+    }
+    else
+    {
+        io_in->set.P0dc = io_in->set.P1dc = fault;
+    }
 }
 //-----------------------------------------------------
 uint8_t DEV_Checksum(FS9Buffer_t* packet, uint8_t size)

@@ -542,6 +542,21 @@
               <FileType>1</FileType>
               <FilePath>..\Src\device\error\error.c</FilePath>
             </File>
+            <File>
+              <FileName>SEGGER_RTT.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Src\RTT\SEGGER_RTT.c</FilePath>
+            </File>
+            <File>
+              <FileName>SEGGER_RTT_printf.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Src\RTT\SEGGER_RTT_printf.c</FilePath>
+            </File>
+            <File>
+              <FileName>SEGGER_RTT_Syscalls_GCC.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Src\RTT\SEGGER_RTT_Syscalls_GCC.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
