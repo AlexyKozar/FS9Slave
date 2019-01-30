@@ -770,7 +770,6 @@ bool DEV_Driver(FS9Buffer_t* source, FS9Buffer_t* dest)
                             else if(out->state == OUTPUT_STATE_FREQ_2HZ || out->state == OUTPUT_STATE_RESERVE)
                             {
                                 kill_task(n_out);
-
                                 DEV_OutReset(out);
                             }
                             
@@ -1601,7 +1600,7 @@ void insert_task(uint8_t id)
 //------------------------
 void kill_task(uint8_t id)
 {
-    if(out_queue_blink.count < MAX_SIZE_QUEUE_OUT)
+    if(out_queue_blink.count > 0 && id < MAX_SIZE_QUEUE_OUT)
     {
         out_queue_blink.queue[id] = 0xFF;
         out_queue_blink.count--;
