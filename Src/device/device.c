@@ -573,10 +573,6 @@ bool DEV_Driver(FS9Buffer_t* source, FS9Buffer_t* dest)
     uint16_t  time      = 0x0000;
     output_t* out       = NULL;
     
-    uint8_t eeprom[15] = { 0x10, 0x20, 0x30, 0x40, 0x5F, 0x07, 0x32, 0x14, 0x02, 0x0A,
-                           0x11, 0x21, 0x31, 0x41, 0x60}; // data write to eeprom - test
-//    uint8_t eeprom2[5] = { 0x00, 0x00, 0x00, 0x00, 0x00 }; // buffer for read data from eeprom - test
-    
     union
     {
         uint16_t count;

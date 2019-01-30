@@ -35,7 +35,7 @@
     <configuration
       Name="FS9Slave External"
       armcc_cl_enable_debug_info="Yes"
-      armcc_cl_optimization_level="None"
+      armcc_cl_optimization_level="Level 3"
       asm_additional_options="--pd;&quot;__MICROLIB SETA 1&quot;"
       build_intermediate_directory="FS9Slave"
       build_output_directory="FS9Slave"
