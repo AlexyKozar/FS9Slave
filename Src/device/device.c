@@ -1248,9 +1248,11 @@ void DEV_InputFilter(uint8_t index)
             }
             else if(input->mode == IN_MODE_DC) // режим входа DC
             {
-                uint16_t tfault_lev = (act_level == true)?input->duration*io_in->set.P1dc:
-                                                          input->duration*io_in->set.P0dc;
+                uint16_t tfault_lev = ((act_level == true)?input->duration*io_in->set.P1dc:
+                                                           input->duration*io_in->set.P0dc)/100;
                 uint16_t tdur = (act_level == true)?input->filter.c_lev_1:input->filter.c_lev_0;
+
+                SEGGER_RTT_printf(0, "fault: %d, duration: %d\n", tfault_lev, tdur);
                 
                 if(tdur >= tfault_lev)
                     input->filter.c_state++;
