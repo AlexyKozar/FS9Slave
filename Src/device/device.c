@@ -1399,6 +1399,11 @@ void DEV_InputSetDefault(void)
             io_in->list[i].duration = 20;
         else
             io_in->list[i].duration = 10;
+
+        if(devAddr == DEVICE_MDVV_01 && i == 4) // пятый вход по умолчанию цифровой
+        {
+            io_in->list[i].mode = IN_MODE_DC;
+        }
     }
 }
 //-------------------------------------
