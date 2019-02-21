@@ -1,7 +1,9 @@
 <!DOCTYPE CrossStudio_Session_File>
 <session>
  <Bookmarks/>
- <Breakpoints groups="Breakpoints" active_group="Breakpoints"/>
+ <Breakpoints groups="Breakpoints" active_group="Breakpoints">
+  <Exceptions set="HardFault"/>
+ </Breakpoints>
  <ExecutionProfileWindow/>
  <FrameBufferWindow>
   <FrameBufferWindow bufferHeight="-1" addressSpace="" addressText="" bufferWidth="-1"/>
@@ -58,7 +60,7 @@
  <Files>
   <SessionOpenFile windowGroup="DockEditLeft" x="0" y="66" useTextEdit="1" useBinaryEdit="0" left="0" path="../Src/main.c" selected="0" top="50" codecName="UTF-8"/>
   <SessionOpenFile windowGroup="DockEditLeft" x="0" y="179" useTextEdit="1" useBinaryEdit="0" left="0" path="../Src/device/device.h" selected="0" top="77" codecName="UTF-8"/>
-  <SessionOpenFile windowGroup="DockEditLeft" x="92" y="1026" useTextEdit="1" useBinaryEdit="0" left="0" path="../Src/device/device.c" selected="1" top="1017" codecName="UTF-8"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="86" y="1332" useTextEdit="1" useBinaryEdit="0" left="0" path="../Src/device/device.c" selected="1" top="1329" codecName="UTF-8"/>
  </Files>
  <ARMCrossStudioWindow activeProject="FS9Slave" fileDialogDefaultFilter="*.c" autoConnectTarget="J-Link" buildConfiguration="FS9Slave External" debugSearchFileMap="" fileDialogInitialDirectory="D:/projects/workspace/fs9slave/Src/RTT" debugSearchPath="" autoConnectCapabilities="3199"/>
 </session>

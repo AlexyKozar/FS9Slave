@@ -309,9 +309,15 @@ void convertInputState(uint8_t* data)
                 
                 if(channel->state == true) // если вход установлен, то добавляем активное состояние
                     channel_state |= 0x01;
+                else if(channel_state == false)
+                    channel_state |= 0x00;
                 
                 // сбрасываем ошибку канала входа при чтении
-                channel->error = false;
+                if(channel_state & 0x02)
+                {
+                    channel->error = false;
+                    channel->state = 0x00;
+                }
             }
             
             data[byte_index] |= channel_state << bit_count;
@@ -334,17 +340,21 @@ bool isEqualIputState(uint8_t* data)
 //-------------------------
 void inputStateUpdate(void)
 {
+    if(int_state.mode != INT_STATE_IDLE || (GPIO_INT->BSRR & GPIO_INT_RESET)) // вывод INT в таймауте или INT прижат
+    {
+        return; // выходим и не сохраняем состояние
+    }
+
     uint8_t state[3];
     convertInputState(state); // создаем снимок текущего состояния входов
-    
     if(!isEqualIputState(state)) // если текущее состоние не равно последнему снимку
     {
         int_state.state[0] = state[0]; // то меняем состояние снимка на текущее
         int_state.state[1] = state[1];
         int_state.state[2] = state[2];
-        
+
         InputStateChanged = false; // очистка флага изменения состояния входов
-        GPIO_INT->BSRR |= GPIO_INT_RESET; // прижимаем линию INT (сигxнал для МЦП - состояния входов изменились)
+        GPIO_INT->BSRR |= GPIO_INT_RESET; // прижимаем линию INT (сигнал для МЦП - состояния входов изменились)
     }
 }
 //------------------------------------
@@ -589,9 +599,19 @@ bool DEV_Driver(FS9Buffer_t* source, FS9Buffer_t* dest)
             dest->data[1] = int_state.state[1];
             dest->data[2] = int_state.state[2];
             dest->size = 3;
-            int_state.mode = INT_STATE_TIMEOUT; // включение режима ожидания таймаута перед очередной отправкой
+
+            // очищаем буфер состояний
+            int_state.state[0] = 0x00;
+            int_state.state[1] = 0x00;
+            int_state.state[2] = 0x00;
+
             GPIO_INT->BSRR |= GPIO_INT_SET; // поднимаем сигнал INT
-            EVENT_Create(5, false, int_timeout, NULL, 0xFF); // создание задачи ожидания таймаута (5мс)
+
+            if(int_state.mode == INT_STATE_IDLE)
+            {
+                int_state.mode = INT_STATE_TIMEOUT; // включение режима ожидания таймаута перед очередной отправкой
+                EVENT_Create(5, false, int_timeout, NULL, 0xFF); // создание задачи ожидания таймаута (5мс)
+            }
         break;
             
         case 0x01: // чтение дискретных каналов выходов
@@ -692,8 +712,6 @@ bool DEV_Driver(FS9Buffer_t* source, FS9Buffer_t* dest)
             int_state.mode = INT_STATE_TIMEOUT; // включение режима ожидания таймаута перед очередной отправкой
             GPIO_INT->BSRR |= GPIO_INT_SET; // поднимаем сигнал INT
             EVENT_Create(5, false, int_timeout, NULL, 0xFF); // создание задачи ожидания таймаута (5мс)
-            
-            dest->size = 3;
         break;
             
         case 0x04: // чтение регистра расширения дискретных каналов выходов
@@ -1242,8 +1260,6 @@ void DEV_InputFilter(uint8_t index)
                 uint16_t tfault_lev = ((act_level == true)?input->duration*io_in->set.P1dc:
                                                            input->duration*io_in->set.P0dc)/100;
                 uint16_t tdur = (act_level == true)?input->filter.c_lev_1:input->filter.c_lev_0;
-
-                SEGGER_RTT_printf(0, "fault: %d, duration: %d\n", tfault_lev, tdur);
                 
                 if(tdur >= tfault_lev)
                     input->filter.c_state++;
@@ -1317,9 +1333,7 @@ void DEV_KeyboardScan(void* data)
         
         case KEY_MODE_SCAN_1:
             scan  = io_in->list[10].pin;
-            keys.temp = scan.gpio->IDR;
-            keys.temp &= 0x000003FF; // считываем состояние кнопок
-            
+            keys.temp = scan.gpio->IDR&0x000003FF; // считываем состояние кнопок
             scan.gpio->BSRR |= scan.io; // поднимаем первую сканлинию
         
             scan = io_in->list[11].pin; // вторая сканлиния
@@ -1350,7 +1364,6 @@ void DEV_KeyboardScan(void* data)
                     if(keys.temp != keys.last_state) // предыдущее состояние не равно текущему (произошли изменения)
                     {
                         keys.last_state = keys.temp; // сохраняем текущее состояние входов
-                        
                         InputStateChanged = true; // устанавливаем сигнал INT для оповещении ЦП об изменении состояния входов
                     }
                 }
