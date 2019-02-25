@@ -28,7 +28,6 @@ void USART1_IRQHandler(void)
     if((USART1->ISR & USART_ISR_RXNE) == USART_ISR_RXNE) // read data
     {
         uint16_t byte = USART1->RDR;
-        
         if(_address != 0xFF) // device address is valid
         {
             if(!_is_cmd && (byte&CMD_MASK) == CMD_MASK) // command yet is not finded and byte contains is command bit
@@ -84,8 +83,8 @@ void USART1_IRQHandler(void)
     
     if((USART1->ISR & USART_ISR_ORE) == USART_ISR_ORE)
     {
+        SEGGER_RTT_printf(0, "overrun: byte = %d, is_cmd = %d\n", USART1->RDR, _is_cmd);
         _is_cmd = false;
-        
         ERROR_overrun_inc(); // overrun error counter increment
         
         USART1->ICR |= USART_ICR_ORECF; // clear flag

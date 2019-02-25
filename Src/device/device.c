@@ -580,7 +580,6 @@ bool DEV_Driver(FS9Buffer_t* source, FS9Buffer_t* dest)
     uint8_t   byte      = 0x00;
     uint8_t   state     = 0x00;
     uint8_t   n_out     = 0x00;
-    uint16_t  time      = 0x0000;
     output_t* out       = NULL;
     
     union
@@ -956,38 +955,42 @@ bool DEV_Driver(FS9Buffer_t* source, FS9Buffer_t* dest)
             dest->size = sizeof(deviceSN);
         break;
             
-        case 0x1F: // чтение времени срабатывания выделенного входного дискретного канала                
-            if(_pwr_ok.is_crash == true)
-            {
-                uint8_t state = DSDIN_TRIGGER_ON_0;
-                
-                if(_pwr_ok.IN_change == true)
-                {
-                    state = (_pwr_ok.IN_state == true)?DSDIN_TRIGGER_ON_1:DSDIN_TRIGGER_ON_0;
-                    time  = _pwr_ok.IN_time;
-                }
-                else
-                {
-                    state = (io_in->list[PWROK_INPUT].state == true)?DSDIN_TRIGGER_ON_1:
-                                                                                                                 DSDIN_TRIGGER_ON_0;
-                }
-                
-                _pwr_ok.is_crash  = false;
-                _pwr_ok.IN_change = false;
-                _pwr_ok.IN_state  = false;
-                _pwr_ok.IN_time   = 0x0000;
-                
-                dest->data[0] = state;
-            }
-            else
-            {
-                dest->data[0] = DSDIN_TRIGGER_OFF;
-            }
-            
-            dest->data[1] = (uint8_t)(time&0x00FF);
-            dest->data[2] = (uint8_t)((time&0xFF00) >> 8);
+        case 0x1F: // чтение времени срабатывания выделенного входного дискретного канала
+        {
+            uint16_t IN_time = 0x0000;
+            uint8_t state = DSDIN_FUNCTION_NOT_SUPPORT;
 
-            dest->size = 3;
+            if(devAddr == DEVICE_MDVV_01)
+            {
+                if(FLASH_Unlock())
+                {
+                    uint32_t dsdin = FLASH_Read(FLASH_BASE_ADDRESS);
+
+                    if(dsdin != FLASH_CELL_EMPTY)
+                    {
+                        bool IN_change = dsdin&00100000 >> 20; // получаем флаг фиксации изменения состояния входа
+                        bool IN_state = dsdin&00010000 >> 24; // получаем флаг состояния входа
+                        
+                        if(IN_change)
+                        {
+                            state = (IN_state)?DSDIN_TRIGGER_ON_1:DSDIN_TRIGGER_ON_0;
+                            IN_time = dsdin&0x0000FFFF;
+                        }
+                        else
+                            state = DSDIN_TRIGGER_OFF;
+
+                        FLASH_Erase(FLASH_BASE_ADDRESS); // стирание данных со страницы
+                    }
+                }
+
+                FLASH_Lock();
+            }
+
+            dest->data[0] = state;
+            dest->data[1] = (uint8_t)(IN_time&0x00FF);
+            dest->data[2] = (uint8_t)((IN_time&0xFF00) >> 8);
+            dest->size    = 3;
+        }
         break;
 					
         case 0x3A: // запись серийного номера
@@ -1295,6 +1298,26 @@ void DEV_InputFilter(uint8_t index)
                             _pwr_ok.IN_state  = input->state;
                             _pwr_ok.IN_time   = TIM14->CNT;
                             _pwr_ok.IN_change = true;
+
+                            // Сохраняем состояние и время во флеш в формате:
+                            // 0xXXCSTTTT, где X - indefinite state, C - change, S - state, T - time (2 bytes)
+                            if(FLASH_Unlock()) // перезаписываем данные на странице настроек
+                            {
+                                if(FLASH_Erase(FLASH_BASE_ADDRESS))
+                                {
+                                    uint32_t pwrok = _pwr_ok.IN_time;
+
+                                    if(_pwr_ok.IN_change)
+                                        pwrok |= 1 << 20;
+
+                                    if(_pwr_ok.IN_state)
+                                        pwrok |= 1 << 24;
+
+                                    FLASH_Write(FLASH_BASE_ADDRESS, pwrok);
+                                }
+                            }
+                            
+                            FLASH_Lock();
                         }
                     }
                 }
