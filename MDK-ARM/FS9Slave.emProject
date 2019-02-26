@@ -72,7 +72,11 @@
       <file file_name="../Src/main.c" />
       <file file_name="../Src/stm32f0xx_hal_msp.c" />
       <file file_name="../Src/stm32f0xx_it.c" />
-      <file file_name="../Src/device/device.c" />
+      <file file_name="../Src/device/device.c">
+        <configuration
+          Name="FS9Slave External"
+          armcc_cl_optimization_level="Level 3" />
+      </file>
       <file file_name="../Src/device/fs9slave/cmd/cmd.c" />
       <file file_name="../Src/device/ain/ain.c" />
       <file file_name="../src/device/event/event.c" />

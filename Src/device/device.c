@@ -599,11 +599,6 @@ bool DEV_Driver(FS9Buffer_t* source, FS9Buffer_t* dest)
             dest->data[2] = int_state.state[2];
             dest->size = 3;
 
-            // очищаем буфер состояний
-            int_state.state[0] = 0x00;
-            int_state.state[1] = 0x00;
-            int_state.state[2] = 0x00;
-
             GPIO_INT->BSRR |= GPIO_INT_SET; // поднимаем сигнал INT
 
             if(int_state.mode == INT_STATE_IDLE)
@@ -962,18 +957,20 @@ bool DEV_Driver(FS9Buffer_t* source, FS9Buffer_t* dest)
 
             if(devAddr == DEVICE_MDVV_01)
             {
+                state = DSDIN_TRIGGER_OFF;
+
                 if(FLASH_Unlock())
                 {
                     uint32_t dsdin = FLASH_Read(FLASH_BASE_ADDRESS);
 
                     if(dsdin != FLASH_CELL_EMPTY)
                     {
-                        bool IN_change = dsdin&00100000 >> 20; // получаем флаг фиксации изменения состояния входа
-                        bool IN_state = dsdin&00010000 >> 24; // получаем флаг состояния входа
+                        uint32_t IN_change = (dsdin&0x00100000) >> 20; // получаем флаг фиксации изменения состояния входа
+                        uint32_t IN_state = (dsdin&0x00010000) >> 16; // получаем флаг состояния входа
                         
-                        if(IN_change)
+                        if(IN_change == 1)
                         {
-                            state = (IN_state)?DSDIN_TRIGGER_ON_1:DSDIN_TRIGGER_ON_0;
+                            state = (IN_state == 1)?DSDIN_TRIGGER_ON_1:DSDIN_TRIGGER_ON_0;
                             IN_time = dsdin&0x0000FFFF;
                         }
                         else
@@ -982,7 +979,6 @@ bool DEV_Driver(FS9Buffer_t* source, FS9Buffer_t* dest)
                         FLASH_Erase(FLASH_BASE_ADDRESS); // стирание данных со страницы
                     }
                 }
-
                 FLASH_Lock();
             }
 
@@ -1311,7 +1307,7 @@ void DEV_InputFilter(uint8_t index)
                                         pwrok |= 1 << 20;
 
                                     if(_pwr_ok.IN_state)
-                                        pwrok |= 1 << 24;
+                                        pwrok |= 1 << 16;
 
                                     FLASH_Write(FLASH_BASE_ADDRESS, pwrok);
                                 }
