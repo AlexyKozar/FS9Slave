@@ -28,6 +28,8 @@ PORT_Output_Type* io_out;
 //---------------------
 uint8_t devAddr = 0xFF;
 uint8_t devID   = 0xFF;
+//--------------------------
+uint8_t int_reset_id = 0xFF; // id задачи СБРОСА линии INT по таймауту чтения
 //-------------------------
 bool InputStateChanged = false;
 //-----------------------------
@@ -355,6 +357,8 @@ void inputStateUpdate(void)
 
         InputStateChanged = false; // очистка флага изменения состояния входов
         GPIO_INT->BSRR |= GPIO_INT_RESET; // прижимаем линию INT (сигнал для МЦП - состояния входов изменились)
+        int_state.mode = INT_STATE_RESET; // выставляем состояние СБРОСА линии INT, если чтения нет в течении 100мс
+        int_reset_id = EVENT_Create(100, false, int_timeout, NULL, 0xFF); // создание задачи СБРОСА на линии INT (100мс)
     }
 }
 //------------------------------------
@@ -600,6 +604,13 @@ bool DEV_Driver(FS9Buffer_t* source, FS9Buffer_t* dest)
             dest->size = 3;
 
             GPIO_INT->BSRR |= GPIO_INT_SET; // поднимаем сигнал INT
+            
+            if(int_reset_id != 0xFF)
+            {
+                kill_task(int_reset_id);
+                int_reset_id = 0xFF;
+                int_state.mode = INT_STATE_IDLE;
+            }
 
             if(int_state.mode == INT_STATE_IDLE)
             {
@@ -703,9 +714,21 @@ bool DEV_Driver(FS9Buffer_t* source, FS9Buffer_t* dest)
             dest->data[1] = int_state.state[1];
             dest->data[2] = int_state.state[2];
             dest->size = 3;
-            int_state.mode = INT_STATE_TIMEOUT; // включение режима ожидания таймаута перед очередной отправкой
+
             GPIO_INT->BSRR |= GPIO_INT_SET; // поднимаем сигнал INT
-            EVENT_Create(5, false, int_timeout, NULL, 0xFF); // создание задачи ожидания таймаута (5мс)
+            
+            if(int_reset_id != 0xFF)
+            {
+                kill_task(int_reset_id);
+                int_reset_id = 0xFF;
+                int_state.mode = INT_STATE_IDLE;
+            }
+
+            if(int_state.mode == INT_STATE_IDLE)
+            {
+                int_state.mode = INT_STATE_TIMEOUT; // включение режима ожидания таймаута перед очередной отправкой
+                EVENT_Create(5, false, int_timeout, NULL, 0xFF); // создание задачи ожидания таймаута (5мс)
+            }
         break;
             
         case 0x04: // чтение регистра расширения дискретных каналов выходов
@@ -1601,7 +1624,16 @@ void crash(void* output)
 //---------------------------
 void int_timeout(void* param)
 {
-    int_state.mode = INT_STATE_IDLE;
+    if(int_state.mode == INT_STATE_TIMEOUT)
+    {
+        int_state.mode = INT_STATE_IDLE;
+    }
+    else if(int_state.mode == INT_STATE_RESET) // обработка сброса на линии INT
+    {
+        GPIO_INT->BSRR |= GPIO_INT_SET; // поднимаем сигнал INT
+        GPIO_INT->BSRR |= GPIO_INT_RESET; // прижимаем сигнал INT к нулю (режим .mode не меняем)
+        int_reset_id = EVENT_Create(100, false, int_timeout, NULL, 0xFF); // создание задачи СБРОСА на линии INT (100мс)
+    }
 }
 //--------------------
 void  queue_init(void)

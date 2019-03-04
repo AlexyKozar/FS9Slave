@@ -1,9 +1,10 @@
 <!DOCTYPE CrossStudio_Session_File>
 <session>
- <Bookmarks/>
- <Breakpoints groups="Breakpoints" active_group="Breakpoints">
-  <Exceptions set="HardFault"/>
- </Breakpoints>
+ <Bookmarks>
+  <BookmarkItem objectName="" line="969" column="0" path="D:/projects/workspace/uC/fs9slave/Src/device/device.c" number="3" extra="case 0x1F: // ?????? ??????? ???????????? ??????????? ???????? ??????????? ??????" color="25"/>
+  <BookmarkItem objectName="" line="1306" column="0" path="D:/projects/workspace/uC/fs9slave/Src/device/device.c" number="4" extra="if(_pwr_ok.state == true &amp;&amp; index == PWROK_INPUT)" color="25"/>
+ </Bookmarks>
+ <Breakpoints groups="Breakpoints" active_group="Breakpoints"/>
  <ExecutionProfileWindow/>
  <FrameBufferWindow>
   <FrameBufferWindow bufferHeight="-1" addressSpace="" addressText="" bufferWidth="-1"/>
@@ -45,7 +46,7 @@
  </TraceWindow>
  <Watch1>
   <Watches active="1" update="Never">
-   <Watchpoint numelements="0" expression="dest" evalMode="1" name="dest" radix="16" linenumber="561" filename="../Src/device/device.c" list=""/>
+   <Watchpoint numelements="0" expression="pwrok" evalMode="1" name="pwrok" radix="16" linenumber="565" filename="../Src/device/device.c" list=""/>
   </Watches>
  </Watch1>
  <Watch2>
@@ -58,9 +59,9 @@
   <Watches active="0" update="Never"/>
  </Watch4>
  <Files>
-  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="66" useTextEdit="1" useBinaryEdit="0" left="0" path="../Src/main.c" selected="0" top="47" codecName="UTF-8"/>
-  <SessionOpenFile windowGroup="DockEditLeft" x="5" y="93" useTextEdit="1" useBinaryEdit="0" left="0" path="../Src/device/device.h" selected="1" top="66" codecName="UTF-8"/>
-  <SessionOpenFile windowGroup="DockEditLeft" x="118" y="1298" useTextEdit="1" useBinaryEdit="0" left="0" path="../Src/device/device.c" selected="0" top="1274" codecName="UTF-8"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="66" useTextEdit="1" useBinaryEdit="0" left="0" path="../Src/main.c" selected="0" top="43" codecName="UTF-8"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="94" y="81" useTextEdit="1" useBinaryEdit="0" left="0" path="../Src/device/device.h" selected="0" top="51" codecName="UTF-8"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="40" y="718" useTextEdit="1" useBinaryEdit="0" left="0" path="../Src/device/device.c" selected="1" top="711" codecName="UTF-8"/>
  </Files>
  <ARMCrossStudioWindow activeProject="FS9Slave" fileDialogDefaultFilter="*.c" autoConnectTarget="J-Link" buildConfiguration="FS9Slave External" debugSearchFileMap="" fileDialogInitialDirectory="D:/projects/workspace/fs9slave/Src/RTT" debugSearchPath="" autoConnectCapabilities="3199"/>
 </session>
