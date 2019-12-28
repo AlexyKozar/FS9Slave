@@ -115,6 +115,22 @@ void EVENT_Kill(uint8_t id)
 {
     timer[id].timer = TIMER_IDLE;
 }
+//-------------------------------
+bool EVENT_SearchByID(uint8_t id)
+{
+		if(id == 0xFF)
+			return false;
+		
+		for(uint8_t i = 0; i < EVENT_MAX_SIZE; ++i)
+		{
+				if(timer[i].event.id == id && timer[i].timer != TIMER_IDLE)
+				{
+						return true;
+				}
+		}
+		
+		return false;
+}
 //-----------------------------
 uint16_t EVENT_Tick(uint8_t id)
 {

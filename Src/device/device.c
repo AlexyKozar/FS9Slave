@@ -13,6 +13,7 @@ float   UAIN_to_TResistance(uint16_t val, uint8_t in_num); // преобразо
 void    blink2Hz(void* output); // мигание с частотой 2Гц (для МИК-01)
 void    crash(void* output); // для обработки аварийной ситуации (нет запросов от ЦП 5 сек)
 void    int_timeout(void* param); // для обработки таймаута отправки данных по изменению состояний входов
+void    int_watchdog(void *param); // для обработки зависания сигнала INT
 void    queue_init(void);
 void    insert_task(uint8_t id); // вставка задачи в очередь для мигания (МИК-01)
 void    kill_task(uint8_t id); // убить задачу в очереди для мигания (МИК-01)
@@ -22,6 +23,7 @@ void    convertInputState(uint8_t* data); // конвертирование со
 bool    isEqualIputState(uint8_t* data); // проверка на эквивалентность состояний входов
 void    inputStateUpdate(void);
 void    inputSettings(uint8_t number, uint8_t mode, uint8_t duration, uint8_t fault);
+void    Backlight_Init(void); // инициализация ноги подсветки дисплея
 //----------------------
 PORT_Input_Type*  io_in;
 PORT_Output_Type* io_out;
@@ -76,6 +78,9 @@ uint16_t AIN_TEMP[MAX_SIZE_AIN_TEMP][3] =
 //--------------------
 uint32_t key_read = 0;
 uint32_t key_receive = 0;
+//---------------------------
+uint32_t int_reset_count = 0; // переменная подсчета сбросов сигнала INT (если было 50, то устройство занято и сброс отключается)
+uint32_t int_watchdog_count = 0; // переменная подсчета активности сигнала INT (активным является низкий уровень)
 //-----------------------------------------------------
 void DEV_Create(GPIO_TypeDef* gpio, uint16_t addr_pins)
 {
@@ -155,7 +160,10 @@ void DEV_Init(PORT_Input_Type* inputs, PORT_Output_Type* outputs)
     }
     else
     {
+				Backlight_Init(); // инициализация ноги подсветки дисплея
+			
         EVENT_Create(5, false, DEV_KeyboardScan, NULL, 0xFF); // опрос клавиатуры
+				EVENT_Create(250, false, int_watchdog, NULL, 0xFF); // создание задачи сторожевой собаки для линии линии INT (250мс)
         
         queue_init(); // инициализация очереди входов для работы в режиме мигания
         
@@ -212,6 +220,21 @@ void DEV_Init(PORT_Input_Type* inputs, PORT_Output_Type* outputs)
     int_state.state[0] = 0x00;
     int_state.state[1] = 0x00;
     int_state.state[2] = 0x00;
+}
+//-----------------------
+void Backlight_Init(void)
+{
+		GPIO_InitTypeDef GPIO_InitStruct;
+	
+		RCC->AHBENR |= RCC_AHBENR_GPIOBEN;
+    
+    /*Configure GPIO pins*/
+    GPIO_InitStruct.Pin  = GPIO_PIN_3;
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+	
+		GPIOB->BSRR |= GPIO_BSRR_BS_3;
 }
 /*!
  * date - буфер для хранения даты
@@ -354,6 +377,9 @@ void inputStateUpdate(void)
         int_state.state[0] = state[0]; // то меняем состояние снимка на текущее
         int_state.state[1] = state[1];
         int_state.state[2] = state[2];
+			
+				int_reset_count = 0; // сброс переменной хранящей количество сброса сигнала INT
+				int_watchdog_count = 0;
 
         InputStateChanged = false; // очистка флага изменения состояния входов
         GPIO_INT->BSRR |= GPIO_INT_RESET; // прижимаем линию INT (сигнал для МЦП - состояния входов изменились)
@@ -604,6 +630,9 @@ bool DEV_Driver(FS9Buffer_t* source, FS9Buffer_t* dest)
             dest->size = 3;
 
             GPIO_INT->BSRR |= GPIO_INT_SET; // поднимаем сигнал INT
+				
+						int_reset_count = 0; // сброс переменной хранящей количество сброса сигнала INT
+						int_watchdog_count = 0;
             
             if(int_reset_id != 0xFF)
             {
@@ -1624,16 +1653,63 @@ void crash(void* output)
 //---------------------------
 void int_timeout(void* param)
 {
+		GPIO_INT->BSRR |= GPIO_INT_SET; // поднимаем сигнал INT
+	
     if(int_state.mode == INT_STATE_TIMEOUT)
     {
-        int_state.mode = INT_STATE_IDLE;
+				int_state.mode = INT_STATE_IDLE;
+			
+				if(int_reset_id != 0xFF)
+				{
+						kill_task(int_reset_id);
+						int_reset_id = 0xFF;
+				}
     }
     else if(int_state.mode == INT_STATE_RESET) // обработка сброса на линии INT
     {
-        GPIO_INT->BSRR |= GPIO_INT_SET; // поднимаем сигнал INT
-        GPIO_INT->BSRR |= GPIO_INT_RESET; // прижимаем сигнал INT к нулю (режим .mode не меняем)
+				int_reset_count++; // инкремент переменной хранящей количество сброса сигнала INT
+			
+				if(int_reset_count > 50) // количество сбросов больше 50
+				{
+						if(int_reset_id != 0xFF)
+						{
+								kill_task(int_reset_id);
+								int_reset_id = 0xFF;
+						}
+						
+						int_reset_count = 0; // сброс переменной хранящей количество сброса сигнала INT
+						int_watchdog_count = 0;
+						int_state.mode = INT_STATE_IDLE;
+						
+						return;
+				}
+				
+				GPIO_INT->BSRR |= GPIO_INT_RESET; // прижимаем сигнал INT к нулю (режим .mode не меняем)
         int_reset_id = EVENT_Create(100, false, int_timeout, NULL, 0xFF); // создание задачи СБРОСА на линии INT (100мс)
     }
+}
+//----------------------------
+void int_watchdog(void *param)
+{
+		if((GPIO_INT->BSRR & GPIO_INT_RESET)) // если линия INT прижата
+		{
+				int_watchdog_count++; // инкрементируем переменную подсчета активного уровня сигнала INT
+		}
+		
+		if(int_watchdog_count > 10) // активным сигнал остается на протяжении 10 проверок, то снимаем сигнал (возможно зависание)
+		{
+				GPIO_INT->BSRR |= GPIO_INT_SET; // поднимаем сигнал INT
+				int_watchdog_count = 0;
+				int_state.mode = INT_STATE_IDLE;
+			
+				if(int_reset_id != 0xFF)
+				{
+						kill_task(int_reset_id);
+						int_reset_id = 0xFF;
+				}
+		}
+		
+		EVENT_Create(250, false, int_watchdog, NULL, 0xFF); // создание задачи сторожевой собаки для линии линии INT (250мс)
 }
 //--------------------
 void  queue_init(void)
