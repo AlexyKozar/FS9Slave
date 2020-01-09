@@ -36,7 +36,7 @@ uint8_t int_reset_id = 0xFF; // id задачи СБРОСА линии INT по
 //-------------------------
 bool InputStateChanged = false;
 //-----------------------------
-bool        is_crash   = false; // авария - отключение выхода (происходит в случае отсутствия запросов от ЦП 5 сек)
+bool        is_crash   = false; // авария - включение выхода (происходит в случае отсутствия запросов от ЦП 5 сек)
 output_t*   out_crash  = NULL; // выход аварийной сигнализации
 input_t*    io_inOff   = 0;
 input_t*    io_inOn    = 0;
@@ -379,8 +379,8 @@ void inputStateUpdate(void)
         int_state.state[1] = state[1];
         int_state.state[2] = state[2];
 			
-				int_reset_count = 0; // сброс переменной хранящей количество сброса сигнала INT
-				int_watchdog_count = 0;
+        int_reset_count = 0; // сброс переменной хранящей количество сброса сигнала INT
+        int_watchdog_count = 0;
 
         InputStateChanged = false; // очистка флага изменения состояния входов
         GPIO_INT->BSRR |= GPIO_INT_RESET; // прижимаем линию INT (сигнал для МЦП - состояния входов изменились)
@@ -599,7 +599,7 @@ void DEV_CrashInit(void)
     out_crash        = &io_out->list[2];
     out_crash->param = EVENT_Create(5000, true, crash, out_crash, 0xFF);
 
-    //DEV_OutSet(out_crash); // включаем аварийный выход - только для теста
+    DEV_OutReset(out_crash); // выключаем аварийный выход при включении модуля (включается, если опроса не было 5 сек)
 }
 //-----------------------
 uint8_t DEV_Address(void)
@@ -1695,9 +1695,9 @@ void crash(void* output)
     {
         is_crash = false;
     }
-    else // запроса нет - отключаем выход
+    else // запроса нет - включаем выход и держим включенным до тех пор пока ЦПУ не даст команду на отключение
     {
-        DEV_OutReset(out);
+        DEV_OutSet(out);
     }
 }
 //---------------------------
