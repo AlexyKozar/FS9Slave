@@ -8,6 +8,7 @@ void    TIM_Scan_Init(void);
 void    TIM_Scan_Update(void);
 void    TIM_INT_Init(void);
 void    TIM_INT_Start(void);
+void    TIM_Backlight_Update(void);
 float   Get_Temp(uint16_t val, uint8_t in_num);
 float   UAIN_to_TResistance(uint16_t val, uint8_t in_num); // преобразование напряжения в сопротивление температуры
 void    blink2Hz(void* output); // мигание с частотой 2Гц (для МИК-01)
@@ -149,8 +150,6 @@ void DEV_Init(PORT_Input_Type* inputs, PORT_Output_Type* outputs)
     
     if(devAddr != DEVICE_MIK_01) // только для МДВВ
     {
-        TIM_Scan_Init();
-        
         if(devAddr == DEVICE_MDVV_01) // только для МДВВ-01
         {
             io_inPhase = &io_in->list[0]; // искробезопасный вход DI_1 для определения фазы
@@ -220,21 +219,23 @@ void DEV_Init(PORT_Input_Type* inputs, PORT_Output_Type* outputs)
     int_state.state[0] = 0x00;
     int_state.state[1] = 0x00;
     int_state.state[2] = 0x00;
+		
+    TIM_Scan_Init(); // запуск сканирования входов для плат МДВВ-01 и МДВВ-02 или инициализация подсветки для МИК-01
 }
 //-----------------------
 void Backlight_Init(void)
 {
-		GPIO_InitTypeDef GPIO_InitStruct;
-	
-		RCC->AHBENR |= RCC_AHBENR_GPIOBEN;
+    GPIO_InitTypeDef GPIO_InitStruct;
+
+    RCC->AHBENR |= RCC_AHBENR_GPIOBEN;
     
     /*Configure GPIO pins*/
-    GPIO_InitStruct.Pin  = GPIO_PIN_3;
+    GPIO_InitStruct.Pin  = GPIO_BACKLIGHT_PIN;
     GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
-    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+    HAL_GPIO_Init(GPIO_BACKLIGHT, &GPIO_InitStruct);
 	
-		GPIOB->BSRR |= GPIO_BSRR_BS_3;
+    GPIO_BACKLIGHT->BSRR |= GPIO_BACKLIGHT_LOW;
 }
 /*!
  * date - буфер для хранения даты
@@ -473,15 +474,56 @@ void TIM_Scan_Init(void)
 {
     RCC->APB2ENR |= RCC_APB2ENR_TIM16EN;
     
-    TIM16->PSC   = F_CPU/1000000UL - 1;
+    TIM16->PSC = F_CPU/1000000UL - 1;
     
-    TIM_Scan_Update();
+    if(devAddr != DEVICE_MIK_01) // если это не МИК-01, то инициализируем сканирование входов
+    {
+        TIM_Scan_Update();
+        
+        TIM16->CR1  |= TIM_CR1_ARPE;
+        TIM16->DIER |= TIM_DIER_UIE;
     
-    TIM16->CR1  |= TIM_CR1_ARPE;
-    TIM16->DIER |= TIM_DIER_UIE;
-    TIM16->CR1  |= TIM_CR1_CEN;
+        NVIC_EnableIRQ(TIM16_IRQn);
     
-    NVIC_EnableIRQ(TIM16_IRQn);
+        TIM16->CR1  |= TIM_CR1_CEN; 
+    }
+    else
+    {
+        TIM16->ARR = 1000000 - 1; // пауза 1 секунда перед настройкой дисплея
+        TIM_Backlight_Update();
+
+        TIM16->CR1 |= TIM_CR1_CEN;
+    
+        while(!(TIM16->SR & TIM_SR_UIF)) {} // Ожидаем пока не сработает таймер
+            
+        TIM16->SR &= ~TIM_SR_UIF;
+        TIM16->CR1 &= ~TIM_CR1_CEN;
+            
+        TIM16->ARR = 10 - 1; // пауза 1 микросекунда - подача импульса яркости
+        TIM_Backlight_Update();
+            
+        GPIO_BACKLIGHT->BSRR |= GPIO_BACKLIGHT_HIGH; // устанавливаем высокий уровень импульса
+            
+        TIM16->CR1 |= TIM_CR1_CEN;
+    
+        while(!(TIM16->SR & TIM_SR_UIF)) {} // Ожидаем пока не сработает таймер
+            
+        TIM16->SR &= ~TIM_SR_UIF;
+        TIM16->CR1 &= ~TIM_CR1_CEN;
+            
+        TIM16->ARR = 10 - 1; // пауза 1 микросекунда - пауза после импульса яркости
+        TIM_Backlight_Update();
+            
+        GPIO_BACKLIGHT->BSRR |= GPIO_BACKLIGHT_LOW; // устанавливаем низкий уровень импульса
+            
+        TIM16->CR1 |= TIM_CR1_CEN;
+            
+        while(!(TIM16->SR & TIM_SR_UIF)) {} // Ожидаем пока не сработает таймер
+            
+        TIM16->SR &= ~TIM_SR_UIF;
+        TIM16->CR1 &= ~TIM_CR1_CEN;
+        GPIO_BACKLIGHT->BSRR |= GPIO_BACKLIGHT_HIGH; // устанавливаем высокий уровень - подсветка включена (через 500мкс яркость установится в максимальный уровень - по даташиту)
+    }
 }
 //------------------------
 void TIM_Scan_Update(void)
@@ -489,7 +531,15 @@ void TIM_Scan_Update(void)
     TIM16->ARR   = 10000/io_in->set.Ndiscret - 1;
     TIM16->DIER &= ~TIM_DIER_UIE;
     TIM16->EGR  |= TIM_EGR_UG;
+		TIM16->SR &= ~TIM_SR_UIF;
     TIM16->DIER |= TIM_DIER_UIE;
+}
+//-----------------------------
+void TIM_Backlight_Update(void)
+{
+		TIM16->DIER &= ~TIM_DIER_UIE;
+    TIM16->EGR  |= TIM_EGR_UG;
+		TIM16->SR &= ~TIM_SR_UIF;
 }
 //---------------------
 void TIM_INT_Init(void)

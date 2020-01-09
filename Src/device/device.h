@@ -45,6 +45,11 @@
     #define GPIO_INT_PIN   GPIO_PIN_5
     #define GPIO_INT_SET   GPIO_BSRR_BS_5
     #define GPIO_INT_RESET GPIO_BSRR_BR_5
+		//-------------------------------
+		#define GPIO_BACKLIGHT      GPIOB
+		#define GPIO_BACKLIGHT_PIN  GPIO_PIN_3
+		#define GPIO_BACKLIGHT_LOW  GPIO_BSRR_BR_3
+		#define GPIO_BACKLIGHT_HIGH GPIO_BSRR_BS_3
     //-------------------------------------
     #define DSDIN_TRIGGER_ON_0         0xA1 // срабатывание зафиксировано, установлен уровень «0»
     #define DSDIN_TRIGGER_ON_1         0xF5 // срабатывание зафиксировано, установлен уровень «1»
