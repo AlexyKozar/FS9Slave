@@ -362,7 +362,7 @@ ork --depend=fs9slave\startup_stm32f030x6.d -ofs9slave\startup_stm32f030x6.o -I
 .\RTE\_FS9Slave -IC:\Users\gruffi\AppData\Local\Arm\Packs\ARM\CMSIS\5.6.0\CMSIS
 \Core\Include -IC:\Users\gruffi\AppData\Local\Arm\Packs\Keil\STM32F0xx_DFP\2.0.
 0\Drivers\CMSIS\Device\ST\STM32F0xx\Include --predefine="__EVAL SETA 1" --prede
-fine="__MICROLIB SETA 1" --predefine="__UVISION_VERSION SETA 528" --predefine="
+fine="__MICROLIB SETA 1" --predefine="__UVISION_VERSION SETA 529" --predefine="
 _RTE_ SETA 1" --predefine="STM32F030x6 SETA 1" --list=startup_stm32f030x6.lst s
 tartup_stm32f030x6.s
 

@@ -25,6 +25,7 @@ bool    isEqualIputState(uint8_t* data); // проверка на эквивал
 void    inputStateUpdate(void);
 void    inputSettings(uint8_t number, uint8_t mode, uint8_t duration, uint8_t fault);
 void    Backlight_Init(void); // инициализация ноги подсветки дисплея
+void    TIM_Init_Crash(void); // инициализация таймера обрыва связи
 //----------------------
 PORT_Input_Type*  io_in;
 PORT_Output_Type* io_out;
@@ -82,6 +83,8 @@ uint32_t key_receive = 0;
 //---------------------------
 uint32_t int_reset_count = 0; // переменная подсчета сбросов сигнала INT (если было 50, то устройство занято и сброс отключается)
 uint32_t int_watchdog_count = 0; // переменная подсчета активности сигнала INT (активным является низкий уровень)
+//------------------------------------------------
+uint16_t backlight_mode = MODE_BACKLIGHT_PAUSE_0N; // режим инициализации подсветки дисплея
 //-----------------------------------------------------
 void DEV_Create(GPIO_TypeDef* gpio, uint16_t addr_pins)
 {
@@ -138,7 +141,8 @@ void DEV_Init(PORT_Input_Type* inputs, PORT_Output_Type* outputs)
         io_out->list[i].pin.num = i;
         io_out->list[i].state   = OUTPUT_STATE_OFF;
 
-        DEV_OutReset(&io_out->list[i]); // выключить выход - состояние по умолчанию
+				HAL_GPIO_WritePin(io_out->list[i].pin.gpio, io_out->list[i].pin.io, GPIO_PIN_RESET); // выключить выход - состояние по умолчанию
+        //DEV_OutReset(&io_out->list[i]); // выключить выход - состояние по умолчанию
     }
     
     io_t pin_int = { GPIO_INT, GPIO_INT_PIN };
@@ -159,10 +163,10 @@ void DEV_Init(PORT_Input_Type* inputs, PORT_Output_Type* outputs)
     }
     else
     {
-				Backlight_Init(); // инициализация ноги подсветки дисплея
+        Backlight_Init(); // инициализация ноги подсветки дисплея
 			
         EVENT_Create(5, false, DEV_KeyboardScan, NULL, 0xFF); // опрос клавиатуры
-				EVENT_Create(250, false, int_watchdog, NULL, 0xFF); // создание задачи сторожевой собаки для линии линии INT (250мс)
+        EVENT_Create(250, false, int_watchdog, NULL, 0xFF); // создание задачи сторожевой собаки для линии линии INT (250мс)
         
         queue_init(); // инициализация очереди входов для работы в режиме мигания
         
@@ -465,9 +469,24 @@ void CHANNEL_Out_Reset(uint8_t index)
     if(index < io_out->size)
     {
         output_t* out = &io_out->list[index];
-
         DEV_OutReset(out);
     }
+}
+//-----------------------
+void TIM_Init_Crash(void)
+{
+    RCC->APB2ENR |= RCC_APB2ENR_TIM1EN;
+    
+    TIM1->PSC = F_CPU/1000UL - 1;
+    TIM1->ARR = 5000 - 1; // перезагрузка каждые 5сек
+    TIM1->DIER &= ~TIM_DIER_UIE;
+    TIM1->EGR |= TIM_EGR_UG;
+    TIM1->SR &= ~TIM_SR_UIF;
+    TIM1->DIER |= TIM_DIER_UIE;
+    TIM1->CR1 |= TIM_CR1_OPM | TIM_CR1_CEN;
+    
+    NVIC_SetPriority(TIM1_BRK_UP_TRG_COM_IRQn, 1);
+    NVIC_EnableIRQ(TIM1_BRK_UP_TRG_COM_IRQn);
 }
 //----------------------
 void TIM_Scan_Init(void)
@@ -475,54 +494,23 @@ void TIM_Scan_Init(void)
     RCC->APB2ENR |= RCC_APB2ENR_TIM16EN;
     
     TIM16->PSC = F_CPU/1000000UL - 1;
+    TIM16->DIER |= TIM_DIER_UIE;
+    NVIC_EnableIRQ(TIM16_IRQn);
     
     if(devAddr != DEVICE_MIK_01) // если это не МИК-01, то инициализируем сканирование входов
     {
         TIM_Scan_Update();
         
         TIM16->CR1  |= TIM_CR1_ARPE;
-        TIM16->DIER |= TIM_DIER_UIE;
-    
-        NVIC_EnableIRQ(TIM16_IRQn);
-    
         TIM16->CR1  |= TIM_CR1_CEN; 
     }
     else
     {
-        TIM16->ARR = 1000000 - 1; // пауза 1 секунда перед настройкой дисплея
+        TIM16->PSC = 48000 - 1;
+        TIM16->ARR = 200 - 1; // пауза 1 секунда перед настройкой дисплея
         TIM_Backlight_Update();
 
-        TIM16->CR1 |= TIM_CR1_CEN;
-    
-        while(!(TIM16->SR & TIM_SR_UIF)) {} // Ожидаем пока не сработает таймер
-            
-        TIM16->SR &= ~TIM_SR_UIF;
-        TIM16->CR1 &= ~TIM_CR1_CEN;
-            
-        TIM16->ARR = 10 - 1; // пауза 1 микросекунда - подача импульса яркости
-        TIM_Backlight_Update();
-            
-        GPIO_BACKLIGHT->BSRR |= GPIO_BACKLIGHT_HIGH; // устанавливаем высокий уровень импульса
-            
-        TIM16->CR1 |= TIM_CR1_CEN;
-    
-        while(!(TIM16->SR & TIM_SR_UIF)) {} // Ожидаем пока не сработает таймер
-            
-        TIM16->SR &= ~TIM_SR_UIF;
-        TIM16->CR1 &= ~TIM_CR1_CEN;
-            
-        TIM16->ARR = 10 - 1; // пауза 1 микросекунда - пауза после импульса яркости
-        TIM_Backlight_Update();
-            
-        GPIO_BACKLIGHT->BSRR |= GPIO_BACKLIGHT_LOW; // устанавливаем низкий уровень импульса
-            
-        TIM16->CR1 |= TIM_CR1_CEN;
-            
-        while(!(TIM16->SR & TIM_SR_UIF)) {} // Ожидаем пока не сработает таймер
-            
-        TIM16->SR &= ~TIM_SR_UIF;
-        TIM16->CR1 &= ~TIM_CR1_CEN;
-        GPIO_BACKLIGHT->BSRR |= GPIO_BACKLIGHT_HIGH; // устанавливаем высокий уровень - подсветка включена (через 500мкс яркость установится в максимальный уровень - по даташиту)
+        TIM16->CR1 |= TIM_CR1_OPM | TIM_CR1_CEN;
     }
 }
 //------------------------
@@ -531,15 +519,16 @@ void TIM_Scan_Update(void)
     TIM16->ARR   = 10000/io_in->set.Ndiscret - 1;
     TIM16->DIER &= ~TIM_DIER_UIE;
     TIM16->EGR  |= TIM_EGR_UG;
-		TIM16->SR &= ~TIM_SR_UIF;
+    TIM16->SR &= ~TIM_SR_UIF;
     TIM16->DIER |= TIM_DIER_UIE;
 }
 //-----------------------------
 void TIM_Backlight_Update(void)
 {
-		TIM16->DIER &= ~TIM_DIER_UIE;
+    TIM16->DIER &= ~TIM_DIER_UIE;
     TIM16->EGR  |= TIM_EGR_UG;
-		TIM16->SR &= ~TIM_SR_UIF;
+    TIM16->SR &= ~TIM_SR_UIF;
+    TIM16->DIER |= TIM_DIER_UIE;
 }
 //---------------------
 void TIM_INT_Init(void)
@@ -597,9 +586,8 @@ void DEV_CrashInit(void)
 {
     // настройка аварийного выхода
     out_crash        = &io_out->list[2];
-    out_crash->param = EVENT_Create(5000, true, crash, out_crash, 0xFF);
-
-    DEV_OutReset(out_crash); // выключаем аварийный выход при включении модуля (включается, если опроса не было 5 сек)
+    HAL_GPIO_WritePin(out_crash->pin.gpio, out_crash->pin.io, GPIO_PIN_RESET); // выключаем аварийный выход при включении модуля (включается, если опроса не было 5 сек)
+    TIM_Init_Crash(); // запуск таймера
 }
 //-----------------------
 uint8_t DEV_Address(void)
@@ -1170,16 +1158,19 @@ bool DEV_Driver(FS9Buffer_t* source, FS9Buffer_t* dest)
 //-------------------------------------------------------------------------------
 void inputSettings(uint8_t number, uint8_t mode, uint8_t duration, uint8_t fault)
 {
+	if(duration == 0) // защита от дурака - если длительность равна 0, то отменяем настройку
+		return;
+	
     io_in->list[number].mode  = mode; // режим работы входа AC или DC
     io_in->list[number].duration = duration; // длительность периода
 
     if(mode == IN_MODE_AC)
     {
-        io_in->list[number].fault = fault; // погрешность допускаемая за один период - в процентах
+        io_in->list[number].fault = (fault > 100)?100:fault; // погрешность допускаемая за один период - в процентах
     }
     else
     {
-        io_in->set.P0dc = io_in->set.P1dc = fault;
+        io_in->set.P0dc = io_in->set.P1dc = (fault > 100)?100:fault;
     }
 }
 //-----------------------------------------------------
@@ -1601,7 +1592,47 @@ void TIM16_IRQHandler(void)
 {
     if((TIM16->SR & TIM_SR_UIF) == TIM_SR_UIF)
     {
-        DEV_InputScan();
+        if(devAddr != DEVICE_MIK_01) // если не устройство МИК-01, то запускаем сканирование входов
+            DEV_InputScan();
+        else
+        {
+            switch(backlight_mode)
+            {
+                case MODE_BACKLIGHT_PAUSE_0N:
+                    // DEV_OutSet(&io_out->list[0]); // для отладки
+                    TIM16->PSC = F_CPU/1000000UL - 1;
+                    TIM16->ARR = 10 - 1; // пауза 1 микросекунда - подача импульса яркости
+                    TIM_Backlight_Update();
+                        
+                    GPIO_BACKLIGHT->BSRR |= GPIO_BACKLIGHT_HIGH; // устанавливаем высокий уровень импульса
+                    backlight_mode = MODE_BACKLIGHT_PULSE_ON;
+                        
+                    TIM16->CR1 |= TIM_CR1_OPM | TIM_CR1_CEN;
+                break;
+                
+                case MODE_BACKLIGHT_PULSE_ON:
+                    // DEV_OutSet(&io_out->list[1]);  // для отладки
+                    TIM16->ARR = 10 - 1; // пауза 1 микросекунда - пауза после импульса яркости
+                    TIM_Backlight_Update();
+                        
+                    GPIO_BACKLIGHT->BSRR |= GPIO_BACKLIGHT_LOW; // устанавливаем низкий уровень импульса
+                    backlight_mode = MODE_BACKLIGHT_PULSE_OFF;
+                        
+                    TIM16->CR1 |= TIM_CR1_OPM | TIM_CR1_CEN;
+                break;
+                
+                case MODE_BACKLIGHT_PULSE_OFF:
+                    // DEV_OutSet(&io_out->list[2]);  // для отладки
+                    GPIO_BACKLIGHT->BSRR |= GPIO_BACKLIGHT_HIGH; // устанавливаем высокий уровень - подсветка включена 
+                                            // (через 500мкс яркость установится в максимальный уровень - по даташиту)
+                break;
+                
+                default:
+                    GPIO_BACKLIGHT->BSRR |= GPIO_BACKLIGHT_HIGH; // устанавливаем высокий уровень - подсветка включена 
+                                            // (через 500мкс яркость установится в максимальный уровень - по даташиту)
+                break;
+            }
+        }
         
         TIM16->SR &= ~TIM_SR_UIF;
     }
@@ -1612,6 +1643,31 @@ void TIM17_IRQHandler(void)
     if((TIM17->SR & TIM_SR_UIF) == TIM_SR_UIF)
     {   
         TIM17->SR &= ~TIM_SR_UIF;
+    }
+}
+//---------------------------------------
+void TIM1_BRK_UP_TRG_COM_IRQHandler(void) // обработчик таймера обрыва связи
+{
+    if((TIM1->SR & TIM_SR_UIF))
+    {
+        TIM1->SR &= ~TIM_SR_UIF;
+        
+        if(!(TIM1->CR1 & TIM_CR1_OPM)) // флаг одиночного запуска не выставлен - рабочий режим
+        {
+            if(is_crash == true) // запрос пришел
+            {
+                is_crash = false;
+            }
+            else // запроса нет - включаем выход и держим включенным до тех пор пока ЦПУ не даст команду на отключение
+            {
+                HAL_GPIO_WritePin(out_crash->pin.gpio, out_crash->pin.io, GPIO_PIN_SET);
+            }
+        }
+        else // режим 5ти секундной задержки перед стартом аварийного таймера
+        {
+            TIM1->CR1 = (TIM1->CR1 & ~TIM_CR1_OPM) | TIM_CR1_CEN; // запуск таймера в рабочем режиме
+            HAL_GPIO_WritePin(out_crash->pin.gpio, out_crash->pin.io, GPIO_PIN_RESET); // снимаем сигнал с аварийного реле
+        }
     }
 }
 //------------------------------------------
@@ -1697,69 +1753,69 @@ void crash(void* output)
     }
     else // запроса нет - включаем выход и держим включенным до тех пор пока ЦПУ не даст команду на отключение
     {
-        DEV_OutSet(out);
+        HAL_GPIO_WritePin(out->pin.gpio, out->pin.io, GPIO_PIN_SET);
     }
 }
 //---------------------------
 void int_timeout(void* param)
 {
-		GPIO_INT->BSRR |= GPIO_INT_SET; // поднимаем сигнал INT
+    GPIO_INT->BSRR |= GPIO_INT_SET; // поднимаем сигнал INT
 	
     if(int_state.mode == INT_STATE_TIMEOUT)
     {
-				int_state.mode = INT_STATE_IDLE;
-			
-				if(int_reset_id != 0xFF)
-				{
-						kill_task(int_reset_id);
-						int_reset_id = 0xFF;
-				}
+        int_state.mode = INT_STATE_IDLE;
+    
+        if(int_reset_id != 0xFF)
+        {
+            kill_task(int_reset_id);
+            int_reset_id = 0xFF;
+        }
     }
     else if(int_state.mode == INT_STATE_RESET) // обработка сброса на линии INT
     {
-				int_reset_count++; // инкремент переменной хранящей количество сброса сигнала INT
-			
-				if(int_reset_count > 50) // количество сбросов больше 50
-				{
-						if(int_reset_id != 0xFF)
-						{
-								kill_task(int_reset_id);
-								int_reset_id = 0xFF;
-						}
-						
-						int_reset_count = 0; // сброс переменной хранящей количество сброса сигнала INT
-						int_watchdog_count = 0;
-						int_state.mode = INT_STATE_IDLE;
-						
-						return;
-				}
-				
-				GPIO_INT->BSRR |= GPIO_INT_RESET; // прижимаем сигнал INT к нулю (режим .mode не меняем)
+        int_reset_count++; // инкремент переменной хранящей количество сброса сигнала INT
+    
+        if(int_reset_count > 50) // количество сбросов больше 50
+        {
+            if(int_reset_id != 0xFF)
+            {
+                    kill_task(int_reset_id);
+                    int_reset_id = 0xFF;
+            }
+            
+            int_reset_count = 0; // сброс переменной хранящей количество сброса сигнала INT
+            int_watchdog_count = 0;
+            int_state.mode = INT_STATE_IDLE;
+            
+            return;
+        }
+        
+        GPIO_INT->BSRR |= GPIO_INT_RESET; // прижимаем сигнал INT к нулю (режим .mode не меняем)
         int_reset_id = EVENT_Create(100, false, int_timeout, NULL, 0xFF); // создание задачи СБРОСА на линии INT (100мс)
     }
 }
 //----------------------------
 void int_watchdog(void *param)
 {
-		if((GPIO_INT->BSRR & GPIO_INT_RESET)) // если линия INT прижата
-		{
-				int_watchdog_count++; // инкрементируем переменную подсчета активного уровня сигнала INT
-		}
-		
-		if(int_watchdog_count > 10) // активным сигнал остается на протяжении 10 проверок, то снимаем сигнал (возможно зависание)
-		{
-				GPIO_INT->BSRR |= GPIO_INT_SET; // поднимаем сигнал INT
-				int_watchdog_count = 0;
-				int_state.mode = INT_STATE_IDLE;
-			
-				if(int_reset_id != 0xFF)
-				{
-						kill_task(int_reset_id);
-						int_reset_id = 0xFF;
-				}
-		}
-		
-		EVENT_Create(250, false, int_watchdog, NULL, 0xFF); // создание задачи сторожевой собаки для линии линии INT (250мс)
+    if((GPIO_INT->BSRR & GPIO_INT_RESET)) // если линия INT прижата
+    {
+            int_watchdog_count++; // инкрементируем переменную подсчета активного уровня сигнала INT
+    }
+    
+    if(int_watchdog_count > 10) // активным сигнал остается на протяжении 10 проверок, то снимаем сигнал (возможно зависание)
+    {
+            GPIO_INT->BSRR |= GPIO_INT_SET; // поднимаем сигнал INT
+            int_watchdog_count = 0;
+            int_state.mode = INT_STATE_IDLE;
+        
+            if(int_reset_id != 0xFF)
+            {
+                    kill_task(int_reset_id);
+                    int_reset_id = 0xFF;
+            }
+    }
+    
+    EVENT_Create(250, false, int_watchdog, NULL, 0xFF); // создание задачи сторожевой собаки для линии линии INT (250мс)
 }
 //--------------------
 void  queue_init(void)
