@@ -995,6 +995,37 @@ bool DEV_Driver(FS9Buffer_t* source, FS9Buffer_t* dest)
                 return false;
         break;
             
+        case 0x1B: // чтение общих настроек фильтра дискретных входов
+            dest->data[0] = io_in->set.Nperiod; // количество периодов фильтрации
+            dest->data[1] = io_in->set.Ndiscret; // дискретность (количество выборок на период)
+            dest->data[2] = io_in->set.SGac; // длительность сигнала считаемая, что сигнал валидный
+        
+            dest->size = 3;
+        break;
+        
+        case 0x1C: // чтение настроек дискретного входа
+        {
+            uint8_t input = source->data[0];
+            if(input >= io_in->size)
+                return false;
+            
+            uint8_t byte = 0;
+            
+            if(io_in->list[input].mode != IN_MODE_AC) // режим входа "постоянный"
+            {
+                byte = (1 << 7); // устанавливаем 8 бит в единицу (отвечает за режим работы входа - в данном случае DC)
+            }
+            
+            byte |= (io_in->list[input].fault&0x7F); // остальные 7 битов содержат погрешность в %
+            
+            dest->data[0] = input; // возвращаем номер входа
+            dest->data[1] = byte; // режим входа + его погрешность
+            dest->data[2] = io_in->list[input].duration; // длительность периода
+            
+            dest->size = 3;
+        }
+        break;
+            
         case 0x1D: // чтение отладочной информации (счетчиков ошибок)
             utemp.count = ERROR_request();; // чтение счетчика количества запросов
             
