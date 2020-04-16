@@ -56,6 +56,28 @@ bool FLASH_Write(uint32_t addr, uint32_t data)
     
     return true;
 }
+//----------------------------------------------
+bool FLASH_Write16(uint32_t addr, uint16_t data)
+{
+    FLASH->CR |= FLASH_CR_PG;
+    
+    (*(__IO uint16_t*)addr) = data;
+    
+    while((FLASH->SR & FLASH_SR_BSY) != 0);
+    
+    if((FLASH->SR & FLASH_SR_EOP) != 0)
+    {
+        FLASH->SR = FLASH_SR_EOP;
+    }
+    else
+    {   
+        return false;
+    }
+    
+    FLASH->CR &= ~FLASH_CR_PG;
+    
+    return true;
+}
 //-----------------------------
 bool FLASH_Erase(uint32_t addr)
 {

@@ -109,11 +109,11 @@ int main(void)
 
     if(addr == DEVICE_MDVV_01)
     {
-        DS18B20_Init();
+        // DS18B20_Init();
         DEV_CrashInit();
         I2C_EE_Init();
         
-        EVENT_Create(2000, false, DS18B20_Convert, NULL, 0xFF);
+        // EVENT_Create(2000, false, DS18B20_Convert, NULL, 0xFF);
     }
     else
     {
@@ -145,6 +145,34 @@ int main(void)
             }
         }
     }
+    
+    // Проверка готовности сэмпла состояний входов
+    if(IO_SampleIsReady())
+    {
+       // uint32_t inputs[DINPUT_MAX_SIZE];
+        uint32_t* inputs = IO_SampleCopy();
+        uint8_t size = 0;
+        if(addr == DEVICE_MDVV_01) 
+            size = 12;
+        else if (addr == DEVICE_MDVV_02)
+            size = 10;
+        else
+            break;
+			
+        io_TypeDef io_set[DINPUT_MAX_SIZE];
+        
+        for(uint8_t i = 0; i < 12; i++)
+        {
+            io_set[i].type = input.list[i].mode;
+            io_set[i].mode = input.list[i].spark_security;
+            io_set[i].fltDuratiod = input.list[i].duration;
+        }
+        
+        uint16_t result = InputFilter(inputs, io_set, size);
+        IO_ReadyReset(); // сброс флага блокировки набора данных временно
+        DEV_InputBufferUpdate(result);
+    }
+    
     // обработка события
     EVENT_Execute();
     // конец обработки события

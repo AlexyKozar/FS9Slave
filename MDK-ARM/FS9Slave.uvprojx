@@ -312,7 +312,7 @@
           </ArmAdsMisc>
           <Cads>
             <interw>1</interw>
-            <Optim>4</Optim>
+            <Optim>1</Optim>
             <oTime>1</oTime>
             <SplitLS>0</SplitLS>
             <OneElfS>1</OneElfS>
@@ -556,6 +556,21 @@
               <FileName>SEGGER_RTT_Syscalls_GCC.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\Src\RTT\SEGGER_RTT_Syscalls_GCC.c</FilePath>
+            </File>
+            <File>
+              <FileName>io.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Src\device\input\io.h</FilePath>
+            </File>
+            <File>
+              <FileName>io.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Src\device\input\io.c</FilePath>
+            </File>
+            <File>
+              <FileName>dig_inputs_filter.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Src\device\filter\dig_inputs_filter.c</FilePath>
             </File>
           </Files>
         </Group>

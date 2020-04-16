@@ -13,6 +13,8 @@
     #include "i2c/i2c.h"
     #include "flash/flash.h"
     #include "error.h"
+    #include "filter/dig_inputs_filter.h"
+    #include "input/io.h"
     #include "../RTT/SEGGER_RTT.h"
     #include "../RTT/SEGGER_RTT_Conf.h"
     //----------------------
@@ -208,4 +210,5 @@
     void    DEV_OutReset(output_t* out);
     void    DEV_OutToggle(output_t* out);
     bool    DEV_IsOut(output_t* out);
+    void    DEV_InputBufferUpdate(uint16_t inputs);
 #endif

@@ -26,6 +26,8 @@ void    inputStateUpdate(void);
 void    inputSettings(uint8_t number, uint8_t mode, uint8_t duration, uint8_t fault);
 void    Backlight_Init(void); // инициализация ноги подсветки дисплея
 void    TIM_Init_Crash(void); // инициализация таймера обрыва связи
+void    SaveSettingsToFLASH(void); // Запись настроек дискретных входов во флеш
+void    ReadSettingsFromFLASH(void); // Чтение настроек дискретных входов из флеша
 //----------------------
 PORT_Input_Type*  io_in;
 PORT_Output_Type* io_out;
@@ -141,7 +143,7 @@ void DEV_Init(PORT_Input_Type* inputs, PORT_Output_Type* outputs)
         io_out->list[i].pin.num = i;
         io_out->list[i].state   = OUTPUT_STATE_OFF;
 
-				HAL_GPIO_WritePin(io_out->list[i].pin.gpio, io_out->list[i].pin.io, GPIO_PIN_RESET); // выключить выход - состояние по умолчанию
+        HAL_GPIO_WritePin(io_out->list[i].pin.gpio, io_out->list[i].pin.io, GPIO_PIN_RESET); // выключить выход - состояние по умолчанию
         //DEV_OutReset(&io_out->list[i]); // выключить выход - состояние по умолчанию
     }
     
@@ -160,9 +162,13 @@ void DEV_Init(PORT_Input_Type* inputs, PORT_Output_Type* outputs)
             io_inOff   = &io_in->list[1]; // искробезопасный вход DI_2 - кнопка СТОП
             io_inOn    = &io_in->list[2]; // искробезопасный вход DI_3 - кнопка СТАРТ
         }
+        
+        IO_TIM_Init(devAddr);
+        // TIM_Scan_Init(); // запуск сканирования входов для плат МДВВ-01 и МДВВ-02
     }
     else
     {
+        TIM_Init_Crash(); // инициализация таймера для подсветки дисплея (таймер совместно используется с обрывом связи для МДВВ-01)
         Backlight_Init(); // инициализация ноги подсветки дисплея
 			
         EVENT_Create(5, false, DEV_KeyboardScan, NULL, 0xFF); // опрос клавиатуры
@@ -223,8 +229,10 @@ void DEV_Init(PORT_Input_Type* inputs, PORT_Output_Type* outputs)
     int_state.state[0] = 0x00;
     int_state.state[1] = 0x00;
     int_state.state[2] = 0x00;
-		
-    TIM_Scan_Init(); // запуск сканирования входов для плат МДВВ-01 и МДВВ-02 или инициализация подсветки для МИК-01
+    
+//    SaveSettingsToFLASH();
+		if(devAddr != DEVICE_MIK_01)
+				ReadSettingsFromFLASH();
 }
 //-----------------------
 void Backlight_Init(void)
@@ -296,6 +304,31 @@ void IO_Clock_Enable(GPIO_TypeDef* gpio)
         RCC->AHBENR |= RCC_AHBENR_GPIODEN;
     else if(gpio == GPIOF)
         RCC->AHBENR |= RCC_AHBENR_GPIOFEN;
+}
+//-----------------------------------------
+void DEV_InputBufferUpdate(uint16_t inputs)
+{
+    uint8_t state[3] =
+    {
+        ((inputs&0x0001) | ((inputs >> 1)&0x0001) << 2 | ((inputs >> 2)&0x0001) << 4 | ((inputs >> 3)&0x0001) << 6),
+        (((inputs >> 4)&0x0001) | ((inputs >> 5)&0x0001) << 2 | ((inputs >> 6)&0x0001) << 4 | ((inputs >> 7)&0x0001) << 6),
+        (((inputs >> 8)&0x0001) | ((inputs >> 9)&0x0001) << 2 | ((inputs >> 10)&0x0001) << 4 | ((inputs >> 11)&0x0001) << 6)
+    };
+    
+    if(!isEqualIputState(state)) // если текущее состоние не равно последнему снимку
+    {	
+        int_state.state[0] = state[0]; // то меняем состояние снимка на текущее
+        int_state.state[1] = state[1];
+        int_state.state[2] = state[2];
+        
+        int_reset_count = 0; // сброс переменной хранящей количество сброса сигнала INT
+        int_watchdog_count = 0;
+
+        InputStateChanged = false; // очистка флага изменения состояния входов
+        GPIO_INT->BSRR |= GPIO_INT_RESET; // прижимаем линию INT (сигнал для МЦП - состояния входов изменились)
+        int_state.mode = INT_STATE_RESET; // выставляем состояние СБРОСА линии INT, если чтения нет в течении 100мс
+        int_reset_id = EVENT_Create(100, false, int_timeout, NULL, 0xFF); // создание задачи СБРОСА на линии INT (100мс)
+    }
 }
 //-----------------------------------
 void convertInputState(uint8_t* data)
@@ -477,8 +510,17 @@ void TIM_Init_Crash(void)
 {
     RCC->APB2ENR |= RCC_APB2ENR_TIM1EN;
     
-    TIM1->PSC = F_CPU/1000UL - 1;
-    TIM1->ARR = 5000 - 1; // перезагрузка каждые 5сек
+    if(devAddr == DEVICE_MDVV_01)
+    {
+        TIM1->PSC = F_CPU/1000UL - 1;
+        TIM1->ARR = 5000 - 1; // перезагрузка каждые 5сек
+    }
+    else if(devAddr == DEVICE_MIK_01)
+    {
+        TIM16->PSC = 48000 - 1;
+        TIM16->ARR = 200 - 1; // пауза 1 секунда перед настройкой дисплея
+    }
+    
     TIM1->DIER &= ~TIM_DIER_UIE;
     TIM1->EGR |= TIM_EGR_UG;
     TIM1->SR &= ~TIM_SR_UIF;
@@ -491,36 +533,36 @@ void TIM_Init_Crash(void)
 //----------------------
 void TIM_Scan_Init(void)
 {
-    RCC->APB2ENR |= RCC_APB2ENR_TIM16EN;
-    
-    TIM16->PSC = F_CPU/1000000UL - 1;
-    TIM16->DIER |= TIM_DIER_UIE;
-    NVIC_EnableIRQ(TIM16_IRQn);
-    
-    if(devAddr != DEVICE_MIK_01) // если это не МИК-01, то инициализируем сканирование входов
-    {
-        TIM_Scan_Update();
-        
-        TIM16->CR1  |= TIM_CR1_ARPE;
-        TIM16->CR1  |= TIM_CR1_CEN; 
-    }
-    else
-    {
-        TIM16->PSC = 48000 - 1;
-        TIM16->ARR = 200 - 1; // пауза 1 секунда перед настройкой дисплея
-        TIM_Backlight_Update();
+//    RCC->APB2ENR |= RCC_APB2ENR_TIM16EN;
+//    
+//    TIM16->PSC = F_CPU/1000000UL - 1;
+//    TIM16->DIER |= TIM_DIER_UIE;
+//    NVIC_EnableIRQ(TIM16_IRQn);
+//    
+//    if(devAddr != DEVICE_MIK_01) // если это не МИК-01, то инициализируем сканирование входов
+//    {
+//        TIM_Scan_Update();
+//        
+//        TIM16->CR1  |= TIM_CR1_ARPE;
+//        TIM16->CR1  |= TIM_CR1_CEN; 
+//    }
+//    else
+//    {
+//        TIM16->PSC = 48000 - 1;
+//        TIM16->ARR = 200 - 1; // пауза 1 секунда перед настройкой дисплея
+//        TIM_Backlight_Update();
 
-        TIM16->CR1 |= TIM_CR1_OPM | TIM_CR1_CEN;
-    }
+//        TIM16->CR1 |= TIM_CR1_OPM | TIM_CR1_CEN;
+//    }
 }
 //------------------------
 void TIM_Scan_Update(void)
 {
-    TIM16->ARR   = 10000/io_in->set.Ndiscret - 1;
-    TIM16->DIER &= ~TIM_DIER_UIE;
-    TIM16->EGR  |= TIM_EGR_UG;
-    TIM16->SR &= ~TIM_SR_UIF;
-    TIM16->DIER |= TIM_DIER_UIE;
+//    TIM16->ARR   = 10000/io_in->set.Ndiscret - 1;
+//    TIM16->DIER &= ~TIM_DIER_UIE;
+//    TIM16->EGR  |= TIM_EGR_UG;
+//    TIM16->SR &= ~TIM_SR_UIF;
+//    TIM16->DIER |= TIM_DIER_UIE;
 }
 //-----------------------------
 void TIM_Backlight_Update(void)
@@ -760,7 +802,7 @@ bool DEV_Driver(FS9Buffer_t* source, FS9Buffer_t* dest)
 
             if(devAddr == 0x00)
             {
-                t.number = DS18B20_Temperature();
+                t.number = /*DS18B20_Temperature()*/0.0;
             }
             else
             {
@@ -1155,7 +1197,7 @@ bool DEV_Driver(FS9Buffer_t* source, FS9Buffer_t* dest)
                 io_in->set.Ndiscret = source->data[1]; // количество выборок на период
                 io_in->set.SGac     = source->data[2]; // длительность сигнала считаемая, что сигнал валидный
                 
-                TIM_Scan_Update();
+               // TIM_Scan_Update();
             }
         break;
             
@@ -1172,9 +1214,12 @@ bool DEV_Driver(FS9Buffer_t* source, FS9Buffer_t* dest)
                     if(input & (1 << i)) // вход выбран
                     {
                         inputSettings(i, source->data[2], source->data[3], source->data[4]);
+											
                     }
                 }
             }
+            
+            SaveSettingsToFLASH();
         break;
         
         default:
@@ -1533,7 +1578,7 @@ void DEV_KeyboardScan(void* data)
 //----------------------------
 void DEV_InputSetDefault(void)
 {
-    io_in->set.Ndiscret = 10;
+    io_in->set.Ndiscret = 20;
     io_in->set.Nperiod  = 3;
     io_in->set.SGac     = 5;
     io_in->set.P0dc     = 50;
@@ -1545,17 +1590,18 @@ void DEV_InputSetDefault(void)
         io_in->list[i].fault             = 10;
         io_in->list[i].state             = false;
         io_in->list[i].error             = false;
+        io_in->list[i].duration          = 60;
         io_in->list[i].filter.c_clock    = 0;
         io_in->list[i].filter.c_period   = 0;
         io_in->list[i].filter.c_state    = 0;
         io_in->list[i].filter.c_error    = 0;
         io_in->list[i].filter.is_capture = false;
-        
+       /* 
         if(io_in->list[i].spark_security == SPARK_SECURITY_MODE_2 || io_in->list[i].spark_security == SPARK_SECURITY_MODE_3)
             io_in->list[i].duration = 20;
         else
             io_in->list[i].duration = 10;
-
+				*/
         if(devAddr == DEVICE_MDVV_01 && i == 4) // пятый вход по умолчанию цифровой
         {
             io_in->list[i].mode = IN_MODE_DC;
@@ -1566,6 +1612,66 @@ void DEV_InputSetDefault(void)
 bool DEV_InputStateChangedChannel(void)
 {
     return InputStateChanged;
+}
+//----------------------------
+void SaveSettingsToFLASH(void)
+{
+    if(FLASH_Unlock())
+    {
+        if(FLASH_Erase(FLASH_SETTINGS_ADDRESS))
+        {
+            for(uint8_t i = 0; i < io_in->size; i++)
+            {
+                uint8_t type = io_in->list[i].mode; // AC/DC - 1 bit
+                uint8_t mode = io_in->list[i].spark_security; // spark security - 2 bits, states: 0, 1, 2, 3
+                uint8_t duration = io_in->list[i].duration; // duration - 8 bits
+                
+                uint16_t cell = (uint16_t)((type&0x01) << 10) | (uint16_t)((mode&0x03) << 8) | (duration); // cell with data for flash
+                
+                FLASH_Write16(FLASH_SETTINGS_ADDRESS + i*2, (uint16_t)cell);
+            }
+        }
+    }
+ 
+    FLASH_Lock();
+}
+//------------------------------
+void ReadSettingsFromFLASH(void)
+{
+if(FLASH_Unlock())
+    {
+        for(uint8_t i = 0; i < io_in->size - 1; i += 2)
+        {
+            uint32_t value = FLASH_Read(FLASH_SETTINGS_ADDRESS + i*2);
+            
+            uint16_t val1 = (uint16_t)(value&0xFFFF);
+            uint16_t val2 = (uint16_t)((value >> 16)&0xFFFF);
+            
+            if((uint32_t)value != FLASH_CELL_EMPTY)
+            {
+                uint8_t type1 = ((val1 >> 10)&0x0001); // AC/DC - 1 bit
+                uint8_t spark1 = ((val1 >> 8)&0x0003);
+                uint8_t duration1 = (val1&0x00FF);
+                
+                uint8_t type2 = ((val2 >> 10)&0x0001); // AC/DC - 1 bit
+                uint8_t spark2 = ((val2 >> 8)&0x0003);
+                uint8_t duration2 = (val2&0x00FF);
+                
+                if((duration1 > 200 && duration1 < 20) && (duration2 > 200 && duration2 < 20))
+                    break;
+                
+                io_in->list[i].mode = type1;
+                io_in->list[i].spark_security = spark1; // spark security - 2 bits, states: 0, 1, 2, 3
+                io_in->list[i].duration = duration1; // duration - 8 bits
+                
+                io_in->list[i+1].mode = type2;
+                io_in->list[i+1].spark_security = spark2; // spark security - 2 bits, states: 0, 1, 2, 3
+                io_in->list[i+1].duration = duration2; // duration - 8 bits
+            }
+        }
+    }
+ 
+    FLASH_Lock();
 }
 //----------------------------
 void EXTI4_15_IRQHandler(void)
@@ -1619,13 +1725,55 @@ void TIM14_IRQHandler(void)
 	}
 }
 //-------------------------
-void TIM16_IRQHandler(void)
+/*void TIM16_IRQHandler(void)
 {
     if((TIM16->SR & TIM_SR_UIF) == TIM_SR_UIF)
     {
         if(devAddr != DEVICE_MIK_01) // если не устройство МИК-01, то запускаем сканирование входов
             DEV_InputScan();
         else
+        {
+            
+        }
+        
+        TIM16->SR &= ~TIM_SR_UIF;
+    }
+}*/
+//-------------------------
+void TIM17_IRQHandler(void)
+{
+    if((TIM17->SR & TIM_SR_UIF) == TIM_SR_UIF)
+    {   
+        TIM17->SR &= ~TIM_SR_UIF;
+    }
+}
+//---------------------------------------
+void TIM1_BRK_UP_TRG_COM_IRQHandler(void) // обработчик таймера обрыва связи
+{
+    if((TIM1->SR & TIM_SR_UIF))
+    {
+        TIM1->SR &= ~TIM_SR_UIF;
+        
+        if(devAddr == DEVICE_MDVV_01)
+        {
+            if(!(TIM1->CR1 & TIM_CR1_OPM)) // флаг одиночного запуска не выставлен - рабочий режим
+            {
+                if(is_crash == true) // запрос пришел
+                {
+                    is_crash = false;
+                }
+                else // запроса нет - включаем выход и держим включенным до тех пор пока ЦПУ не даст команду на отключение
+                {
+                    HAL_GPIO_WritePin(out_crash->pin.gpio, out_crash->pin.io, GPIO_PIN_SET);
+                }
+            }
+            else // режим 5ти секундной задержки перед стартом аварийного таймера
+            {
+                TIM1->CR1 = (TIM1->CR1 & ~TIM_CR1_OPM) | TIM_CR1_CEN; // запуск таймера в рабочем режиме
+                HAL_GPIO_WritePin(out_crash->pin.gpio, out_crash->pin.io, GPIO_PIN_RESET); // снимаем сигнал с аварийного реле
+            }
+        }
+        else if(devAddr == DEVICE_MIK_01)
         {
             switch(backlight_mode)
             {
@@ -1663,41 +1811,6 @@ void TIM16_IRQHandler(void)
                                             // (через 500мкс яркость установится в максимальный уровень - по даташиту)
                 break;
             }
-        }
-        
-        TIM16->SR &= ~TIM_SR_UIF;
-    }
-}
-//-------------------------
-void TIM17_IRQHandler(void)
-{
-    if((TIM17->SR & TIM_SR_UIF) == TIM_SR_UIF)
-    {   
-        TIM17->SR &= ~TIM_SR_UIF;
-    }
-}
-//---------------------------------------
-void TIM1_BRK_UP_TRG_COM_IRQHandler(void) // обработчик таймера обрыва связи
-{
-    if((TIM1->SR & TIM_SR_UIF))
-    {
-        TIM1->SR &= ~TIM_SR_UIF;
-        
-        if(!(TIM1->CR1 & TIM_CR1_OPM)) // флаг одиночного запуска не выставлен - рабочий режим
-        {
-            if(is_crash == true) // запрос пришел
-            {
-                is_crash = false;
-            }
-            else // запроса нет - включаем выход и держим включенным до тех пор пока ЦПУ не даст команду на отключение
-            {
-                HAL_GPIO_WritePin(out_crash->pin.gpio, out_crash->pin.io, GPIO_PIN_SET);
-            }
-        }
-        else // режим 5ти секундной задержки перед стартом аварийного таймера
-        {
-            TIM1->CR1 = (TIM1->CR1 & ~TIM_CR1_OPM) | TIM_CR1_CEN; // запуск таймера в рабочем режиме
-            HAL_GPIO_WritePin(out_crash->pin.gpio, out_crash->pin.io, GPIO_PIN_RESET); // снимаем сигнал с аварийного реле
         }
     }
 }
