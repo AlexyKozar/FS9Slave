@@ -210,5 +210,5 @@
     void    DEV_OutReset(output_t* out);
     void    DEV_OutToggle(output_t* out);
     bool    DEV_IsOut(output_t* out);
-    void    DEV_InputBufferUpdate(uint16_t inputs);
+    void    DEV_InputBufferUpdate(uint16_t inputs, bool uif);
 #endif

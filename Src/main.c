@@ -61,6 +61,7 @@ static void MX_USART1_UART_Init(void);
 /* USER CODE BEGIN 0 */
 //---------------------------------------------------------------------------
 void IODevice_Init(uint8_t addr, PORT_Input_Type* in, PORT_Output_Type* out);
+uint16_t UpdateInputFilterSettings(io_TypeDef *in, PORT_Input_Type input, size_t size);
 /* USER CODE END 0 */
 
 int main(void)
@@ -107,22 +108,26 @@ int main(void)
     IODevice_Init(addr, &input, &output);    
     DEV_Init(&input, &output);
 
-    if(addr == DEVICE_MDVV_01)
-    {
-        // DS18B20_Init();
-        DEV_CrashInit();
-        I2C_EE_Init();
-        
-        // EVENT_Create(2000, false, DS18B20_Convert, NULL, 0xFF);
-    }
-    else
-    {
-        FLASH_Init();
-    }
-    
     DEV_PWROKInit();
     AIN_Init(addr);
 
+    // создание списка входов с их настройками для использования в фильтрации
+    io_TypeDef io_set[DINPUT_MAX_SIZE];
+    uint16_t sample_count = UpdateInputFilterSettings(io_set, input, input.size);
+    IO_SetSequenceCount(sample_count*2);
+    uint16_t result = 0; // результат сканирования входов
+    
+    // пока не получили валидный результат состояния входов не входим в рабочий режим
+    // результат получает фильтрацией входов по самому большому значению фильрации одного из входов
+    while(!IO_SampleIsEnd())
+    {
+        uint32_t* inputs = IO_SampleCopy();
+        result = InputFilter(inputs, io_set, input.size);
+        IO_ReadyReset(); // сброс флага блокировки набора данных временно
+    }
+    
+    DEV_InputBufferUpdate(result, true); // принудительное обновление состояний входов (отправка сигнала INT)
+    
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
@@ -149,28 +154,11 @@ int main(void)
     // Проверка готовности сэмпла состояний входов
     if(IO_SampleIsReady())
     {
-       // uint32_t inputs[DINPUT_MAX_SIZE];
         uint32_t* inputs = IO_SampleCopy();
-        uint8_t size = 0;
-        if(addr == DEVICE_MDVV_01) 
-            size = 12;
-        else if (addr == DEVICE_MDVV_02)
-            size = 10;
-        else
-            break;
-			
-        io_TypeDef io_set[DINPUT_MAX_SIZE];
-        
-        for(uint8_t i = 0; i < 12; i++)
-        {
-            io_set[i].type = input.list[i].mode;
-            io_set[i].mode = input.list[i].spark_security;
-            io_set[i].fltDuratiod = input.list[i].duration;
-        }
-        
-        uint16_t result = InputFilter(inputs, io_set, size);
+        UpdateInputFilterSettings(io_set, input, input.size);
+        result = InputFilter(inputs, io_set, input.size);
         IO_ReadyReset(); // сброс флага блокировки набора данных временно
-        DEV_InputBufferUpdate(result);
+        DEV_InputBufferUpdate(result, false);
     }
     
     // обработка события
@@ -439,6 +427,25 @@ void IODevice_Init(uint8_t addr, PORT_Input_Type* in, PORT_Output_Type* out)
         in->size  = 12;
         out->size = 12;
     }
+}
+//------------------------------------------------------------------------------------
+uint16_t UpdateInputFilterSettings(io_TypeDef *in, PORT_Input_Type input, size_t size)
+{
+    // Копирование настроек входов для их фильтрации из списка настроек входов
+    // Возвращаем максимальное время фильтрации
+    uint16_t sample_time = DINPUT_SAMPLE_PERIOD; // максимальное время фильтрации по всем входам
+    
+    for(uint8_t i = 0; i < size; i++)
+    {
+        in[i].type = input.list[i].mode;
+        in[i].mode = input.list[i].spark_security;
+        in[i].fltDuratiod = input.list[i].duration;
+        
+        if(in[i].fltDuratiod >sample_time)
+            sample_time = in[i].fltDuratiod;
+    }
+    
+    return sample_time;
 }
 /* USER CODE END 4 */
 

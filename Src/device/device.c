@@ -131,7 +131,7 @@ void DEV_Init(PORT_Input_Type* inputs, PORT_Output_Type* outputs)
         else
         {
             IO_Init(io_in->list[i].pin, DEV_IO_INPUT); // настраиваем как вход
-            io_in->list[i].frequency = 0; // обнуляем переменную, которая сохраняет предыдущую частоту
+            //io_in->list[i].frequency = 0; // обнуляем переменную, которая сохраняет предыдущую частоту
         }
         
         io_in->list[i].pin.num = i;
@@ -154,10 +154,18 @@ void DEV_Init(PORT_Input_Type* inputs, PORT_Output_Type* outputs)
     
     DEV_InputSetDefault();
     
+    // начальная инициализация буфера хранения состояний входов
+    int_state.mode = INT_STATE_IDLE;
+    int_state.state[0] = 0x00;
+    int_state.state[1] = 0x00;
+    int_state.state[2] = 0x00;
+    
     if(devAddr != DEVICE_MIK_01) // только для МДВВ
     {
         if(devAddr == DEVICE_MDVV_01) // только для МДВВ-01
         {
+            DEV_CrashInit();
+            // I2C_EE_Init(); // Инициализация памяти по интерфейсу i2c - пока отлкючено
             io_inPhase = &io_in->list[0]; // искробезопасный вход DI_1 для определения фазы
             io_inOff   = &io_in->list[1]; // искробезопасный вход DI_2 - кнопка СТОП
             io_inOn    = &io_in->list[2]; // искробезопасный вход DI_3 - кнопка СТАРТ
@@ -223,16 +231,9 @@ void DEV_Init(PORT_Input_Type* inputs, PORT_Output_Type* outputs)
         			
         FLASH_Lock();
     }
-    
-    // начальная инициализация буфера хранения состояний входов
-    int_state.mode = INT_STATE_IDLE;
-    int_state.state[0] = 0x00;
-    int_state.state[1] = 0x00;
-    int_state.state[2] = 0x00;
-    
-//    SaveSettingsToFLASH();
-		if(devAddr != DEVICE_MIK_01)
-				ReadSettingsFromFLASH();
+
+    if(devAddr != DEVICE_MIK_01)
+        ReadSettingsFromFLASH();
 }
 //-----------------------
 void Backlight_Init(void)
@@ -305,17 +306,30 @@ void IO_Clock_Enable(GPIO_TypeDef* gpio)
     else if(gpio == GPIOF)
         RCC->AHBENR |= RCC_AHBENR_GPIOFEN;
 }
-//-----------------------------------------
-void DEV_InputBufferUpdate(uint16_t inputs)
+//---------------------------------------------------
+void DEV_InputBufferUpdate(uint16_t inputs, bool uif) // uif - update input flag
 {
-    uint8_t state[3] =
-    {
-        ((inputs&0x0001) | ((inputs >> 1)&0x0001) << 2 | ((inputs >> 2)&0x0001) << 4 | ((inputs >> 3)&0x0001) << 6),
-        (((inputs >> 4)&0x0001) | ((inputs >> 5)&0x0001) << 2 | ((inputs >> 6)&0x0001) << 4 | ((inputs >> 7)&0x0001) << 6),
-        (((inputs >> 8)&0x0001) | ((inputs >> 9)&0x0001) << 2 | ((inputs >> 10)&0x0001) << 4 | ((inputs >> 11)&0x0001) << 6)
-    };
+    uint8_t state[3] = { 0 };
     
-    if(!isEqualIputState(state)) // если текущее состоние не равно последнему снимку
+    state[0] = ((inputs&0x0001) | ((inputs >> 1)&0x0001) << 2 | ((inputs >> 2)&0x0001) << 4 | ((inputs >> 3)&0x0001) << 6);
+    state[1] = (((inputs >> 4)&0x0001) | ((inputs >> 5)&0x0001) << 2 | ((inputs >> 6)&0x0001) << 4 | ((inputs >> 7)&0x0001) << 6);
+    
+    // 3й байт инициализируется в завистимости от типа модуля (МДВВ-01 = 12 входов, МДВВ-02 = 10 входов)
+    if(devAddr == DEVICE_MDVV_01)
+        state[2] = (((inputs >> 8)&0x0001) | ((inputs >> 9)&0x0001) << 2 | ((inputs >> 10)&0x0001) << 4 | ((inputs >> 11)&0x0001) << 6);
+    else if(devAddr == DEVICE_MDVV_02)
+        state[2] = (((inputs >> 8)&0x0001) | ((inputs >> 9)&0x0001) << 2);
+    
+    state[0] &= 0x55;
+    state[1] &= 0x55;
+    
+    if(devAddr == DEVICE_MDVV_01)
+        state[2] &= 0x55;
+    
+    else if(devAddr == DEVICE_MDVV_02)
+        state[2] &= 0x05;
+    
+    if(!isEqualIputState(state) || uif) // если текущее состоние не равно последнему снимку или выставлен флаг обновления
     {	
         int_state.state[0] = state[0]; // то меняем состояние снимка на текущее
         int_state.state[1] = state[1];
@@ -711,8 +725,8 @@ bool DEV_Driver(FS9Buffer_t* source, FS9Buffer_t* dest)
 
             GPIO_INT->BSRR |= GPIO_INT_SET; // поднимаем сигнал INT
 				
-						int_reset_count = 0; // сброс переменной хранящей количество сброса сигнала INT
-						int_watchdog_count = 0;
+            int_reset_count = 0; // сброс переменной хранящей количество сброса сигнала INT
+            int_watchdog_count = 0;
             
             if(int_reset_id != 0xFF)
             {
