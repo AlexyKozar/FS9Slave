@@ -532,8 +532,8 @@ void TIM_Init_Crash(void)
     }
     else if(devAddr == DEVICE_MIK_01)
     {
-        TIM16->PSC = 48000 - 1;
-        TIM16->ARR = 200 - 1; // пауза 1 секунда перед настройкой дисплея
+        TIM1->PSC = 48000 - 1;
+        TIM1->ARR = 200 - 1; // пауза 1 секунда перед настройкой дисплея
     }
     
     TIM1->DIER &= ~TIM_DIER_UIE;
@@ -546,7 +546,7 @@ void TIM_Init_Crash(void)
     NVIC_EnableIRQ(TIM1_BRK_UP_TRG_COM_IRQn);
 }
 //----------------------
-void TIM_Scan_Init(void)
+void TIM_Scan_Init(void) // DEPRECATED
 {
 //    RCC->APB2ENR |= RCC_APB2ENR_TIM16EN;
 //    
@@ -571,7 +571,7 @@ void TIM_Scan_Init(void)
 //    }
 }
 //------------------------
-void TIM_Scan_Update(void)
+void TIM_Scan_Update(void) // DEPRECATED
 {
 //    TIM16->ARR   = 10000/io_in->set.Ndiscret - 1;
 //    TIM16->DIER &= ~TIM_DIER_UIE;
@@ -1742,7 +1742,7 @@ void TIM14_IRQHandler(void)
 	}
 }
 //-------------------------
-/*void TIM16_IRQHandler(void)
+/*void TIM16_IRQHandler(void) // DEPRECATED
 {
     if((TIM16->SR & TIM_SR_UIF) == TIM_SR_UIF)
     {
@@ -1796,25 +1796,25 @@ void TIM1_BRK_UP_TRG_COM_IRQHandler(void) // обработчик таймера
             {
                 case MODE_BACKLIGHT_PAUSE_0N:
                     // DEV_OutSet(&io_out->list[0]); // для отладки
-                    TIM16->PSC = F_CPU/1000000UL - 1;
-                    TIM16->ARR = 10 - 1; // пауза 1 микросекунда - подача импульса яркости
+                    TIM1->PSC = F_CPU/1000000UL - 1;
+                    TIM1->ARR = 10 - 1; // пауза 1 микросекунда - подача импульса яркости
                     TIM_Backlight_Update();
                         
                     GPIO_BACKLIGHT->BSRR |= GPIO_BACKLIGHT_HIGH; // устанавливаем высокий уровень импульса
                     backlight_mode = MODE_BACKLIGHT_PULSE_ON;
                         
-                    TIM16->CR1 |= TIM_CR1_OPM | TIM_CR1_CEN;
+                    TIM1->CR1 |= TIM_CR1_OPM | TIM_CR1_CEN;
                 break;
                 
                 case MODE_BACKLIGHT_PULSE_ON:
                     // DEV_OutSet(&io_out->list[1]);  // для отладки
-                    TIM16->ARR = 10 - 1; // пауза 1 микросекунда - пауза после импульса яркости
+                    TIM1->ARR = 10 - 1; // пауза 1 микросекунда - пауза после импульса яркости
                     TIM_Backlight_Update();
                         
                     GPIO_BACKLIGHT->BSRR |= GPIO_BACKLIGHT_LOW; // устанавливаем низкий уровень импульса
                     backlight_mode = MODE_BACKLIGHT_PULSE_OFF;
                         
-                    TIM16->CR1 |= TIM_CR1_OPM | TIM_CR1_CEN;
+                    TIM1->CR1 |= TIM_CR1_OPM | TIM_CR1_CEN;
                 break;
                 
                 case MODE_BACKLIGHT_PULSE_OFF:

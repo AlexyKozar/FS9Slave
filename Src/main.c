@@ -150,21 +150,18 @@ int main(void)
                 }
             }
         }
-
-        if(addr != DEVICE_MIK_01) // Если устройство не МИК-01
+        
+        if(DEV_InputFilterIsChanged()) // Если настройки фильтра входов были изменены, то обновляем их
         {
-            if(DEV_InputFilterIsChanged()) // Если настройки фильтра входов были изменены, то обновляем их
-            {
-                UpdateInputFilterSettings(&input);
-            }
-            
-            // Проверка готовности сэмпла состояний входов
-            if(IO_SampleIsReady())
-            {
-                result = InputFilter(IO_SampleCopy(), io_set, input.size);
-                IO_ReadyReset(); // сброс флага блокировки набора данных временно
-                DEV_InputBufferUpdate(result, false); // обновляем буфер состояний входов
-            }
+            UpdateInputFilterSettings(&input);
+        }
+        
+        // Проверка готовности сэмпла состояний входов
+        if(IO_SampleIsReady())
+        {
+            result = InputFilter(IO_SampleCopy(), io_set, input.size);
+            IO_ReadyReset(); // сброс флага блокировки набора данных временно
+            DEV_InputBufferUpdate(result, false); // обновляем буфер состояний входов
         }
 
         // обработка событий
