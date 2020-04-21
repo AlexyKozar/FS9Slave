@@ -13,10 +13,7 @@
     #include "i2c/i2c.h"
     #include "flash/flash.h"
     #include "error.h"
-    #include "filter/dig_inputs_filter.h"
     #include "input/io.h"
-    #include "../RTT/SEGGER_RTT.h"
-    #include "../RTT/SEGGER_RTT_Conf.h"
     //----------------------
     #define F_CPU 48000000UL
     //-------------------------
@@ -93,25 +90,25 @@
     //--------------------------------------
     typedef struct _FS9Buffer_t FS9Buffer_t;
     //-------------------------
-    typedef struct _input_set_t
-    {
-        uint8_t Nperiod; // количество периодов накопления информации
-        uint8_t Ndiscret; // количество выборок на период
-        uint8_t SGac; // длина валидного импульса
-        uint8_t P0dc; // процент нулей фильтра для постоянного сигнала
-        uint8_t P1dc; // процент единиц фильтра для постоянного сигнала
-    } input_set_t;
+//    typedef struct _input_set_t
+//    {
+//        uint8_t Nperiod; // количество периодов накопления информации
+//        uint8_t Ndiscret; // количество выборок на период
+//        uint8_t SGac; // длина валидного импульса
+//        uint8_t P0dc; // процент нулей фильтра для постоянного сигнала
+//        uint8_t P1dc; // процент единиц фильтра для постоянного сигнала
+//    } input_set_t;
     //----------------------------
-    typedef struct _input_filter_t
-    {
-        uint8_t c_clock; // такты после захвата входа
-        uint8_t c_error; // счетчик ошибок
-        bool    is_capture; // флаг захвата входа
-        uint8_t c_lev_0; // количество импульсов лог. "0"
-        uint8_t c_lev_1; // количество импульсов лог. "1"
-        uint8_t c_period; // количество периодов
-        uint8_t c_state; // количество валидных состояний
-    } input_filter_t;
+//    typedef struct _input_filter_t
+//    {
+//        uint8_t c_clock; // такты после захвата входа
+//        uint8_t c_error; // счетчик ошибок
+//        bool    is_capture; // флаг захвата входа
+//        uint8_t c_lev_0; // количество импульсов лог. "0"
+//        uint8_t c_lev_1; // количество импульсов лог. "1"
+//        uint8_t c_period; // количество периодов
+//        uint8_t c_state; // количество валидных состояний
+//    } input_filter_t;
     //------------------
     typedef struct _io_t
     {
@@ -123,15 +120,15 @@
     typedef struct _input_t
     {
         io_t           pin;    // вход (номер входа и порт)
-        bool           state;  // состояние входа (вкл или выкл)
-        bool           error;  // ошибка канала
-        input_filter_t filter; // параметры фильтрации входа
+//        bool           state;  // состояние входа (вкл или выкл)
+//        bool           error;  // ошибка канала
+//        input_filter_t filter; // параметры фильтрации входа
         uint8_t        fault;  // погрешность длительности периода в %
         uint8_t        mode;   // режим входа (AC/DC)
         uint8_t        dir;    // направление (прямой/инверсный)
         uint16_t       duration; // длительность периода
         uint8_t        spark_security; // настройка искробезопасных входов (только для МДВВ-01, входы DI01-DI04)
-        uint8_t        frequency; // предыдущая частота сигнала
+//        uint8_t        frequency; // предыдущая частота сигнала
     } input_t;
     //----------------------
     typedef struct _output_t
@@ -145,7 +142,7 @@
     typedef struct _PORT_Input_Type
     {
         input_t     list[MAX_SIZE_DS_INPUT];
-        input_set_t set;
+//        input_set_t set;
         uint8_t     size;
     } PORT_Input_Type;
     //------------------------------
@@ -211,4 +208,5 @@
     void    DEV_OutToggle(output_t* out);
     bool    DEV_IsOut(output_t* out);
     void    DEV_InputBufferUpdate(uint16_t inputs, bool uif);
+    bool    DEV_InputFilterIsChanged(void); // чтение флага изменения настроек фильтра входов
 #endif

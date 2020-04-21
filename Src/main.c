@@ -48,6 +48,7 @@ UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
 /* Private variables ---------------------------------------------------------*/
+io_TypeDef io_set[DINPUT_MAX_SIZE];
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -61,7 +62,8 @@ static void MX_USART1_UART_Init(void);
 /* USER CODE BEGIN 0 */
 //---------------------------------------------------------------------------
 void IODevice_Init(uint8_t addr, PORT_Input_Type* in, PORT_Output_Type* out);
-uint16_t UpdateInputFilterSettings(io_TypeDef *in, PORT_Input_Type input, size_t size);
+//---------------------------------------------------------
+uint16_t UpdateInputFilterSettings(PORT_Input_Type *input);
 /* USER CODE END 0 */
 
 int main(void)
@@ -112,60 +114,63 @@ int main(void)
     AIN_Init(addr);
 
     // создание списка входов с их настройками для использования в фильтрации
-    io_TypeDef io_set[DINPUT_MAX_SIZE];
-    uint16_t sample_count = UpdateInputFilterSettings(io_set, input, input.size);
-    IO_SetSequenceCount(sample_count*2);
+    uint16_t sample_count = UpdateInputFilterSettings(&input); // чтение настроек фильтра входов
+    IO_SetSequenceCount(sample_count*2); // установка значения фильтрации входов до входа в рабочий режим
     uint16_t result = 0; // результат сканирования входов
     
-    // пока не получили валидный результат состояния входов не входим в рабочий режим
-    // результат получает фильтрацией входов по самому большому значению фильрации одного из входов
-    while(!IO_SampleIsEnd())
+    if(addr != DEVICE_MIK_01) // Если устройство не МИК-01
     {
-        uint32_t* inputs = IO_SampleCopy();
-        result = InputFilter(inputs, io_set, input.size);
-        IO_ReadyReset(); // сброс флага блокировки набора данных временно
-    }
-    
-    DEV_InputBufferUpdate(result, true); // принудительное обновление состояний входов (отправка сигнала INT)
-    
-  /* Infinite loop */
-  /* USER CODE BEGIN WHILE */
-  while (1)
-  {
-  /* USER CODE END WHILE */
-
-  /* USER CODE BEGIN 3 */
-      
-    if(FS9Slave_IsReady())
-    {
-        FS9Buffer_t source = { 0 };
-        FS9Buffer_t dest   = { 0 };
-
-        if(FS9Slave_Read(&source))
+        // пока не получили валидный результат состояния входов не входим в рабочий режим
+        // результат получает фильтрацией входов по самому большому значению фильрации одного из входов
+        while(!IO_SampleIsEnd())
         {
-            if(DEV_Request(&source, &dest) && dest.size > 0) // request is successful and destination packet size isn't empty
+            if(IO_SampleIsReady()) // Ожидаение готовности резултьтата сканирования выборки
             {
-                // send answer
-                FS9Slave_Write(&dest);
+                result = InputFilter(IO_SampleCopy(), io_set, input.size);
+                IO_ReadyReset(); // сброс флага блокировки набора данных временно
             }
         }
+        
+        DEV_InputBufferUpdate(result, true); // принудительное обновление состояний входов (отправка сигнала INT)
     }
-    
-    // Проверка готовности сэмпла состояний входов
-    if(IO_SampleIsReady())
+  
+    while (1)
     {
-        uint32_t* inputs = IO_SampleCopy();
-        UpdateInputFilterSettings(io_set, input, input.size);
-        result = InputFilter(inputs, io_set, input.size);
-        IO_ReadyReset(); // сброс флага блокировки набора данных временно
-        DEV_InputBufferUpdate(result, false);
+        if(FS9Slave_IsReady())
+        {
+            FS9Buffer_t source = { 0 };
+            FS9Buffer_t dest   = { 0 };
+
+            if(FS9Slave_Read(&source))
+            {
+                if(DEV_Request(&source, &dest) && dest.size > 0) // request is successful and destination packet size isn't empty
+                {
+                    // send answer
+                    FS9Slave_Write(&dest);
+                }
+            }
+        }
+
+        if(addr != DEVICE_MIK_01) // Если устройство не МИК-01
+        {
+            if(DEV_InputFilterIsChanged()) // Если настройки фильтра входов были изменены, то обновляем их
+            {
+                UpdateInputFilterSettings(&input);
+            }
+            
+            // Проверка готовности сэмпла состояний входов
+            if(IO_SampleIsReady())
+            {
+                result = InputFilter(IO_SampleCopy(), io_set, input.size);
+                IO_ReadyReset(); // сброс флага блокировки набора данных временно
+                DEV_InputBufferUpdate(result, false); // обновляем буфер состояний входов
+            }
+        }
+
+        // обработка событий
+        EVENT_Execute();
+        // конец обработки события
     }
-    
-    // обработка события
-    EVENT_Execute();
-    // конец обработки события
-  }
-  /* USER CODE END 3 */
 }
 
 /** System Clock Configuration
@@ -428,21 +433,21 @@ void IODevice_Init(uint8_t addr, PORT_Input_Type* in, PORT_Output_Type* out)
         out->size = 12;
     }
 }
-//------------------------------------------------------------------------------------
-uint16_t UpdateInputFilterSettings(io_TypeDef *in, PORT_Input_Type input, size_t size)
+//--------------------------------------------------------
+uint16_t UpdateInputFilterSettings(PORT_Input_Type *input)
 {
     // Копирование настроек входов для их фильтрации из списка настроек входов
     // Возвращаем максимальное время фильтрации
     uint16_t sample_time = DINPUT_SAMPLE_PERIOD; // максимальное время фильтрации по всем входам
     
-    for(uint8_t i = 0; i < size; i++)
+    for(uint8_t i = 0; i < input->size; i++)
     {
-        in[i].type = input.list[i].mode;
-        in[i].mode = input.list[i].spark_security;
-        in[i].fltDuratiod = input.list[i].duration;
+        io_set[i].type = input->list[i].mode;
+        io_set[i].mode = input->list[i].spark_security;
+        io_set[i].fltDuratiod = input->list[i].duration;
         
-        if(in[i].fltDuratiod >sample_time)
-            sample_time = in[i].fltDuratiod;
+        if(io_set[i].fltDuratiod > sample_time)
+            sample_time = io_set[i].fltDuratiod;
     }
     
     return sample_time;

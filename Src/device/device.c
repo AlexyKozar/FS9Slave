@@ -56,6 +56,8 @@ error_t error = { 0, 0, 0, 0 };
 Blink_queue_t out_queue_blink;
 //-----------------------------------------------------------------------
 volatile pwrok_t _pwr_ok = { false, false, false, false, false, 0x0000 };
+//-------------------------------------------
+volatile bool _is_filter_set_changed = false;
 //---------------------------------------
 uint16_t AIN_TEMP[MAX_SIZE_AIN_TEMP][3] = 
 {
@@ -143,8 +145,7 @@ void DEV_Init(PORT_Input_Type* inputs, PORT_Output_Type* outputs)
         io_out->list[i].pin.num = i;
         io_out->list[i].state   = OUTPUT_STATE_OFF;
 
-        HAL_GPIO_WritePin(io_out->list[i].pin.gpio, io_out->list[i].pin.io, GPIO_PIN_RESET); // выключить выход - состояние по умолчанию
-        //DEV_OutReset(&io_out->list[i]); // выключить выход - состояние по умолчанию
+        DEV_OutReset(&io_out->list[i]); // выключить выход - состояние по умолчанию
     }
     
     io_t pin_int = { GPIO_INT, GPIO_INT_PIN };
@@ -347,8 +348,8 @@ void DEV_InputBufferUpdate(uint16_t inputs, bool uif) // uif - update input flag
 //-----------------------------------
 void convertInputState(uint8_t* data)
 {
-    uint8_t  bit_count  = 0x00; // счетчик битов
-    uint8_t  byte_index = 0x00; // индекс текущего байта
+//    uint8_t  bit_count  = 0x00; // счетчик битов
+//    uint8_t  byte_index = 0x00; // индекс текущего байта
     
     // обнуление массива состояний входов
     data[0] = 0x00;
@@ -361,7 +362,7 @@ void convertInputState(uint8_t* data)
         data[1] = (keys.last_state >> 8)&0x000000FF;
         data[2] = (keys.last_state >> 16)&0x0000000F;
     }
-    else
+    /*else
     {
         for(uint8_t i = 0; i < io_in->size; ++i)
         {
@@ -400,7 +401,7 @@ void convertInputState(uint8_t* data)
             data[byte_index] |= channel_state << bit_count;
             bit_count += 2;
         }
-    }
+    }*/
 }
 //----------------------------------
 bool isEqualIputState(uint8_t* data)
@@ -581,10 +582,10 @@ void TIM_Scan_Update(void)
 //-----------------------------
 void TIM_Backlight_Update(void)
 {
-    TIM16->DIER &= ~TIM_DIER_UIE;
-    TIM16->EGR  |= TIM_EGR_UG;
-    TIM16->SR &= ~TIM_SR_UIF;
-    TIM16->DIER |= TIM_DIER_UIE;
+    TIM1->DIER &= ~TIM_DIER_UIE;
+    TIM1->EGR  |= TIM_EGR_UG;
+    TIM1->SR &= ~TIM_SR_UIF;
+    TIM1->DIER |= TIM_DIER_UIE;
 }
 //---------------------
 void TIM_INT_Init(void)
@@ -1052,9 +1053,9 @@ bool DEV_Driver(FS9Buffer_t* source, FS9Buffer_t* dest)
         break;
             
         case 0x1B: // чтение общих настроек фильтра дискретных входов
-            dest->data[0] = io_in->set.Nperiod; // количество периодов фильтрации
-            dest->data[1] = io_in->set.Ndiscret; // дискретность (количество выборок на период)
-            dest->data[2] = io_in->set.SGac; // длительность сигнала считаемая, что сигнал валидный
+            dest->data[0] = /*io_in->set.Nperiod*/0; // количество периодов фильтрации
+            dest->data[1] = /*io_in->set.Ndiscret*/0; // дискретность (количество выборок на период)
+            dest->data[2] = /*io_in->set.SGac*/0; // длительность сигнала считаемая, что сигнал валидный
         
             dest->size = 3;
         break;
@@ -1207,9 +1208,9 @@ bool DEV_Driver(FS9Buffer_t* source, FS9Buffer_t* dest)
         case 0x3E: // изменение параметров фильтрации
             if(source->size == 3)
             {
-                io_in->set.Nperiod  = source->data[0]; // количество периодов фильтрации
-                io_in->set.Ndiscret = source->data[1]; // количество выборок на период
-                io_in->set.SGac     = source->data[2]; // длительность сигнала считаемая, что сигнал валидный
+//                io_in->set.Nperiod  = source->data[0]; // количество периодов фильтрации
+//                io_in->set.Ndiscret = source->data[1]; // количество выборок на период
+//                io_in->set.SGac     = source->data[2]; // длительность сигнала считаемая, что сигнал валидный
                 
                // TIM_Scan_Update();
             }
@@ -1228,7 +1229,9 @@ bool DEV_Driver(FS9Buffer_t* source, FS9Buffer_t* dest)
                     if(input & (1 << i)) // вход выбран
                     {
                         inputSettings(i, source->data[2], source->data[3], source->data[4]);
-											
+                        
+                        if(!_is_filter_set_changed)
+                            _is_filter_set_changed = true;
                     }
                 }
             }
@@ -1254,14 +1257,14 @@ void inputSettings(uint8_t number, uint8_t mode, uint8_t duration, uint8_t fault
     io_in->list[number].mode  = mode; // режим работы входа AC или DC
     io_in->list[number].duration = duration; // длительность периода
 
-    if(mode == IN_MODE_AC)
-    {
-        io_in->list[number].fault = (fault > 100)?100:fault; // погрешность допускаемая за один период - в процентах
-    }
-    else
-    {
-        io_in->set.P0dc = io_in->set.P1dc = (fault > 100)?100:fault;
-    }
+//    if(mode == IN_MODE_AC)
+//    {
+//        io_in->list[number].fault = (fault > 100)?100:fault; // погрешность допускаемая за один период - в процентах
+//    }
+//    else
+//    {
+//        io_in->set.P0dc = io_in->set.P1dc = (fault > 100)?100:fault;
+//    }
 }
 //-----------------------------------------------------
 uint8_t DEV_Checksum(FS9Buffer_t* packet, uint8_t size)
@@ -1304,218 +1307,218 @@ void DEV_InputScan(void)
 //---------------------------------
 void DEV_InputFilter(uint8_t index)
 {
-    input_t* input = &io_in->list[index];
-    
-    bool in_state  = input->pin.gpio->IDR & input->pin.io;
-    bool act_level = !input->state; // ожидаемый уровень (при выключенном входе - лог "1", при включенном лог "0")
-    
-    // если уровень на входе равен ожидаемому уровню (обратное значение от состояния входа)
-    if(in_state == act_level && input->filter.is_capture == false)
-    {
-        input->filter.is_capture = true; // захватываем вход
-        
-        if(in_state == true)
-            input->filter.c_lev_1++;
-        else
-            input->filter.c_lev_0++;
-        
-        input->filter.c_clock++;
-    }
-    else if(input->filter.is_capture == true) // если вход захвачен, то набираем данные для фильтрации
-    {
-        if(in_state == true)
-            input->filter.c_lev_1++;
-        else
-            input->filter.c_lev_0++;
-        
-        input->filter.c_clock++;
-        
-        if(input->filter.c_clock >= input->duration) // набрали данные на очередной период
-        {
-            input->filter.c_period++;
-            
-            if(input->mode == IN_MODE_AC) // режим входа АС
-            {
-                // если ожидаемый уровень лог "1" и количество лог "0" равно нулю, то это либо постоянный
-                // сигнал, либо сигнал с частотой меньше установленно, т.е. это ошибка
-                if(act_level == true && input->filter.c_lev_0 == 0)
-                {
-                    input->filter.c_error++;
+//    input_t* input = &io_in->list[index];
+//    
+//    bool in_state  = input->pin.gpio->IDR & input->pin.io;
+//    bool act_level = !input->state; // ожидаемый уровень (при выключенном входе - лог "1", при включенном лог "0")
+//    
+//    // если уровень на входе равен ожидаемому уровню (обратное значение от состояния входа)
+//    if(in_state == act_level && input->filter.is_capture == false)
+//    {
+//        input->filter.is_capture = true; // захватываем вход
+//        
+//        if(in_state == true)
+//            input->filter.c_lev_1++;
+//        else
+//            input->filter.c_lev_0++;
+//        
+//        input->filter.c_clock++;
+//    }
+//    else if(input->filter.is_capture == true) // если вход захвачен, то набираем данные для фильтрации
+//    {
+//        if(in_state == true)
+//            input->filter.c_lev_1++;
+//        else
+//            input->filter.c_lev_0++;
+//        
+//        input->filter.c_clock++;
+//        
+//        if(input->filter.c_clock >= input->duration) // набрали данные на очередной период
+//        {
+//            input->filter.c_period++;
+//            
+//            if(input->mode == IN_MODE_AC) // режим входа АС
+//            {
+//                // если ожидаемый уровень лог "1" и количество лог "0" равно нулю, то это либо постоянный
+//                // сигнал, либо сигнал с частотой меньше установленно, т.е. это ошибка
+//                if(act_level == true && input->filter.c_lev_0 == 0)
+//                {
+//                    input->filter.c_error++;
 
-                    input->filter.c_clock = 0;
-                    input->filter.c_lev_0 = 0;
-                    input->filter.c_lev_1 = 0;
+//                    input->filter.c_clock = 0;
+//                    input->filter.c_lev_0 = 0;
+//                    input->filter.c_lev_1 = 0;
 
-                    return;
-                }
-                
-                // если ожидаемый уровень лог "1" и длительность сигнала меньше пороговой, то это ошибка
-                if(act_level == true && input->filter.c_lev_1 < io_in->set.SGac)
-                {
-                    input->filter.c_error++;
+//                    return;
+//                }
+//                
+//                // если ожидаемый уровень лог "1" и длительность сигнала меньше пороговой, то это ошибка
+//                if(act_level == true && input->filter.c_lev_1 < io_in->set.SGac)
+//                {
+//                    input->filter.c_error++;
 
-                    input->filter.c_clock = 0;
-                    input->filter.c_lev_0 = 0;
-                    input->filter.c_lev_1 = 0;
+//                    input->filter.c_clock = 0;
+//                    input->filter.c_lev_0 = 0;
+//                    input->filter.c_lev_1 = 0;
 
-                    return;
-                }
-                
-                // если ожидаемый уровень лог "0" (снятие сигнала со входа) и длительность лог "1"
-                // больше нуля, то значит это не снятие сигнала и нет смысла дальше анализировать
-                if(act_level == false && input->filter.c_lev_1 > 0 && (input->spark_security != SPARK_SECURITY_MODE_2 || 
-                                                                       input->spark_security != SPARK_SECURITY_MODE_3))
-                {
-                    input->filter.c_clock    = 0;
-                    input->filter.c_error    = 0;
-                    input->filter.c_lev_0    = 0;
-                    input->filter.c_lev_1    = 0;
-                    input->filter.c_period   = 0;
-                    input->filter.c_state    = 0;
-                    input->filter.is_capture = false;
-                    
-                    return;
-                }
-                
-                uint16_t tdur = (act_level == true)?(input->filter.c_lev_0 + input->filter.c_lev_1):
-                                                     input->filter.c_lev_0;
-                
-                // определяем количество тиков до перезагрузки таймера сканирования, т.е. чему равно одно прерывание
-                // процессор настроен на 48 МГц, т.е. таймер сканирования считает 1 тик = 1 мкс
-                uint16_t tick_count = 10000/io_in->set.Ndiscret; // количество мкс до перезагрузки таймера, н-р: дискретность равна 10, тогда 1000 = 1мс
-                
-                // расчет частоты входного сигнала исходя из счетчиков нулей и единиц (длительность сигнала tdur)
-                uint16_t frequency = tick_count/tdur; // н-р: единиц и нулей по 5, тогда 1000/10 = 100Гц
-                uint16_t fault     = (tick_count/io_in->set.Ndiscret)*input->fault/100; // погрешность частоты, н-р: частота 100Гц, 
-                                                                                        // погрешность 10% - 100*10/100 = 10Гц
-                
-                input->frequency = frequency; // обновляем переменную предыдущего значения частоты сигнала
-                
-                if(input->spark_security == SPARK_SECURITY_MODE_NONE || input->spark_security == SPARK_SECURITY_MODE_1)
-                {
-                    // обрабатываются не искробезопасные входы, либо искробезопасные в режиме №1
-                    if(frequency >= (100 - fault) && frequency <= (100 + fault)) // частота в пределах 100Гц
-                        input->filter.c_state++;
-                    else
-                        input->filter.c_error++;
-                }
-                else if(input->spark_security == SPARK_SECURITY_MODE_2 || input->spark_security == SPARK_SECURITY_MODE_3)
-                {
-                    /*! обработка искробезопасных входов в режиме №2 и №3 (сигнал на входе 50Гц)
-                     *  Алгоритм работает следующим образом:
-                     *  Вход ON фиксирует входной сигнал только в том случае, если на входе DI_1 и DI_3 (ПУСК) присутсвтвует сигнал 50Гц в противофазе
-                     *  Состояние входа DI_3 (ПУСК) считается ошибкой, если сигнал находится в фазе с сигналом на входе DI_1 (прямое включение диода)
-                     *  Состосние входа DI_2 (СТОП) считается ошибкой, если сигнал 50Гц на входе DI_1 присутствует, а налинии DI_2 нет (обрыв линии)
-                     *  Состояние на любом из искробезопасных входов DI_1 - DI_4 является ошибкой, если частота сигнала меньше или больше 50Гц
-                     */
-                    
-                    // мгновенные значения состояний входов DI_1, DI_2 (СТОП) и DI_3 (ПУСК)
-                    bool io_phaseState = io_inPhase->pin.gpio->IDR & io_inPhase->pin.io;
-                    bool io_offState   = io_inOff->pin.gpio->IDR & io_inOff->pin.io;
-                    bool io_onState    = io_inOn->pin.gpio->IDR & io_inOn->pin.io;
-                    
-                    if((frequency >= (50 - fault) && frequency <= (50 + fault)) == false) // частота меньше или больше 50Гц с учетом погрешности
-                    {
-                        input->filter.c_error++;
-                    }
-                    else
-                    {
-                        if(input == io_inOn)
-                        {
-                            if(!input->state && io_onState && (!io_phaseState && !io_offState) && (io_inPhase->state && io_inOff->state))
-                                input->filter.c_state++;
-                            else if(input->state && !io_onState)
-                                input->filter.c_state++;
-                            else if(io_onState && io_offState && io_phaseState && input->spark_security == SPARK_SECURITY_MODE_2)
-                            {
-                                // ошибка включения диода на линии ON (должен быть влкючен в обратном) - только для режим №2 (в режиме №3 норма)
-                                input->filter.c_error++;
-                            }
-                        }
-                        else
-                            input->filter.c_state++;
-                    }
-                }
-            }
-            else if(input->mode == IN_MODE_DC) // режим входа DC
-            {
-                uint16_t tfault_lev = ((act_level == true)?input->duration*io_in->set.P1dc:
-                                                           input->duration*io_in->set.P0dc)/100;
-                uint16_t tdur = (act_level == true)?input->filter.c_lev_1:input->filter.c_lev_0;
-                
-                if(tdur >= tfault_lev)
-                    input->filter.c_state++;
-            }
-            
-            input->filter.c_clock = 0;
-            input->filter.c_lev_0 = 0;
-            input->filter.c_lev_1 = 0;
-        }
-        
-        if(input->filter.c_period >= io_in->set.Nperiod) // конец фильтрации - принятие решения
-        {
-            if(input->filter.c_state >= (io_in->set.Nperiod - 1))
-            {
-                // обработка состояния ошибки для искробезопасного входа в режиме 2 и №3
-                if(input == io_inOff && !act_level && io_inPhase->state && (input->spark_security == SPARK_SECURITY_MODE_2 || 
-                                                                            input->spark_security == SPARK_SECURITY_MODE_3))
-                {
-                    input->error  = true;
-                    input->state  = false;
-                    InputStateChanged = true;
-                }
-                else
-                {
-                    input->error  = false;
-                    input->state  = act_level;
-                    InputStateChanged = true;
-                    
-                    if(_pwr_ok.state == true && index == PWROK_INPUT)
-                    {
-                        if(_pwr_ok.IN_change == false)
-                        {
-                            _pwr_ok.IN_state  = input->state;
-                            _pwr_ok.IN_time   = TIM14->CNT;
-                            _pwr_ok.IN_change = true;
+//                    return;
+//                }
+//                
+//                // если ожидаемый уровень лог "0" (снятие сигнала со входа) и длительность лог "1"
+//                // больше нуля, то значит это не снятие сигнала и нет смысла дальше анализировать
+//                if(act_level == false && input->filter.c_lev_1 > 0 && (input->spark_security != SPARK_SECURITY_MODE_2 || 
+//                                                                       input->spark_security != SPARK_SECURITY_MODE_3))
+//                {
+//                    input->filter.c_clock    = 0;
+//                    input->filter.c_error    = 0;
+//                    input->filter.c_lev_0    = 0;
+//                    input->filter.c_lev_1    = 0;
+//                    input->filter.c_period   = 0;
+//                    input->filter.c_state    = 0;
+//                    input->filter.is_capture = false;
+//                    
+//                    return;
+//                }
+//                
+//                uint16_t tdur = (act_level == true)?(input->filter.c_lev_0 + input->filter.c_lev_1):
+//                                                     input->filter.c_lev_0;
+//                
+//                // определяем количество тиков до перезагрузки таймера сканирования, т.е. чему равно одно прерывание
+//                // процессор настроен на 48 МГц, т.е. таймер сканирования считает 1 тик = 1 мкс
+//                uint16_t tick_count = 10000/io_in->set.Ndiscret; // количество мкс до перезагрузки таймера, н-р: дискретность равна 10, тогда 1000 = 1мс
+//                
+//                // расчет частоты входного сигнала исходя из счетчиков нулей и единиц (длительность сигнала tdur)
+//                uint16_t frequency = tick_count/tdur; // н-р: единиц и нулей по 5, тогда 1000/10 = 100Гц
+//                uint16_t fault     = (tick_count/io_in->set.Ndiscret)*input->fault/100; // погрешность частоты, н-р: частота 100Гц, 
+//                                                                                        // погрешность 10% - 100*10/100 = 10Гц
+//                
+//                input->frequency = frequency; // обновляем переменную предыдущего значения частоты сигнала
+//                
+//                if(input->spark_security == SPARK_SECURITY_MODE_NONE || input->spark_security == SPARK_SECURITY_MODE_1)
+//                {
+//                    // обрабатываются не искробезопасные входы, либо искробезопасные в режиме №1
+//                    if(frequency >= (100 - fault) && frequency <= (100 + fault)) // частота в пределах 100Гц
+//                        input->filter.c_state++;
+//                    else
+//                        input->filter.c_error++;
+//                }
+//                else if(input->spark_security == SPARK_SECURITY_MODE_2 || input->spark_security == SPARK_SECURITY_MODE_3)
+//                {
+//                    /*! обработка искробезопасных входов в режиме №2 и №3 (сигнал на входе 50Гц)
+//                     *  Алгоритм работает следующим образом:
+//                     *  Вход ON фиксирует входной сигнал только в том случае, если на входе DI_1 и DI_3 (ПУСК) присутсвтвует сигнал 50Гц в противофазе
+//                     *  Состояние входа DI_3 (ПУСК) считается ошибкой, если сигнал находится в фазе с сигналом на входе DI_1 (прямое включение диода)
+//                     *  Состосние входа DI_2 (СТОП) считается ошибкой, если сигнал 50Гц на входе DI_1 присутствует, а налинии DI_2 нет (обрыв линии)
+//                     *  Состояние на любом из искробезопасных входов DI_1 - DI_4 является ошибкой, если частота сигнала меньше или больше 50Гц
+//                     */
+//                    
+//                    // мгновенные значения состояний входов DI_1, DI_2 (СТОП) и DI_3 (ПУСК)
+//                    bool io_phaseState = io_inPhase->pin.gpio->IDR & io_inPhase->pin.io;
+//                    bool io_offState   = io_inOff->pin.gpio->IDR & io_inOff->pin.io;
+//                    bool io_onState    = io_inOn->pin.gpio->IDR & io_inOn->pin.io;
+//                    
+//                    if((frequency >= (50 - fault) && frequency <= (50 + fault)) == false) // частота меньше или больше 50Гц с учетом погрешности
+//                    {
+//                        input->filter.c_error++;
+//                    }
+//                    else
+//                    {
+//                        if(input == io_inOn)
+//                        {
+//                            if(!input->state && io_onState && (!io_phaseState && !io_offState) && (io_inPhase->state && io_inOff->state))
+//                                input->filter.c_state++;
+//                            else if(input->state && !io_onState)
+//                                input->filter.c_state++;
+//                            else if(io_onState && io_offState && io_phaseState && input->spark_security == SPARK_SECURITY_MODE_2)
+//                            {
+//                                // ошибка включения диода на линии ON (должен быть влкючен в обратном) - только для режим №2 (в режиме №3 норма)
+//                                input->filter.c_error++;
+//                            }
+//                        }
+//                        else
+//                            input->filter.c_state++;
+//                    }
+//                }
+//            }
+//            else if(input->mode == IN_MODE_DC) // режим входа DC
+//            {
+//                uint16_t tfault_lev = ((act_level == true)?input->duration*io_in->set.P1dc:
+//                                                           input->duration*io_in->set.P0dc)/100;
+//                uint16_t tdur = (act_level == true)?input->filter.c_lev_1:input->filter.c_lev_0;
+//                
+//                if(tdur >= tfault_lev)
+//                    input->filter.c_state++;
+//            }
+//            
+//            input->filter.c_clock = 0;
+//            input->filter.c_lev_0 = 0;
+//            input->filter.c_lev_1 = 0;
+//        }
+//        
+//        if(input->filter.c_period >= io_in->set.Nperiod) // конец фильтрации - принятие решения
+//        {
+//            if(input->filter.c_state >= (io_in->set.Nperiod - 1))
+//            {
+//                // обработка состояния ошибки для искробезопасного входа в режиме 2 и №3
+//                if(input == io_inOff && !act_level && io_inPhase->state && (input->spark_security == SPARK_SECURITY_MODE_2 || 
+//                                                                            input->spark_security == SPARK_SECURITY_MODE_3))
+//                {
+//                    input->error  = true;
+//                    input->state  = false;
+//                    InputStateChanged = true;
+//                }
+//                else
+//                {
+//                    input->error  = false;
+//                    input->state  = act_level;
+//                    InputStateChanged = true;
+//                    
+//                    if(_pwr_ok.state == true && index == PWROK_INPUT)
+//                    {
+//                        if(_pwr_ok.IN_change == false)
+//                        {
+//                            _pwr_ok.IN_state  = input->state;
+//                            _pwr_ok.IN_time   = TIM14->CNT;
+//                            _pwr_ok.IN_change = true;
 
-                            // Сохраняем состояние и время во флеш в формате:
-                            // 0xXXCSTTTT, где X - indefinite state, C - change, S - state, T - time (2 bytes)
-                            if(FLASH_Unlock()) // перезаписываем данные на странице настроек
-                            {
-                                if(FLASH_Erase(FLASH_BASE_ADDRESS))
-                                {
-                                    uint32_t pwrok = _pwr_ok.IN_time;
+//                            // Сохраняем состояние и время во флеш в формате:
+//                            // 0xXXCSTTTT, где X - indefinite state, C - change, S - state, T - time (2 bytes)
+//                            if(FLASH_Unlock()) // перезаписываем данные на странице настроек
+//                            {
+//                                if(FLASH_Erase(FLASH_BASE_ADDRESS))
+//                                {
+//                                    uint32_t pwrok = _pwr_ok.IN_time;
 
-                                    if(_pwr_ok.IN_change)
-                                        pwrok |= 1 << 20;
+//                                    if(_pwr_ok.IN_change)
+//                                        pwrok |= 1 << 20;
 
-                                    if(_pwr_ok.IN_state)
-                                        pwrok |= 1 << 16;
+//                                    if(_pwr_ok.IN_state)
+//                                        pwrok |= 1 << 16;
 
-                                    FLASH_Write(FLASH_BASE_ADDRESS, pwrok);
-                                }
-                            }
-                            
-                            FLASH_Lock();
-                        }
-                    }
-                }
-            }
-            else if(input->filter.c_error >= io_in->set.Nperiod)
-            {
-                input->error  = true;
-                InputStateChanged = true;
-            }
-            
-            input->filter.c_clock    = 0;
-            input->filter.c_error    = 0;
-            input->filter.c_lev_0    = 0;
-            input->filter.c_lev_1    = 0;
-            input->filter.c_period   = 0;
-            input->filter.c_state    = 0;
-            input->filter.is_capture = false;
-        }
-    }
+//                                    FLASH_Write(FLASH_BASE_ADDRESS, pwrok);
+//                                }
+//                            }
+//                            
+//                            FLASH_Lock();
+//                        }
+//                    }
+//                }
+//            }
+//            else if(input->filter.c_error >= io_in->set.Nperiod)
+//            {
+//                input->error  = true;
+//                InputStateChanged = true;
+//            }
+//            
+//            input->filter.c_clock    = 0;
+//            input->filter.c_error    = 0;
+//            input->filter.c_lev_0    = 0;
+//            input->filter.c_lev_1    = 0;
+//            input->filter.c_period   = 0;
+//            input->filter.c_state    = 0;
+//            input->filter.is_capture = false;
+//        }
+//    }
 }
 //-------------------------------
 void DEV_KeyboardScan(void* data)
@@ -1592,24 +1595,24 @@ void DEV_KeyboardScan(void* data)
 //----------------------------
 void DEV_InputSetDefault(void)
 {
-    io_in->set.Ndiscret = 20;
-    io_in->set.Nperiod  = 3;
-    io_in->set.SGac     = 5;
-    io_in->set.P0dc     = 50;
-    io_in->set.P1dc     = 50;
+//    io_in->set.Ndiscret = 20;
+//    io_in->set.Nperiod  = 3;
+//    io_in->set.SGac     = 5;
+//    io_in->set.P0dc     = 50;
+//    io_in->set.P1dc     = 50;
     
     for(uint8_t i = 0; i < io_in->size; ++i)
     {
         io_in->list[i].mode              = IN_MODE_AC;
-        io_in->list[i].fault             = 10;
-        io_in->list[i].state             = false;
-        io_in->list[i].error             = false;
+//        io_in->list[i].fault             = 10;
+//        io_in->list[i].state             = false;
+//        io_in->list[i].error             = false;
         io_in->list[i].duration          = 60;
-        io_in->list[i].filter.c_clock    = 0;
-        io_in->list[i].filter.c_period   = 0;
-        io_in->list[i].filter.c_state    = 0;
-        io_in->list[i].filter.c_error    = 0;
-        io_in->list[i].filter.is_capture = false;
+//        io_in->list[i].filter.c_clock    = 0;
+//        io_in->list[i].filter.c_period   = 0;
+//        io_in->list[i].filter.c_state    = 0;
+//        io_in->list[i].filter.c_error    = 0;
+//        io_in->list[i].filter.is_capture = false;
        /* 
         if(io_in->list[i].spark_security == SPARK_SECURITY_MODE_2 || io_in->list[i].spark_security == SPARK_SECURITY_MODE_3)
             io_in->list[i].duration = 20;
@@ -2003,4 +2006,12 @@ void kill_task(uint8_t id)
         out_queue_blink.queue[id] = 0xFF;
         out_queue_blink.count--;
     }
+}
+//---------------------------------
+bool DEV_InputFilterIsChanged(void)
+{
+    bool is_changed = _is_filter_set_changed;
+    _is_filter_set_changed = false;
+    
+    return is_changed;
 }

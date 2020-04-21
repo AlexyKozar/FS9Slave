@@ -2,6 +2,7 @@
     #define _IO_H_
     //--------------------
     #include "stm32f0xx.h"
+    #include "../filter/dig_inputs_filter.h"
     //-----------------------------
     #define DINPUT_MAX_SIZE      20 // max size buffer samples
     #define DINPUT_SAMPLE_PERIOD 20 // samples count on one period

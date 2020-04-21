@@ -83,10 +83,7 @@ void USART1_IRQHandler(void)
     
     if((USART1->ISR & USART_ISR_ORE) == USART_ISR_ORE)
     {
-        SEGGER_RTT_printf(0, "overrun: byte = %d, is_cmd = %d\n", USART1->RDR, _is_cmd);
-        _is_cmd = false;
-        ERROR_overrun_inc(); // overrun error counter increment
-        
+        ERROR_overrun_inc(); // overrun error counter increment   
         USART1->ICR |= USART_ICR_ORECF; // clear flag
     }
 }

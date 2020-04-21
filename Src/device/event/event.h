@@ -5,8 +5,8 @@
     #include <stdbool.h>
     #include "stm32f0xx_hal.h"
     #include "stm32f0xx_hal_gpio.h"
-    //-----------------------
-    #define EVENT_MAX_SIZE 16
+    //----------------------
+    #define EVENT_MAX_SIZE 5
     //---------------------------------
     typedef void (*Event)(void* param);
     //---------------------
@@ -23,6 +23,6 @@
     uint8_t  EVENT_Create(uint16_t time, bool autorepeat, Event function, void* param, uint8_t id);
     void     EVENT_Execute(void);
     void     EVENT_Kill(uint8_t id);
-		bool     EVENT_SearchByID(uint8_t id);
+    bool     EVENT_SearchByID(uint8_t id);
     uint16_t EVENT_Tick(uint8_t id);
 #endif

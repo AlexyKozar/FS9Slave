@@ -4,7 +4,6 @@ uint32_t _io_samples[DINPUT_MAX_SIZE /*<< 1*/] = { 0 }; // samples buffer (doubl
 volatile uint8_t  _io_count = 0; // io count
 volatile uint8_t  _io_sample_count = 0; // current sample
 volatile bool     _io_data_is_ready = false; // flag data is ready
-volatile uint8_t  _io_cur_buffer = 0; // offset current begin buffer (first or seconst buffer)
 volatile uint8_t  _io_dev_addr = 0xFF; // device address
 volatile uint16_t _io_sequence_count = DINPUT_SAMPLE_PERIOD; // sequence samples count
 //----------------------------
@@ -19,8 +18,6 @@ void IO_TIM_Init(uint8_t addr)
         _io_count = 12;
     else if(_io_dev_addr == 0x01) // device address is MDVV-02
         _io_count = 10;
-    
-    //_io_cur_buffer = 0; // first buffer
     
     RCC->APB2ENR |= RCC_APB2ENR_TIM16EN;
     
@@ -53,14 +50,6 @@ uint32_t* IO_SampleCopy(void/*uint32_t *samples*/)
         return 0;
     }
     
-    //uint8_t offset = (_io_cur_buffer == 0)?DINPUT_MAX_SIZE:0;
-    
-   // memcpy(samples, _io_samples /*+ offset*/, _io_count);
-	//	memset(_io_samples /*+ offset*/, 0, 20);
-    //_io_data_is_ready = false;
-		//samples = _io_samples;
-    
-   // return _io_count;
     return _io_samples;
 }
 //--------------------------------------
@@ -107,11 +96,6 @@ void TIM16_IRQHandler(void)
         
         if(_io_sample_count >= DINPUT_SAMPLE_PERIOD)
         {
-            /*if(_io_cur_buffer == 0) // if first buffer
-                _io_cur_buffer = DINPUT_MAX_SIZE;
-            else if(_io_cur_buffer == DINPUT_MAX_SIZE)
-                _io_cur_buffer = 0;
-            */
             _io_sample_count = 0;
             _io_data_is_ready = true;
             

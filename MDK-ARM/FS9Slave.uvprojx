@@ -312,7 +312,7 @@
           </ArmAdsMisc>
           <Cads>
             <interw>1</interw>
-            <Optim>1</Optim>
+            <Optim>4</Optim>
             <oTime>1</oTime>
             <SplitLS>0</SplitLS>
             <OneElfS>1</OneElfS>
@@ -541,21 +541,6 @@
               <FileName>error.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\Src\device\error\error.c</FilePath>
-            </File>
-            <File>
-              <FileName>SEGGER_RTT.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Src\RTT\SEGGER_RTT.c</FilePath>
-            </File>
-            <File>
-              <FileName>SEGGER_RTT_printf.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Src\RTT\SEGGER_RTT_printf.c</FilePath>
-            </File>
-            <File>
-              <FileName>SEGGER_RTT_Syscalls_GCC.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Src\RTT\SEGGER_RTT_Syscalls_GCC.c</FilePath>
             </File>
             <File>
               <FileName>io.h</FileName>
